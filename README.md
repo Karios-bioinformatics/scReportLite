@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20697746.svg)](https://doi.org/10.5281/zenodo.20697746)
 # scReportLite
 
 Generate interactive HTML reports from single-cell RNA-seq clustering results.
@@ -214,7 +215,12 @@ Planned features:
 
 ## Citation
 
-If you use scReportLite in research projects, please cite the GitHub repository and future Zenodo DOI release.
+If you use scReportLite in research projects, please cite:
+
+> Park, K. K. (2026).
+> scReportLite v0.1.1-alpha.
+> Zenodo.
+> https://doi.org/10.5281/zenodo.20697746
 
 ---
 
