@@ -417,6 +417,8 @@ var DEFAULT_OPACITY = 0.9;
 var DIM_COLOR = "#D0D0D0";
 var ORIG_COLORS = [];
 var _HAS_SAMPLES = false;
+var _CELL_SAMPLE = {};   // cellId → sample (built from customdata)
+var _TRACE_CELLS = [];   // per-trace cell ID arrays (built from customdata)
 
 // Cache the plotly graph div on first use
 var _gdCache = null;
@@ -486,12 +488,11 @@ function applyHighlight() {
 
     for (var j = 0; j < n; j++) {
       var cellId = cells[j];
-      var info = window._CELL_MAP ? window._CELL_MAP[cellId] : null;
 
-      // Sample filter
+      // Sample filter: lookup from customdata-built index
       var sampleActive = true;
-      if (SELECTED_SAMPLE !== null && info) {
-        sampleActive = (String(info.s) === String(SELECTED_SAMPLE));
+      if (SELECTED_SAMPLE !== null) {
+        sampleActive = (String(_CELL_SAMPLE[cellId]) === String(SELECTED_SAMPLE));
       }
 
       if (clusterActive && sampleActive) {
@@ -666,16 +667,20 @@ function clearMarkerTable() {
     "<p class=\\"no-data\\">Select a cluster from the sidebar to see its marker genes.</p>";
 }
 
-// =========================================================================
-// Cell Info Panel
+// Cell Info Panel (driven by plotly customdata)
 // =========================================================================
 
-function showCellInfo(cellId) {
+function showCellInfoFromCD(cd) {
+  // cd = [cell_id, cluster, sample, UMAP_1, UMAP_2]
+  var cellId  = String(cd[0]);
+  var cluster = String(cd[1]);
+  var sample  = cd[2];
+  var umap1   = Number(cd[3]);
+  var umap2   = Number(cd[4]);
+
   SELECTED_CELL = cellId;
-  var info = window._CELL_MAP ? window._CELL_MAP[cellId] : null;
-  if (!info) return;
 
-  var panel = document.getElementById("cell-info-panel");
+  var panel   = document.getElementById("cell-info-panel");
   var content = document.getElementById("cell-info-content");
   var titleEl = document.getElementById("cell-info-cellid");
 
@@ -685,15 +690,17 @@ function showCellInfo(cellId) {
   html += "<tr><td class=\\"ci-label\\">Cell ID</td>" +
     "<td class=\\"ci-value\\">" + escHtml(cellId) + "</td></tr>";
   html += "<tr><td class=\\"ci-label\\">Cluster</td>" +
-    "<td class=\\"ci-value\\">" + escHtml(String(info.c)) + "</td></tr>";
-  if (_HAS_SAMPLES && info.s != null && info.s !== "null" && info.s !== "") {
+    "<td class=\\"ci-value\\">" + escHtml(cluster) + "</td></tr>";
+
+  if (_HAS_SAMPLES && sample != null && String(sample) !== "") {
     html += "<tr><td class=\\"ci-label\\">Sample</td>" +
-      "<td class=\\"ci-value\\">" + escHtml(String(info.s)) + "</td></tr>";
+      "<td class=\\"ci-value\\">" + escHtml(String(sample)) + "</td></tr>";
   }
+
   html += "<tr><td class=\\"ci-label\\">UMAP_1</td>" +
-    "<td class=\\"ci-value\\">" + Number(info.u1).toFixed(4) + "</td></tr>";
+    "<td class=\\"ci-value\\">" + umap1.toFixed(4) + "</td></tr>";
   html += "<tr><td class=\\"ci-label\\">UMAP_2</td>" +
-    "<td class=\\"ci-value\\">" + Number(info.u2).toFixed(4) + "</td></tr>";
+    "<td class=\\"ci-value\\">" + umap2.toFixed(4) + "</td></tr>";
   html += "</table>";
 
   content.innerHTML = html;
@@ -775,16 +782,23 @@ onPlotlyReady(function(gd) {
     return t.marker ? t.marker.color : null;
   });
 
-  // ---- Click on a cell → show info panel ----
+  // ---- Build _TRACE_CELLS and _CELL_SAMPLE from customdata ----
+  // customdata[i][j] = [cell_id, cluster, sample, UMAP_1, UMAP_2]
+  _TRACE_CELLS = gd.data.map(function(trace) {
+    var cd = trace.customdata || [];
+    return cd.map(function(row) {
+      var cid = String(row[0]);
+      _CELL_SAMPLE[cid] = String(row[2] || "");
+      return cid;
+    });
+  });
+
+  // ---- Click on a cell → show info panel from customdata ----
   gd.on("plotly_click", function(data) {
     if (!data || !data.points || data.points.length === 0) return;
-    var pt = data.points[0];
-    var tn = pt.curveNumber;
-    var pi = pt.pointIndex;
-    var traceCells = window._TRACE_CELLS || [];
-    var cells = traceCells[tn];
-    if (cells && pi < cells.length) {
-      showCellInfo(cells[pi]);
+    var cd = data.points[0].customdata;
+    if (cd && cd.length >= 5) {
+      showCellInfoFromCD(cd);
     }
   });
 
@@ -822,29 +836,6 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   cluster_cols <- cluster_color_map(clusters)
   n_total      <- nrow(umap_df)
   has_samples  <- !is.null(sample_col)
-
-  # ---- Per-cluster cell ID arrays (match plotly trace order) ----
-  trace_cells <- lapply(clusters, function(cl) {
-    as.character(umap_df[[cell_col]][umap_df[[cluster_col]] == cl])
-  })
-  trace_cells_json <- jsonlite::toJSON(trace_cells, auto_unbox = FALSE)
-
-  # ---- Cell metadata map (cell_id → {c, s?, u1, u2}) ----
-  cell_map <- stats::setNames(
-    lapply(seq_len(nrow(umap_df)), function(i) {
-      entry <- list(
-        c  = as.character(umap_df[[cluster_col]][i]),
-        u1 = round(umap_df[["UMAP_1"]][i], 6),
-        u2 = round(umap_df[["UMAP_2"]][i], 6)
-      )
-      if (has_samples) {
-        entry$s <- as.character(umap_df[[sample_col]][i])
-      }
-      entry
-    }),
-    as.character(umap_df[[cell_col]])
-  )
-  cell_map_json <- jsonlite::toJSON(cell_map, auto_unbox = TRUE)
 
   # ---- Sidebar: Cluster section ----
   cluster_html <- lapply(clusters, function(cl) {
@@ -1010,13 +1001,11 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
       # ---- Embedded data & JS ----
       tags$script(htmltools::HTML(sprintf(
-        "window._MARKER_DATA = %s;\nwindow._CLUSTERS = %s;\nwindow._MARKER_NTOP = %d;\nwindow._DIM_OPACITY = %s;\nwindow._TRACE_CELLS = %s;\nwindow._CELL_MAP = %s;\nwindow._HAS_SAMPLES = %s;",
+        "window._MARKER_DATA = %s;\nwindow._CLUSTERS = %s;\nwindow._MARKER_NTOP = %d;\nwindow._DIM_OPACITY = %s;\nwindow._HAS_SAMPLES = %s;",
         marker_json,
         clusters_json,
         marker_n_top,
         dim_opacity,
-        trace_cells_json,
-        cell_map_json,
         if (has_samples) "true" else "false"
       ))),
       tags$script(htmltools::HTML(report_js()))
@@ -1126,7 +1115,8 @@ sc_report <- function(umap_df,
   # ---- Build plot ----
   message("scReportLite: building interactive UMAP plot...")
   umap_plot <- build_umap_plotly(
-    umap_df, cluster_col, cell_col, point_size, point_alpha, use_webgl
+    umap_df, cluster_col, cell_col, sample_col,
+    point_size, point_alpha, use_webgl
   )
 
   # ---- Assemble and write HTML ----
