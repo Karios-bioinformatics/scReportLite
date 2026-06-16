@@ -1,10 +1,11 @@
 # scReportLite: Main entry point + HTML assembly + embedded CSS/JS ----------------
+# v0.1.3 — Cell Info Panel, Multi-Cluster Highlight, Sample Highlight
 
 
 # ---- CSS template --------------------------------------------------------------
 
 report_css <- function() {
-'/* === scReportLite Styles === */
+'/* === scReportLite v0.1.3 Styles === */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -61,31 +62,48 @@ body {
   flex-direction: column;
   overflow: hidden;
 }
+
+/* Sidebar sections (clusters + samples) */
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sidebar-section.clusters {
+  flex: 1;
+}
+.sidebar-section.samples {
+  flex: 0 1 auto;
+  max-height: 40%;
+  border-top: 1px solid #dfe6e9;
+}
+
 .sidebar-header {
-  padding: 16px;
-  border-bottom: 1px solid #dfe6e9;
+  padding: 12px 16px;
   font-weight: 600;
-  font-size: 0.95em;
+  font-size: 0.85em;
   color: #636e72;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-}
-.cluster-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 0;
+  flex-shrink: 0;
 }
 
+.cluster-list, .sample-list {
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+/* --- Cluster items (multi-select checkbox style) --- */
 .cluster-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
+  padding: 7px 16px;
   cursor: pointer;
   border-left: 3px solid transparent;
   transition: background 0.15s, border-color 0.15s;
-  font-size: 0.9em;
+  font-size: 0.88em;
   user-select: none;
+  gap: 8px;
 }
 .cluster-item:hover {
   background: #f0f1f5;
@@ -96,20 +114,90 @@ body {
   font-weight: 600;
 }
 
+/* Checkbox indicator */
+.cluster-check {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #b2bec3;
+  border-radius: 3px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.cluster-item.active .cluster-check {
+  background: #1F77B4;
+  border-color: #1F77B4;
+  color: #fff;
+}
+
 .cluster-color-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
-  margin-right: 10px;
 }
 .cluster-name {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .cluster-count {
   font-size: 0.8em;
   color: #b2bec3;
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* --- Sample items (single-select radio style) --- */
+.sample-item {
+  display: flex;
+  align-items: center;
+  padding: 7px 16px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+  font-size: 0.88em;
+  user-select: none;
+  gap: 8px;
+}
+.sample-item:hover {
+  background: #f0f1f5;
+}
+.sample-item.active {
+  background: #fef3e2;
+  border-left-color: #F58231;
+  font-weight: 600;
+}
+
+.sample-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #dfe6e9;
+}
+.sample-item.active .sample-dot {
+  background: #F58231;
+}
+
+.sample-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sample-count {
+  font-size: 0.8em;
+  color: #b2bec3;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* --- Content area --- */
@@ -118,7 +206,7 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 /* --- UMAP plot --- */
@@ -151,6 +239,84 @@ body {
 .umap-container .js-plotly-plot {
   width: 100% !important;
   height: 100% !important;
+}
+
+/* --- Cell Info Panel --- */
+.cell-info-panel {
+  display: none;
+  padding: 12px 16px;
+  background: #fff;
+  margin: 6px 12px 6px 0;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border-left: 4px solid #0984e3;
+  flex-shrink: 0;
+}
+.cell-info-panel.visible {
+  display: block;
+}
+.cell-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cell-info-title {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #2d3436;
+}
+.cell-info-cellid {
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-size: 0.85em;
+  color: #0984e3;
+}
+
+.copy-btn {
+  padding: 4px 12px;
+  background: #dfe6e9;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8em;
+  color: #636e72;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.copy-btn:hover {
+  background: #0984e3;
+  color: #fff;
+}
+.copy-btn.copied {
+  background: #00b894;
+  color: #fff;
+}
+
+.cell-info-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+.cell-info-table td {
+  padding: 3px 8px;
+  vertical-align: top;
+}
+.ci-label {
+  color: #636e72;
+  font-weight: 500;
+  width: 90px;
+  white-space: nowrap;
+}
+.ci-value {
+  color: #2d3436;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+}
+.cell-info-hint {
+  font-size: 0.8em;
+  color: #b2bec3;
+  font-style: italic;
+  padding: 12px 0;
+  text-align: center;
 }
 
 /* --- Marker panel --- */
@@ -242,22 +408,21 @@ body {
 
 report_js <- function() {
 '
-// === scReportLite Interaction Logic ===
+// === scReportLite v0.1.3 Interaction Logic ===
 
-var SELECTED_CLUSTER = null;
+var SELECTED_CLUSTERS = new Set();
+var SELECTED_SAMPLE = null;
+var SELECTED_CELL = null;
 var DEFAULT_OPACITY = 0.9;
-var DIM_OPACITY = 0.25;
 var DIM_COLOR = "#D0D0D0";
 var ORIG_COLORS = [];
+var _HAS_SAMPLES = false;
 
 // Cache the plotly graph div on first use
 var _gdCache = null;
 function getPlotDiv() {
   if (_gdCache) return _gdCache;
   var container = document.getElementById("umap-container");
-  // The plotly htmlwidget root has both "plotly" and "html-widget" classes.
-  // This is the element Plotly.newPlot was called on, so Plotly.restyle
-  // needs this exact element.
   _gdCache = container.querySelector(".plotly.html-widget");
   return _gdCache;
 }
@@ -272,72 +437,169 @@ function onPlotlyReady(cb) {
   }
 }
 
-function selectCluster(clusterId) {
-  clusterId = String(clusterId);
+// =========================================================================
+// Highlight Engine
+// =========================================================================
+// Applies current cluster + sample filters to the UMAP plot.
+// Uses per-point marker.color and marker.opacity arrays so that
+// cluster-level and sample-level filters compose correctly.
+// =========================================================================
 
-  // Toggle off if same cluster clicked
-  if (SELECTED_CLUSTER === clusterId) {
-    resetSelection();
-    return;
-  }
-
-  SELECTED_CLUSTER = clusterId;
-
-  // Update sidebar active state
-  var items = document.querySelectorAll(".cluster-item");
-  items.forEach(function(item) {
-    item.classList.toggle("active",
-      item.getAttribute("data-cluster") === clusterId);
-  });
-
-  // Update plotly trace colors + opacities
+function applyHighlight() {
   var gd = getPlotDiv();
   if (!gd || !gd.data) return;
 
   var nTraces = gd.data.length;
+  var noFilter = (SELECTED_CLUSTERS.size === 0 && SELECTED_SAMPLE === null);
+
+  if (noFilter) {
+    // Reset all traces to original colours + full opacity
+    var ops = gd.data.map(function() { return DEFAULT_OPACITY; });
+    Plotly.restyle(gd, "marker.color", ORIG_COLORS);
+    Plotly.restyle(gd, "marker.opacity", ops);
+    return;
+  }
+
   var colors = [];
   var opacities = [];
+  var traceCells = window._TRACE_CELLS || [];
 
   for (var i = 0; i < nTraces; i++) {
     var traceName = gd.data[i].name || "";
-    var cl = traceName.replace("cluster_", "");
-    if (cl === clusterId) {
+    var clusterId = traceName.replace("cluster_", "");
+    var cells = traceCells[i] || [];
+    var n = cells.length;
+
+    if (n === 0) {
       colors.push(ORIG_COLORS[i]);
       opacities.push(DEFAULT_OPACITY);
-    } else {
-      colors.push(DIM_COLOR);
-      opacities.push(DIM_OPACITY);
+      continue;
     }
+
+    var traceColors = new Array(n);
+    var traceOpacities = new Array(n);
+
+    // Cluster filter: if any clusters are selected, this trace is
+    // "cluster-active" only when its cluster is in the set.
+    var clusterActive = (SELECTED_CLUSTERS.size === 0) ||
+                         SELECTED_CLUSTERS.has(String(clusterId));
+
+    for (var j = 0; j < n; j++) {
+      var cellId = cells[j];
+      var info = window._CELL_MAP ? window._CELL_MAP[cellId] : null;
+
+      // Sample filter
+      var sampleActive = true;
+      if (SELECTED_SAMPLE !== null && info) {
+        sampleActive = (String(info.s) === String(SELECTED_SAMPLE));
+      }
+
+      if (clusterActive && sampleActive) {
+        traceColors[j] = ORIG_COLORS[i];
+        traceOpacities[j] = DEFAULT_OPACITY;
+      } else {
+        traceColors[j] = DIM_COLOR;
+        traceOpacities[j] = window._DIM_OPACITY;
+      }
+    }
+
+    colors.push(traceColors);
+    opacities.push(traceOpacities);
   }
 
   Plotly.restyle(gd, "marker.color", colors);
   Plotly.restyle(gd, "marker.opacity", opacities);
-
-  // Update marker table
-  updateMarkerTable(clusterId);
 }
 
-function resetSelection() {
-  SELECTED_CLUSTER = null;
+// =========================================================================
+// Cluster Toggle (Multi-Select)
+// =========================================================================
 
-  // Clear sidebar active states
-  var items = document.querySelectorAll(".cluster-item");
-  items.forEach(function(item) { item.classList.remove("active"); });
+function toggleCluster(clusterId) {
+  clusterId = String(clusterId);
 
-  // Reset all trace colors + opacities
-  var gd = getPlotDiv();
-  if (gd && gd.data) {
-    var opacities = gd.data.map(function() { return DEFAULT_OPACITY; });
-    Plotly.restyle(gd, "marker.color", ORIG_COLORS);
-    Plotly.restyle(gd, "marker.opacity", opacities);
+  if (SELECTED_CLUSTERS.has(clusterId)) {
+    SELECTED_CLUSTERS.delete(clusterId);
+  } else {
+    SELECTED_CLUSTERS.add(clusterId);
   }
 
-  // Clear marker table
-  document.getElementById("marker-title").textContent =
-    "Click a cluster to view marker genes";
-  document.getElementById("marker-table-container").innerHTML =
-    "<p class=\\"no-data\\">Select a cluster from the sidebar to see its marker genes.</p>";
+  updateSidebarUI();
+  applyHighlight();
+
+  // Show markers for the most recently toggled cluster (if any selected)
+  if (SELECTED_CLUSTERS.size > 0) {
+    updateMarkerTable(clusterId);
+  } else {
+    clearMarkerTable();
+  }
 }
+
+// =========================================================================
+// Sample Highlight (Single-Select)
+// =========================================================================
+
+function selectSample(sampleId) {
+  sampleId = String(sampleId);
+
+  if (SELECTED_SAMPLE === sampleId) {
+    SELECTED_SAMPLE = null;
+  } else {
+    SELECTED_SAMPLE = sampleId;
+  }
+
+  updateSidebarUI();
+  applyHighlight();
+}
+
+// =========================================================================
+// Reset All Selections
+// =========================================================================
+
+function resetAll() {
+  SELECTED_CLUSTERS.clear();
+  SELECTED_SAMPLE = null;
+  updateSidebarUI();
+  applyHighlight();
+  clearMarkerTable();
+  hideCellInfo();
+}
+
+// =========================================================================
+// Sidebar UI Update
+// =========================================================================
+
+function updateSidebarUI() {
+  // Cluster items
+  var citems = document.querySelectorAll(".cluster-item");
+  citems.forEach(function(item) {
+    var cl = item.getAttribute("data-cluster");
+    if (SELECTED_CLUSTERS.has(cl)) {
+      item.classList.add("active");
+      var ck = item.querySelector(".cluster-check");
+      if (ck) ck.textContent = "✓";
+    } else {
+      item.classList.remove("active");
+      var ck = item.querySelector(".cluster-check");
+      if (ck) ck.textContent = "";
+    }
+  });
+
+  // Sample items
+  var sitems = document.querySelectorAll(".sample-item");
+  sitems.forEach(function(item) {
+    var s = item.getAttribute("data-sample");
+    if (s === SELECTED_SAMPLE) {
+      item.classList.add("active");
+    } else {
+      item.classList.remove("active");
+    }
+  });
+}
+
+// =========================================================================
+// Marker Table
+// =========================================================================
 
 function updateMarkerTable(clusterId) {
   var titleEl = document.getElementById("marker-title");
@@ -345,12 +607,10 @@ function updateMarkerTable(clusterId) {
 
   if (!window._MARKER_DATA || window._MARKER_DATA.length === 0) {
     titleEl.textContent = "Marker Genes";
-    container.innerHTML =
-      "<p class=\\"no-data\\">No marker gene data provided.</p>";
+    container.innerHTML = "<p class=\\"no-data\\">No marker gene data provided.</p>";
     return;
   }
 
-  // Filter to selected cluster
   var markers = window._MARKER_DATA.filter(function(row) {
     return String(row.cluster) === String(clusterId);
   });
@@ -363,20 +623,23 @@ function updateMarkerTable(clusterId) {
     return;
   }
 
-  // Sort: smallest p-value first, then largest abs(logFC)
+  // Sort: smallest p-value first, then largest |logFC|
   markers.sort(function(a, b) {
     if (a.p_val_adj !== b.p_val_adj) return a.p_val_adj - b.p_val_adj;
     return Math.abs(b.avg_log2FC) - Math.abs(a.avg_log2FC);
   });
 
-  // Take top N
   var topN = window._MARKER_NTOP || 20;
   markers = markers.slice(0, topN);
 
-  titleEl.textContent = "Cluster " + clusterId +
-    " — Top " + markers.length + " Marker Genes";
+  var selInfo = "";
+  if (SELECTED_CLUSTERS.size > 1) {
+    selInfo = "  (" + SELECTED_CLUSTERS.size + " clusters selected)";
+  }
 
-  // Build table HTML
+  titleEl.textContent = "Cluster " + clusterId +
+    " — Top " + markers.length + " Marker Genes" + selInfo;
+
   var html = "<table class=\\"marker-table\\"><thead><tr>" +
     "<th>#</th><th>Gene</th><th>avg_log2FC</th><th>p_val_adj</th>" +
     "</tr></thead><tbody>";
@@ -396,7 +659,94 @@ function updateMarkerTable(clusterId) {
   container.innerHTML = html;
 }
 
-// p-value formatting (matches R-side logic)
+function clearMarkerTable() {
+  document.getElementById("marker-title").textContent =
+    "Click a cluster to view marker genes";
+  document.getElementById("marker-table-container").innerHTML =
+    "<p class=\\"no-data\\">Select a cluster from the sidebar to see its marker genes.</p>";
+}
+
+// =========================================================================
+// Cell Info Panel
+// =========================================================================
+
+function showCellInfo(cellId) {
+  SELECTED_CELL = cellId;
+  var info = window._CELL_MAP ? window._CELL_MAP[cellId] : null;
+  if (!info) return;
+
+  var panel = document.getElementById("cell-info-panel");
+  var content = document.getElementById("cell-info-content");
+  var titleEl = document.getElementById("cell-info-cellid");
+
+  if (titleEl) titleEl.textContent = escHtml(cellId);
+
+  var html = "<table class=\\"cell-info-table\\">";
+  html += "<tr><td class=\\"ci-label\\">Cell ID</td>" +
+    "<td class=\\"ci-value\\">" + escHtml(cellId) + "</td></tr>";
+  html += "<tr><td class=\\"ci-label\\">Cluster</td>" +
+    "<td class=\\"ci-value\\">" + escHtml(String(info.c)) + "</td></tr>";
+  if (_HAS_SAMPLES && info.s != null && info.s !== "null" && info.s !== "") {
+    html += "<tr><td class=\\"ci-label\\">Sample</td>" +
+      "<td class=\\"ci-value\\">" + escHtml(String(info.s)) + "</td></tr>";
+  }
+  html += "<tr><td class=\\"ci-label\\">UMAP_1</td>" +
+    "<td class=\\"ci-value\\">" + Number(info.u1).toFixed(4) + "</td></tr>";
+  html += "<tr><td class=\\"ci-label\\">UMAP_2</td>" +
+    "<td class=\\"ci-value\\">" + Number(info.u2).toFixed(4) + "</td></tr>";
+  html += "</table>";
+
+  content.innerHTML = html;
+  panel.style.display = "block";
+}
+
+function hideCellInfo() {
+  SELECTED_CELL = null;
+  var panel = document.getElementById("cell-info-panel");
+  if (panel) {
+    panel.style.display = "none";
+    var content = document.getElementById("cell-info-content");
+    if (content) {
+      content.innerHTML =
+        "<p class=\\"cell-info-hint\\">Click a cell on the UMAP to view its details</p>";
+    }
+  }
+}
+
+function copyCellId() {
+  if (!SELECTED_CELL) return;
+  var btn = document.getElementById("copy-cell-btn");
+  var orig = btn.textContent;
+  navigator.clipboard.writeText(SELECTED_CELL).then(function() {
+    btn.textContent = "Copied!";
+    btn.classList.add("copied");
+    setTimeout(function() {
+      btn.textContent = orig;
+      btn.classList.remove("copied");
+    }, 1500);
+  }).catch(function() {
+    // Fallback
+    var ta = document.createElement("textarea");
+    ta.value = SELECTED_CELL;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    btn.textContent = "Copied!";
+    btn.classList.add("copied");
+    setTimeout(function() {
+      btn.textContent = orig;
+      btn.classList.remove("copied");
+    }, 1500);
+  });
+}
+
+// =========================================================================
+// Utility Functions
+// =========================================================================
+
 function formatPval(p) {
   if (p == null || isNaN(p)) return "NA";
   if (p < 0.0001) return p.toExponential(2);
@@ -405,7 +755,6 @@ function formatPval(p) {
   return p.toFixed(4);
 }
 
-// Basic HTML escaping
 function escHtml(s) {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -414,20 +763,34 @@ function escHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
-// After plotly renders, force a resize so the plot fills its container.
-// Without this, the widget may render at its default 400px height
-// even though CSS has set the parent to 600px.
+// =========================================================================
+// Initialization
+// =========================================================================
+
 onPlotlyReady(function(gd) {
   Plotly.Plots.resize(gd);
 
-  // Save original trace colors for later highlight/restore
+  // Save original trace colours
   ORIG_COLORS = gd.data.map(function(t) {
     return t.marker ? t.marker.color : null;
   });
 
-  // Double-click on plot resets selection
+  // ---- Click on a cell → show info panel ----
+  gd.on("plotly_click", function(data) {
+    if (!data || !data.points || data.points.length === 0) return;
+    var pt = data.points[0];
+    var tn = pt.curveNumber;
+    var pi = pt.pointIndex;
+    var traceCells = window._TRACE_CELLS || [];
+    var cells = traceCells[tn];
+    if (cells && pi < cells.length) {
+      showCellInfo(cells[pi]);
+    }
+  });
+
+  // ---- Double-click → reset all selections ----
   gd.on("plotly_doubleclick", function() {
-    resetSelection();
+    resetAll();
   });
 });
 '
@@ -443,23 +806,48 @@ onPlotlyReady(function(gd) {
 #' @param marker_df The input marker data frame (NULL or data.frame)
 #' @param cluster_col Name of the cluster column
 #' @param cell_col Name of the cell column
+#' @param sample_col Optional name of the sample column in umap_df (NULL to skip)
 #' @param output Path to output HTML file
 #' @param title Report title
-#' @param dim_opacity Opacity for non-selected clusters (0-1)
+#' @param dim_opacity Opacity for non-highlighted points (0-1)
 #' @param marker_n_top Number of top marker genes to show per cluster
 #' @return Invisibly, the path to the output file
 #'
 #' @keywords internal
 assemble_report <- function(umap_plot, umap_df, marker_df,
-                             cluster_col, cell_col,
+                             cluster_col, cell_col, sample_col,
                              output, title, dim_opacity, marker_n_top) {
 
   clusters     <- sort(unique(umap_df[[cluster_col]]))
   cluster_cols <- cluster_color_map(clusters)
   n_total      <- nrow(umap_df)
+  has_samples  <- !is.null(sample_col)
 
-  # ---- Sidebar items ----
-  sidebar_html <- lapply(clusters, function(cl) {
+  # ---- Per-cluster cell ID arrays (match plotly trace order) ----
+  trace_cells <- lapply(clusters, function(cl) {
+    as.character(umap_df[[cell_col]][umap_df[[cluster_col]] == cl])
+  })
+  trace_cells_json <- jsonlite::toJSON(trace_cells, auto_unbox = FALSE)
+
+  # ---- Cell metadata map (cell_id → {c, s?, u1, u2}) ----
+  cell_map <- stats::setNames(
+    lapply(seq_len(nrow(umap_df)), function(i) {
+      entry <- list(
+        c  = as.character(umap_df[[cluster_col]][i]),
+        u1 = round(umap_df[["UMAP_1"]][i], 6),
+        u2 = round(umap_df[["UMAP_2"]][i], 6)
+      )
+      if (has_samples) {
+        entry$s <- as.character(umap_df[[sample_col]][i])
+      }
+      entry
+    }),
+    as.character(umap_df[[cell_col]])
+  )
+  cell_map_json <- jsonlite::toJSON(cell_map, auto_unbox = TRUE)
+
+  # ---- Sidebar: Cluster section ----
+  cluster_html <- lapply(clusters, function(cl) {
     n_cells <- sum(umap_df[[cluster_col]] == cl)
     pct     <- round(n_cells / n_total * 100, 1)
     cl_char <- as.character(cl)
@@ -467,7 +855,8 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
     tags$div(
       class = "cluster-item",
       `data-cluster` = cl_char,
-      onclick = sprintf("selectCluster('%s')", cl_char),
+      onclick = sprintf("toggleCluster('%s')", cl_char),
+      tags$span(class = "cluster-check"),
       tags$span(
         class = "cluster-color-dot",
         style = sprintf("background-color: %s;", cluster_cols[cl_char])
@@ -480,9 +869,30 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
     )
   })
 
+  # ---- Sidebar: Sample section (optional) ----
+  sample_html <- NULL
+  if (has_samples) {
+    samples <- sort(unique(umap_df[[sample_col]]))
+    sample_html <- lapply(samples, function(s) {
+      s_char <- as.character(s)
+      n_cells <- sum(umap_df[[sample_col]] == s)
+      pct     <- round(n_cells / n_total * 100, 1)
+      tags$div(
+        class = "sample-item",
+        `data-sample` = s_char,
+        onclick = sprintf("selectSample('%s')", s_char),
+        tags$span(class = "sample-dot"),
+        tags$span(class = "sample-name", s_char),
+        tags$span(
+          class = "sample-count",
+          sprintf("%d (%.1f%%)", n_cells, pct)
+        )
+      )
+    })
+  }
+
   # ---- Marker data as JSON ----
   if (!is.null(marker_df) && nrow(marker_df) > 0) {
-    # Ensure cluster column is character for consistent JSON comparison
     marker_df$cluster <- as.character(marker_df$cluster)
     marker_json <- jsonlite::toJSON(marker_df, dataframe = "rows", auto_unbox = FALSE)
   } else {
@@ -491,9 +901,33 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
   clusters_json <- jsonlite::toJSON(as.character(clusters), auto_unbox = TRUE)
 
-  # Convert plotly widget to htmltools tags so save_html() can
-  # inline its dependencies (plotly.js) correctly.
+  # ---- UMAP plot as tags ----
   umap_tags <- htmltools::as.tags(umap_plot)
+
+  # ---- Sidebar sections assembly ----
+  sidebar_sections <- list(
+    tags$div(
+      class = "sidebar-section clusters",
+      tags$div(
+        class = "sidebar-header",
+        sprintf("Clusters (%d)", length(clusters))
+      ),
+      tags$div(class = "cluster-list", cluster_html)
+    )
+  )
+
+  if (has_samples) {
+    sidebar_sections <- c(sidebar_sections, list(
+      tags$div(
+        class = "sidebar-section samples",
+        tags$div(
+          class = "sidebar-header",
+          sprintf("Samples (%d)", length(samples))
+        ),
+        tags$div(class = "sample-list", sample_html)
+      )
+    ))
+  }
 
   # ---- Assemble full page ----
   page <- tags$html(
@@ -504,11 +938,11 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         content = "width=device-width, initial-scale=1.0"
       ),
       tags$title(title),
-      tags$style(HTML(report_css()))
+      tags$style(htmltools::HTML(report_css()))
     ),
     tags$body(
-      # Header
       tags$div(class = "container",
+        # Header
         tags$div(class = "report-header",
           tags$span(class = "report-title", title),
           tags$span(class = "report-meta",
@@ -522,12 +956,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         tags$div(class = "main-layout",
 
           # ---- Sidebar ----
-          tags$div(class = "sidebar",
-            tags$div(class = "sidebar-header",
-              sprintf("Clusters (%d)", length(clusters))
-            ),
-            tags$div(class = "cluster-list", sidebar_html)
-          ),
+          tags$div(class = "sidebar", sidebar_sections),
 
           # ---- Content area ----
           tags$div(class = "content-area",
@@ -535,10 +964,33 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
             # UMAP plot
             tags$div(class = "umap-section",
               tags$div(class = "section-title",
-                "UMAP — click a cluster in the sidebar to highlight"
+                "UMAP — click a cell to inspect, cluster to highlight"
               ),
               tags$div(class = "umap-container", id = "umap-container",
                 umap_tags
+              )
+            ),
+
+            # Cell Info Panel (hidden until a cell is clicked)
+            tags$div(class = "cell-info-panel", id = "cell-info-panel",
+              style = "display:none;",
+              tags$div(class = "cell-info-header",
+                tags$div(
+                  tags$span(class = "cell-info-title", "Cell Information"),
+                  tags$span(" — "),
+                  tags$span(class = "cell-info-cellid", id = "cell-info-cellid", "")
+                ),
+                tags$button(
+                  class = "copy-btn",
+                  id = "copy-cell-btn",
+                  onclick = "copyCellId()",
+                  "Copy Cell ID"
+                )
+              ),
+              tags$div(
+                id = "cell-info-content",
+                tags$p(class = "cell-info-hint",
+                  "Click a cell on the UMAP to view its details")
               )
             ),
 
@@ -557,11 +1009,17 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
       ),
 
       # ---- Embedded data & JS ----
-      tags$script(HTML(sprintf(
-        "window._MARKER_DATA = %s;\nwindow._CLUSTERS = %s;\nwindow._MARKER_NTOP = %d;\nwindow._DIM_OPACITY = %s;",
-        marker_json, clusters_json, marker_n_top, dim_opacity
+      tags$script(htmltools::HTML(sprintf(
+        "window._MARKER_DATA = %s;\nwindow._CLUSTERS = %s;\nwindow._MARKER_NTOP = %d;\nwindow._DIM_OPACITY = %s;\nwindow._TRACE_CELLS = %s;\nwindow._CELL_MAP = %s;\nwindow._HAS_SAMPLES = %s;",
+        marker_json,
+        clusters_json,
+        marker_n_top,
+        dim_opacity,
+        trace_cells_json,
+        cell_map_json,
+        if (has_samples) "true" else "false"
       ))),
-      tags$script(HTML(report_js()))
+      tags$script(htmltools::HTML(report_js()))
     )
   )
 
@@ -590,6 +1048,9 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 #'   assignments. Default: \code{"cluster"}.
 #' @param cell_col Name of the column in \code{umap_df} containing cell
 #'   barcodes or IDs. Default: \code{"cell"}.
+#' @param sample_col Optional name of the column in \code{umap_df} containing
+#'   sample / condition labels. When provided, a "Samples" section appears
+#'   in the sidebar for per-sample highlighting. Default: \code{NULL}.
 #' @param marker_df Optional data.frame of marker gene results.
 #'   Must contain columns: \code{cluster}, \code{gene},
 #'   \code{avg_log2FC}, \code{p_val_adj}. If \code{NULL}, the marker
@@ -601,9 +1062,9 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 #' @param point_size Marker point size in the UMAP plot. Default: \code{3}.
 #' @param point_alpha Initial marker opacity (0-1) in the UMAP plot.
 #'   Default: \code{0.9}.
-#' @param dim_opacity Opacity for non-selected clusters when a cluster
-#'   is highlighted (0-1). Lower values make unselected clusters more
-#'   transparent. Default: \code{0.06}.
+#' @param dim_opacity Opacity for non-highlighted points (0-1).
+#'   Used when clusters, samples, or both are selected to dim
+#'   cells that do not match the filter. Default: \code{0.06}.
 #' @param marker_n_top Number of top marker genes to show per cluster
 #'   (sorted by p_val_adj ascending, then |avg_log2FC| descending).
 #'   Default: \code{20}.
@@ -617,23 +1078,26 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 #' @examples
 #' \dontrun{
 #' # From Seurat
-#' umap_df <- FetchData(seurat_obj, vars = c("UMAP_1", "UMAP_2", "seurat_clusters"))
-#' colnames(umap_df)[3] <- "cluster"
+#' umap_df <- FetchData(seurat_obj, vars = c("UMAP_1", "UMAP_2",
+#'                                            "seurat_clusters", "orig.ident"))
+#' colnames(umap_df)[3:4] <- c("cluster", "sample")
 #' umap_df$cell <- colnames(seurat_obj)
 #'
 #' markers <- FindAllMarkers(seurat_obj, only.pos = TRUE)
 #' marker_df <- markers[, c("cluster", "gene", "avg_log2FC", "p_val_adj")]
 #'
-#' sc_report(umap_df, marker_df = marker_df, output = "my_report.html")
+#' sc_report(umap_df, marker_df = marker_df, sample_col = "sample",
+#'           output = "my_report.html")
 #'
 #' # From CSV files
 #' umap_df <- read.csv("umap_coords.csv")
 #' marker_df <- read.csv("markers.csv")
-#' sc_report(umap_df, marker_df = marker_df)
+#' sc_report(umap_df, marker_df = marker_df, sample_col = "condition")
 #' }
 sc_report <- function(umap_df,
                        cluster_col  = "cluster",
                        cell_col     = "cell",
+                       sample_col   = NULL,
                        marker_df    = NULL,
                        output       = "sc_report.html",
                        title        = "scRNA-seq Report",
@@ -644,7 +1108,7 @@ sc_report <- function(umap_df,
                        use_webgl    = TRUE) {
 
   # ---- Validate inputs ----
-  validate_inputs(umap_df, marker_df, cluster_col, cell_col)
+  validate_inputs(umap_df, marker_df, cluster_col, cell_col, sample_col)
 
   if (!is.character(output) || length(output) != 1) {
     stop("output must be a single file path string", call. = FALSE)
@@ -673,6 +1137,7 @@ sc_report <- function(umap_df,
     marker_df     = marker_df,
     cluster_col   = cluster_col,
     cell_col      = cell_col,
+    sample_col    = sample_col,
     output        = output,
     title         = title,
     dim_opacity   = dim_opacity,

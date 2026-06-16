@@ -9,10 +9,12 @@
 #' @param marker_df Optional marker gene data frame (can be NULL)
 #' @param cluster_col Name of the cluster column
 #' @param cell_col Name of the cell/barcode column
+#' @param sample_col Optional name of the sample column in umap_df (NULL to skip)
 #' @return Invisibly TRUE if valid; stops otherwise
 #'
 #' @keywords internal
-validate_inputs <- function(umap_df, marker_df, cluster_col, cell_col) {
+validate_inputs <- function(umap_df, marker_df, cluster_col, cell_col,
+                           sample_col = NULL) {
   if (!is.data.frame(umap_df)) {
     stop("umap_df must be a data.frame", call. = FALSE)
   }
@@ -34,6 +36,19 @@ validate_inputs <- function(umap_df, marker_df, cluster_col, cell_col) {
   if (length(unique(umap_df[[cluster_col]])) < 1) {
     stop("cluster column '", cluster_col, "' must have at least one cluster",
          call. = FALSE)
+  }
+
+  # Validate sample_col if provided
+  if (!is.null(sample_col)) {
+    if (!is.character(sample_col) || length(sample_col) != 1) {
+      stop("sample_col must be a single column name string or NULL", call. = FALSE)
+    }
+    if (!sample_col %in% colnames(umap_df)) {
+      stop("sample_col '", sample_col, "' not found in umap_df", call. = FALSE)
+    }
+    if (anyNA(umap_df[[sample_col]])) {
+      stop("sample column '", sample_col, "' contains NA values", call. = FALSE)
+    }
   }
 
   # Validate marker_df if provided

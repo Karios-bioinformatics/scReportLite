@@ -11,7 +11,11 @@ scReportLite converts UMAP coordinates and marker gene tables into a lightweight
 
 - Interactive UMAP visualization
     
-- Cluster highlighting
+- **Multi-cluster highlight** — select multiple clusters simultaneously to compare spatial relationships
+    
+- **Sample / condition highlight** — click a sample to isolate cells from that condition; composes with cluster filter for intersection queries
+    
+- **Cell Information Panel** — click any cell on the UMAP to inspect its metadata (Cell ID, Cluster, Sample, UMAP coordinates); Copy Cell ID button for downstream use
     
 - Marker gene exploration
     
@@ -43,16 +47,18 @@ remotes::install_github(
 ### Prepare UMAP coordinates
 
 ```r
+# With sample / condition column (recommended)
 umap_df <- FetchData(
   seurat_obj,
   vars = c(
     "UMAP_1",
     "UMAP_2",
-    "seurat_clusters"
+    "seurat_clusters",
+    "orig.ident"
   )
 )
 
-colnames(umap_df)[3] <- "cluster"
+colnames(umap_df)[3:4] <- c("cluster", "sample")
 
 umap_df$cell <- colnames(seurat_obj)
 ```
@@ -84,6 +90,7 @@ library(scReportLite)
 sc_report(
   umap_df,
   marker_df = marker_df,
+  sample_col = "sample",   # optional — enables sample highlight
   output = "report.html",
   title = "My scRNA-seq Report"
 )
@@ -103,6 +110,7 @@ Required columns:
 |UMAP_1|UMAP dimension 1|
 |UMAP_2|UMAP dimension 2|
 |cluster|Cluster label|
+|sample|Sample / condition label (optional)|
 
 Example:
 
@@ -136,7 +144,11 @@ The generated report includes:
 
 - Interactive UMAP
     
-- Cluster sidebar
+- Multi-select cluster sidebar with checkboxes
+    
+- Sample / condition sidebar (when `sample_col` is provided)
+    
+- Cell Information Panel (click a cell to inspect metadata, copy Cell ID)
     
 - Cluster statistics
     
@@ -145,7 +157,17 @@ The generated report includes:
 - Hover information for individual cells
     
 
-Users can click clusters in the sidebar to highlight cell populations and inspect marker genes interactively.
+**Multi-cluster highlight:** Click multiple clusters to compare their spatial
+relationships. Toggle clusters on/off — selected clusters stay highlighted
+while others dim.
+
+**Sample highlight:** Click a sample in the sidebar to isolate cells from
+that condition. Compose with cluster selection to see, for example,
+"Cluster 4 cells in Treatment_A" (intersection query).
+
+**Cell Information Panel:** Click any cell on the UMAP to pin its metadata.
+Displays Cell ID, Cluster, Sample, and UMAP coordinates. Use the Copy Cell ID
+button to grab the barcode for downstream analysis in R.
 
 ---
 
@@ -189,8 +211,6 @@ Recommended for datasets containing more than 10,000 cells.
     
 - No 3D visualization
     
-- No metadata panel
-    
 - Marker table requires pre-computed marker genes
     
 
@@ -200,7 +220,7 @@ Recommended for datasets containing more than 10,000 cells.
 
 Planned features:
 
-- Metadata exploration
+- Cell Focus (neighbor search, local clustering — downstream workflow)
     
 - Custom color palettes
     
@@ -218,7 +238,7 @@ Planned features:
 If you use scReportLite in research projects, please cite:
 
 > Park, K. K. (2026).
-> scReportLite v0.1.1-alpha.
+> scReportLite v0.1.3-alpha.
 > Zenodo.
 > https://doi.org/10.5281/zenodo.20697746
 

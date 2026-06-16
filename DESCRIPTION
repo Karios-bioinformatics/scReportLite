@@ -1,7 +1,7 @@
 Package: scReportLite
 Type: Package
 Title: Single-Cell Interactive HTML Report Generator
-Version: 0.1.0
+Version: 0.1.3
 Authors@R: person(given = "Kee-gong Karios",
                   family = "Park",
                   email = "karioslion0517@gmail.com",
