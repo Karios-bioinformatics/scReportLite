@@ -466,7 +466,12 @@ function updatePanelVisibility() {
     if (sampleCompPanel) sampleCompPanel.style.display = "none";
   } else {
     if (markerPanel) markerPanel.style.display = "none";
-    if (sampleCompPanel) sampleCompPanel.style.display = "";
+    if (sampleCompPanel) {
+      sampleCompPanel.style.display = "";
+      // Resize any plotly chart inside the sample composition panel
+      var scBody = sampleCompPanel.querySelector(".panel-body");
+      if (scBody) Plotly.Plots.resize(scBody);
+    }
   }
 }
 
@@ -531,6 +536,7 @@ function updateSampleComposition(sampleId) {
   };
 
   Plotly.react(body, [trace], layout, { displayModeBar: false, displaylogo: false });
+  Plotly.Plots.resize(body);
 }
 
 // Cache the plotly graph div on first use
@@ -626,6 +632,29 @@ function applyHighlight() {
 }
 
 // =========================================================================
+// Marker Panel — state-driven, not event-driven
+// =========================================================================
+
+function updateMarkerPanel() {
+  if (SELECTED_CLUSTERS.size === 1) {
+    var selected = Array.from(SELECTED_CLUSTERS)[0];
+    updateMarkerTable(selected);
+  } else if (SELECTED_CLUSTERS.size === 0) {
+    clearMarkerTable();
+  } else {
+    showMultiClusterMessage();
+  }
+}
+
+function showMultiClusterMessage() {
+  var container = document.getElementById("marker-table-container");
+  if (!container) return;
+  document.getElementById("marker-title").textContent = "Marker Genes";
+  container.innerHTML =
+    "<p class=\\"no-data\\">Marker genes are shown only when exactly one cluster is selected.</p>";
+}
+
+// =========================================================================
 // Cluster Toggle (Multi-Select) — switches to cluster mode
 // =========================================================================
 
@@ -638,19 +667,14 @@ function toggleCluster(clusterId) {
     SELECTED_CLUSTERS.add(clusterId);
   }
 
-  // Switch to cluster mode so marker table is visible
+  // Switch to cluster mode if any cluster is selected
   if (SELECTED_CLUSTERS.size > 0) {
     switchTab("cluster");
   }
 
   updateSidebarUI();
   applyHighlight();
-
-  if (SELECTED_CLUSTERS.size > 0) {
-    updateMarkerTable(clusterId);
-  } else {
-    clearMarkerTable();
-  }
+  updateMarkerPanel();
 }
 
 // =========================================================================
@@ -937,6 +961,17 @@ onPlotlyReady(function(gd) {
 
   // ---- Initial panel visibility (cluster mode) ----
   updatePanelVisibility();
+});
+
+// ---- Global resize handler for all plotly charts ----
+window.addEventListener("resize", function() {
+  var gd = getPlotDiv();
+  if (gd) Plotly.Plots.resize(gd);
+  var scPanel = document.getElementById("srl-panel-sample_composition");
+  if (scPanel) {
+    var scBody = scPanel.querySelector(".panel-body");
+    if (scBody) Plotly.Plots.resize(scBody);
+  }
 });
 '
 }
