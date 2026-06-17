@@ -484,7 +484,7 @@ function updateSampleComposition(sampleId) {
   var colors = window._CLUSTER_COLORS || {};
 
   if (!data || !data[sampleId]) {
-    body.innerHTML = "<p class=\"no-data\">No composition data available for this sample.</p>";
+    body.innerHTML = "<p class=\\"no-data\\">No composition data available for this sample.</p>";
     return;
   }
 
