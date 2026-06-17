@@ -447,6 +447,14 @@ var _ACTIVE_MODE = "cluster";  // "cluster" or "sample" — controls panel visib
 
 function switchTab(mode) {
   _ACTIVE_MODE = mode;
+
+  // Clear selections from the other mode so state is isolated
+  if (mode === "cluster") {
+    SELECTED_SAMPLE = null;
+  } else {
+    SELECTED_CLUSTERS.clear();
+  }
+
   var tabC = document.getElementById("tab-clusters");
   var tabS = document.getElementById("tab-samples");
   var contC = document.getElementById("sidebar-clusters");
@@ -455,6 +463,10 @@ function switchTab(mode) {
   if (tabS) tabS.classList.toggle("active", mode === "sample");
   if (contC) contC.classList.toggle("hidden", mode !== "cluster");
   if (contS) contS.classList.toggle("hidden", mode !== "sample");
+
+  updateSidebarUI();
+  applyHighlight();
+  updateMarkerPanel();
   updatePanelVisibility();
 }
 
