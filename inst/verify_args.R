@@ -1,10 +1,10 @@
-# Quick sc_report args test — run from package root
-# Do NOT call setwd — working directory is set by the caller
+# Quick sc_report verification — run from package root
 
 source("R/utils.R")
 source("R/build_umap.R")
 source("R/panel_cluster_size.R")
 source("R/panel_sample_composition.R")
+source("R/panel_gene_expression.R")
 source("R/panels.R")
 source("R/sc_report.R")
 
@@ -13,7 +13,6 @@ a <- formals(sc_report)
 cat("Number of parameters:", length(a), "\n")
 cat("Parameter names:", paste(names(a), collapse=", "), "\n")
 cat('Has "panels":', "panels" %in% names(a), "\n")
-cat('Default value of panels:', deparse(a$panels), "\n")
+cat('Has "gene_expr_df":', "gene_expr_df" %in% names(a), "\n")
 cat("list_panels():", paste(list_panels(), collapse=", "), "\n")
-cat('"cluster_size" registered:', "cluster_size" %in% list_panels(), "\n")
-cat('"sample_composition" registered:', "sample_composition" %in% list_panels(), "\n")
+cat('"gene_expression" registered:', "gene_expression" %in% list_panels(), "\n")

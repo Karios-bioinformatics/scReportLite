@@ -148,3 +148,57 @@ format_pval <- function(p) {
   if (p < 0.01) return(sprintf("%.5f", p))
   sprintf("%.4f", p)
 }
+
+
+#' Validate gene expression data frame
+#'
+#' Checks that gene_expr_df has a 'cell' column, that gene columns are
+#' numeric, and that cell IDs can be matched to umap_df. Returns TRUE
+#' invisibly on success, stops with a clear message on failure.
+#'
+#' @param gene_expr_df Data frame of gene expression values (wide format)
+#' @param umap_df The UMAP data frame (for cell ID validation)
+#' @param cell_col Name of the cell column in umap_df
+#' @return Invisibly TRUE if valid; stops otherwise
+#'
+#' @keywords internal
+validate_gene_expr_df <- function(gene_expr_df, umap_df, cell_col) {
+  if (is.null(gene_expr_df)) return(invisible(TRUE))
+
+  if (!is.data.frame(gene_expr_df)) {
+    stop("gene_expr_df must be a data.frame or NULL", call. = FALSE)
+  }
+
+  if (!"cell" %in% colnames(gene_expr_df)) {
+    stop("gene_expr_df must contain a 'cell' column", call. = FALSE)
+  }
+
+  gene_cols <- setdiff(colnames(gene_expr_df), "cell")
+  if (length(gene_cols) == 0) {
+    stop("gene_expr_df must contain at least one gene column", call. = FALSE)
+  }
+
+  for (g in gene_cols) {
+    if (!is.numeric(gene_expr_df[[g]])) {
+      stop("gene_expr_df column '", g, "' must be numeric", call. = FALSE)
+    }
+  }
+
+  # Warn if cell IDs don't overlap with UMAP data
+  overlap <- intersect(gene_expr_df[["cell"]], umap_df[[cell_col]])
+  if (length(overlap) == 0) {
+    stop(
+      "No cell IDs in gene_expr_df match umap_df.",
+      "  Check that the 'cell' column values match ", cell_col, ".",
+      call. = FALSE
+    )
+  }
+  if (length(overlap) < nrow(umap_df)) {
+    message(
+      "gene_expr_df covers ", length(overlap), " of ", nrow(umap_df),
+      " cells in umap_df. Missing cells will show zero expression."
+    )
+  }
+
+  invisible(TRUE)
+}

@@ -129,3 +129,7 @@ if (exists("panel_cluster_size", inherits = FALSE)) {
 if (exists("panel_sample_composition", inherits = FALSE)) {
   register_panel(panel_sample_composition)
 }
+
+if (exists("panel_gene_expression", inherits = FALSE)) {
+  register_panel(panel_gene_expression)
+}

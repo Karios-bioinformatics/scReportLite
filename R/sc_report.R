@@ -1,5 +1,5 @@
 # scReportLite: Main entry point + HTML assembly + embedded CSS/JS ----------------
-# v0.1.4 — Panel system: cluster_size barplot, reusable panel architecture
+# v0.1.5 — Gene Expression Mode: gene-level UMAP coloring + summary panel
 
 
 # ---- CSS template --------------------------------------------------------------
@@ -197,6 +197,48 @@ body {
   color: #b2bec3;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* --- Gene search --- */
+.gene-search {
+  padding: 8px 12px;
+  flex-shrink: 0;
+}
+.gene-search input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #dfe6e9;
+  border-radius: 4px;
+  font-size: 0.85em;
+  outline: none;
+  box-sizing: border-box;
+}
+.gene-search input:focus {
+  border-color: #1F77B4;
+}
+
+/* --- Gene items (single-select) --- */
+.gene-list {
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.gene-item {
+  display: flex;
+  align-items: center;
+  padding: 7px 16px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+  font-size: 0.88em;
+  user-select: none;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-style: italic;
+}
+.gene-item:hover { background: #f0f1f5; }
+.gene-item.active {
+  background: #e8ecf8;
+  border-left-color: #1F77B4;
+  font-weight: 600;
 }
 
 /* --- Content area --- */
@@ -440,6 +482,9 @@ var _HAS_SAMPLES = false;
 var _CELL_SAMPLE = {};   // cellId → sample (built from customdata)
 var _TRACE_CELLS = [];   // per-trace cell ID arrays (built from customdata)
 var _ACTIVE_MODE = "cluster";  // "cluster" or "sample" — controls panel visibility
+var _SELECTED_GENE = null;
+var _ORIG_COLORS_SAVED = [];  // saved cluster colors for gene mode restore
+var _GENE_LIST = [];           // cached gene name list
 
 // =========================================================================
 // Tab Switching & Panel Visibility
@@ -448,21 +493,30 @@ var _ACTIVE_MODE = "cluster";  // "cluster" or "sample" — controls panel visib
 function switchTab(mode) {
   _ACTIVE_MODE = mode;
 
-  // Clear selections from the other mode so state is isolated
+  // Clear selections from other modes — state isolation
   if (mode === "cluster") {
     SELECTED_SAMPLE = null;
-  } else {
+    if (_SELECTED_GENE) { restoreClusterColors(); _SELECTED_GENE = null; }
+  } else if (mode === "sample") {
     SELECTED_CLUSTERS.clear();
+    if (_SELECTED_GENE) { restoreClusterColors(); _SELECTED_GENE = null; }
+  } else if (mode === "gene") {
+    SELECTED_CLUSTERS.clear();
+    SELECTED_SAMPLE = null;
   }
 
   var tabC = document.getElementById("tab-clusters");
   var tabS = document.getElementById("tab-samples");
+  var tabG = document.getElementById("tab-genes");
   var contC = document.getElementById("sidebar-clusters");
   var contS = document.getElementById("sidebar-samples");
+  var contG = document.getElementById("sidebar-genes");
   if (tabC) tabC.classList.toggle("active", mode === "cluster");
   if (tabS) tabS.classList.toggle("active", mode === "sample");
+  if (tabG) tabG.classList.toggle("active", mode === "gene");
   if (contC) contC.classList.toggle("hidden", mode !== "cluster");
   if (contS) contS.classList.toggle("hidden", mode !== "sample");
+  if (contG) contG.classList.toggle("hidden", mode !== "gene");
 
   updateSidebarUI();
   applyHighlight();
@@ -471,20 +525,162 @@ function switchTab(mode) {
 }
 
 function updatePanelVisibility() {
-  var markerPanel = document.querySelector(".marker-section");
-  var sampleCompPanel = document.getElementById("srl-panel-sample_composition");
-  if (_ACTIVE_MODE === "cluster") {
-    if (markerPanel) markerPanel.style.display = "";
-    if (sampleCompPanel) sampleCompPanel.style.display = "none";
-  } else {
-    if (markerPanel) markerPanel.style.display = "none";
-    if (sampleCompPanel) {
-      sampleCompPanel.style.display = "";
-      // Resize any plotly chart inside the sample composition panel
-      var scBody = sampleCompPanel.querySelector(".panel-body");
+  var panels = {
+    "cluster": document.querySelector(".marker-section"),
+    "sample":  document.getElementById("srl-panel-sample_composition"),
+    "gene":    document.getElementById("srl-panel-gene_expression")
+  };
+  for (var mode in panels) {
+    var panel = panels[mode];
+    if (panel) panel.style.display = (mode === _ACTIVE_MODE) ? "" : "none";
+  }
+  // Resize any newly visible plotly chart
+  if (_ACTIVE_MODE === "sample") {
+    var scPanel = document.getElementById("srl-panel-sample_composition");
+    if (scPanel) {
+      var scBody = scPanel.querySelector(".panel-body");
       if (scBody) Plotly.Plots.resize(scBody);
     }
   }
+}
+
+// =========================================================================
+// Gene Expression Mode
+// =========================================================================
+
+function selectGene(geneName) {
+  // Switching to gene tab
+  switchTab("gene");
+
+  if (_SELECTED_GENE === geneName) {
+    _SELECTED_GENE = null;
+    restoreClusterColors();
+    updateGeneSummary(null);
+  } else {
+    _SELECTED_GENE = geneName;
+    applyGeneExpression(geneName);
+    updateGeneSummary(geneName);
+  }
+  updateSidebarUI();
+  updateGeneListUI();
+}
+
+function applyGeneExpression(geneName) {
+  var gd = getPlotDiv();
+  if (!gd || !gd.data) return;
+
+  var exprData = window._GENE_EXPR_DATA;
+  if (!exprData || !exprData[geneName]) return;
+  var values = exprData[geneName];
+
+  // Save original cluster colors on first gene selection
+  if (_ORIG_COLORS_SAVED.length === 0) {
+    _ORIG_COLORS_SAVED = gd.data.map(function(t) {
+      return t.marker ? t.marker.color : null;
+    });
+  }
+
+  var traceCells = window._TRACE_CELLS || [];
+  var allExpr = [];
+  for (var i = 0; i < gd.data.length; i++) {
+    var cells = traceCells[i] || [];
+    for (var j = 0; j < cells.length; j++) {
+      allExpr.push(values[cells[j]] || 0);
+    }
+  }
+
+  var maxExpr = Math.max.apply(null, allExpr);
+  var minExpr = Math.min.apply(null, allExpr);
+  if (maxExpr === minExpr) maxExpr = minExpr + 1;  // avoid division by zero
+
+  // Map to gray→red continuous scale
+  function exprColor(val) {
+    var t = Math.max(0, Math.min(1, (val - minExpr) / (maxExpr - minExpr)));
+    var r = Math.round(208 + (230 - 208) * t);
+    var g = Math.round(208 + (25  - 208) * t);
+    var b = Math.round(208 + (75  - 208) * t);
+    return "rgb(" + r + "," + g + "," + b + ")";
+  }
+
+  var colors = [];
+  for (var i = 0; i < gd.data.length; i++) {
+    var cells = traceCells[i] || [];
+    var n = cells.length;
+    var tc = new Array(n);
+    for (var j = 0; j < n; j++) {
+      tc[j] = exprColor(values[cells[j]] || 0);
+    }
+    colors.push(tc);
+  }
+
+  Plotly.restyle(gd, "marker.color", colors);
+}
+
+function restoreClusterColors() {
+  var gd = getPlotDiv();
+  if (!gd || _ORIG_COLORS_SAVED.length === 0) return;
+  Plotly.restyle(gd, "marker.color", _ORIG_COLORS_SAVED);
+  _ORIG_COLORS_SAVED = [];
+}
+
+function updateGeneSummary(geneName) {
+  var container = document.getElementById("srl-panel-gene_expression");
+  if (!container) return;
+  var body = container.querySelector(".panel-body");
+  if (!body) return;
+
+  if (!geneName) {
+    body.innerHTML = "<p class=\\"no-data\\">Select a gene to view expression on UMAP.</p>";
+    return;
+  }
+
+  var exprData = window._GENE_EXPR_DATA;
+  if (!exprData || !exprData[geneName]) {
+    body.innerHTML = "<p class=\\"no-data\\">No expression data for " + geneName + ".</p>";
+    return;
+  }
+
+  var values = exprData[geneName];
+  var allVals = Object.values(values);
+  var nTotal = allVals.length;
+  var posVals = allVals.filter(function(v) { return v > 0; });
+  var nExpr = posVals.length;
+  var pct = (nExpr / nTotal * 100).toFixed(1);
+  var sum = allVals.reduce(function(a,b){return a+b;}, 0);
+  var mean = (sum / nTotal).toFixed(4);
+  var maxV = Math.max.apply(null, allVals).toFixed(4);
+
+  body.innerHTML =
+    "<div style=\\"padding:4px 0;\\">" +
+    "<table style=\\"width:100%;font-size:0.9em;\\">" +
+    "<tr><td style=\\"color:#636e72;width:140px;\\">Gene</td>" +
+    "<td style=\\"font-weight:600;font-style:italic;font-family:monospace;\\">" + geneName + "</td></tr>" +
+    "<tr><td style=\\"color:#636e72;\\">Expressing cells</td>" +
+    "<td>" + nExpr + " / " + nTotal + " (" + pct + "%)</td></tr>" +
+    "<tr><td style=\\"color:#636e72;\\">Mean expression</td><td>" + mean + "</td></tr>" +
+    "<tr><td style=\\"color:#636e72;\\">Max expression</td><td>" + maxV + "</td></tr>" +
+    "</table></div>";
+}
+
+function updateGeneListUI() {
+  var items = document.querySelectorAll(".gene-item");
+  items.forEach(function(item) {
+    var g = item.getAttribute("data-gene");
+    if (g === _SELECTED_GENE) {
+      item.classList.add("active");
+    } else {
+      item.classList.remove("active");
+    }
+  });
+}
+
+function filterGenes(query) {
+  var items = document.querySelectorAll(".gene-item");
+  query = (query || "").toLowerCase().trim();
+  items.forEach(function(item) {
+    var name = (item.getAttribute("data-gene") || "").toLowerCase();
+    item.style.display = (!query || name.indexOf(query) >= 0) ? "" : "none";
+  });
 }
 
 // =========================================================================
@@ -720,11 +916,14 @@ function selectSample(sampleId) {
 function resetAll() {
   SELECTED_CLUSTERS.clear();
   SELECTED_SAMPLE = null;
+  if (_SELECTED_GENE) { restoreClusterColors(); _SELECTED_GENE = null; }
   switchTab("cluster");
   updateSidebarUI();
   applyHighlight();
   clearMarkerTable();
   hideCellInfo();
+  updateGeneSummary(null);
+  updateGeneListUI();
 }
 
 // =========================================================================
@@ -1008,6 +1207,7 @@ window.addEventListener("resize", function() {
 #' @keywords internal
 assemble_report <- function(umap_plot, umap_df, marker_df,
                              cluster_col, cell_col, sample_col,
+                             gene_expr_df = NULL,
                              output, title, dim_opacity, marker_n_top,
                              panels = c("umap", "marker_table")) {
 
@@ -1095,6 +1295,44 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         tags$div(class = "sample-list", sample_html)
       )
     ))
+  }
+
+  # ---- Gene tab & list (only when gene_expr_df is provided) ----
+  has_genes <- !is.null(gene_expr_df)
+  gene_expr_json <- "{}"
+  if (has_genes) {
+    gene_names <- setdiff(colnames(gene_expr_df), "cell")
+    sidebar_tabs <- c(sidebar_tabs, list(
+      tags$div(class = "sidebar-tab", id = "tab-genes",
+               onclick = "switchTab('gene')", "Genes")
+    ))
+    gene_html <- lapply(gene_names, function(g) {
+      tags$div(
+        class = "gene-item",
+        `data-gene` = g,
+        onclick = sprintf("selectGene('%s')", g),
+        g
+      )
+    })
+    sidebar_contents <- c(sidebar_contents, list(
+      tags$div(class = "sidebar-content hidden", id = "sidebar-genes",
+        tags$div(class = "gene-search",
+          tags$input(type = "text", id = "gene-search-input",
+                     placeholder = "Filter genes...",
+                     oninput = "filterGenes(this.value)")
+        ),
+        tags$div(class = "gene-list", gene_html)
+      )
+    ))
+
+    # Build gene expression data for JS: {gene: {cell_id: value, ...}, ...}
+    gene_list <- lapply(gene_names, function(g) {
+      vals <- as.list(gene_expr_df[[g]])
+      names(vals) <- gene_expr_df[["cell"]]
+      vals
+    })
+    names(gene_list) <- gene_names
+    gene_expr_json <- jsonlite::toJSON(gene_list, auto_unbox = TRUE)
   }
 
   sidebar_html <- c(
@@ -1241,6 +1479,10 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         "window._CLUSTER_COLORS = %s;",
         cluster_colors_json
       ))),
+      tags$script(htmltools::HTML(sprintf(
+        "window._GENE_EXPR_DATA = %s;",
+        gene_expr_json
+      ))),
       tags$script(htmltools::HTML(paste(report_js(), panel_js_extra, sep = "\n")))
     )
   )
@@ -1277,6 +1519,12 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 #'   Must contain columns: \code{cluster}, \code{gene},
 #'   \code{avg_log2FC}, \code{p_val_adj}. If \code{NULL}, the marker
 #'   panel will show "no data" messages. Default: \code{NULL}.
+#' @param gene_expr_df Optional data.frame of gene expression values
+#'   (wide format). Must contain a \code{"cell"} column matching
+#'   \code{cell_col} in \code{umap_df}. Remaining columns are gene names
+#'   with numeric expression values. When provided, a "Genes" tab
+#'   appears in the sidebar for gene-level UMAP coloring.
+#'   Default: \code{NULL}.
 #' @param output Path to the output HTML file.
 #'   Default: \code{"sc_report.html"}.
 #' @param title Title displayed in the report header.
@@ -1322,21 +1570,27 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 #' sc_report(umap_df, marker_df = marker_df, sample_col = "condition")
 #' }
 sc_report <- function(umap_df,
-                       cluster_col  = "cluster",
-                       cell_col     = "cell",
-                       sample_col   = NULL,
-                       marker_df    = NULL,
-                       output       = "sc_report.html",
-                       title        = "scRNA-seq Report",
-                       point_size   = 3,
-                       point_alpha  = 0.9,
-                       dim_opacity  = 0.06,
-                       marker_n_top = 20,
-                       panels       = c("umap", "marker_table"),
-                       use_webgl    = TRUE) {
+                       cluster_col   = "cluster",
+                       cell_col      = "cell",
+                       sample_col    = NULL,
+                       marker_df     = NULL,
+                       gene_expr_df  = NULL,
+                       output        = "sc_report.html",
+                       title         = "scRNA-seq Report",
+                       point_size    = 3,
+                       point_alpha   = 0.9,
+                       dim_opacity   = 0.06,
+                       marker_n_top  = 20,
+                       panels        = c("umap", "marker_table"),
+                       use_webgl     = TRUE) {
 
   # ---- Validate inputs ----
   validate_inputs(umap_df, marker_df, cluster_col, cell_col, sample_col)
+
+  # Validate gene expression data if provided
+  if (!is.null(gene_expr_df)) {
+    validate_gene_expr_df(gene_expr_df, umap_df, cell_col)
+  }
 
   if (!is.character(output) || length(output) != 1) {
     stop("output must be a single file path string", call. = FALSE)
@@ -1378,6 +1632,7 @@ sc_report <- function(umap_df,
     cluster_col   = cluster_col,
     cell_col      = cell_col,
     sample_col    = sample_col,
+    gene_expr_df  = gene_expr_df,
     output        = output,
     title         = title,
     dim_opacity   = dim_opacity,
