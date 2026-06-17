@@ -23,15 +23,15 @@ library(plotly)
 library(htmltools)
 library(jsonlite)
 
-# Source package files
+# Source package files (alphabetical order: panel_cluster_size.R before panels.R)
 source("R/utils.R")
 source("R/build_umap.R")
-source("R/panels.R")
 source("R/panel_cluster_size.R")
+source("R/panels.R")
 source("R/sc_report.R")
 
-# Register panels manually (in a real package load, .onLoad handles this)
-register_panel(panel_cluster_size)
+# Verify cluster_size is registered
+stopifnot("cluster_size" %in% list_panels())
 
 set.seed(42)
 

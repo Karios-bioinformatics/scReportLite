@@ -117,17 +117,11 @@ render_panel_section <- function(pn, params) {
 }
 
 
-# ---- Registration deferred to .onLoad -----------------------------------------
-# Panels are defined in separate files (e.g. R/panel_cluster_size.R).
-# Because R sources files alphabetically, panel definitions may be loaded
-# before this infrastructure file.  .onLoad runs after all files are loaded,
-# so it is the safe place to register built-in panels.
+# ---- Registration -------------------------------------------------------------
+# R sources files alphabetically: panel_cluster_size.R comes before panels.R,
+# so panel_cluster_size is already defined when this code runs.
+# The exists() guard handles non-package contexts (e.g. test scripts).
 
-.onLoad <- function(libname, pkgname) {
-  # Register Cluster Size Barplot panel
-  if (exists("panel_cluster_size", inherits = FALSE)) {
-    register_panel(panel_cluster_size)
-  }
-
-  invisible()
+if (exists("panel_cluster_size", inherits = FALSE)) {
+  register_panel(panel_cluster_size)
 }
