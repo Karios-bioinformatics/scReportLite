@@ -71,6 +71,30 @@ validate_inputs <- function(umap_df, marker_df, cluster_col, cell_col,
 }
 
 
+#' Natural sort for character vectors
+#'
+#' Sorts strings with trailing numbers in natural order (e.g. GSE-1, GSE-2,
+#' GSE-10 instead of GSE-1, GSE-10, GSE-2). Strings without trailing digits
+#' fall back to standard character sort. Used for sample labels in the sidebar.
+#'
+#' @param x Character vector to sort
+#' @return Sorted character vector
+#'
+#' @keywords internal
+natural_sort <- function(x) {
+  x <- as.character(x)
+  # Extract prefix (everything before trailing digits) and numeric suffix
+  m <- regexpr("\\d+$", x)
+  if (any(m < 0)) {
+    # Some entries have no trailing digits — fall back to character sort
+    return(sort(x))
+  }
+  prefix <- substr(x, 1, m - 1)
+  suffix <- as.integer(substr(x, m, m + attr(m, "match.length") - 1))
+  x[order(prefix, suffix)]
+}
+
+
 #' Generate a cluster-color mapping
 #'
 #' Creates a named vector mapping cluster IDs to hex color codes using

@@ -1042,7 +1042,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   # ---- Sidebar: Sample section (optional) ----
   sample_html <- NULL
   if (has_samples) {
-    samples <- sort(unique(umap_df[[sample_col]]))
+    samples <- natural_sort(unique(umap_df[[sample_col]]))
     sample_html <- lapply(samples, function(s) {
       s_char <- as.character(s)
       n_cells <- sum(umap_df[[sample_col]] == s)
