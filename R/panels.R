@@ -125,3 +125,7 @@ render_panel_section <- function(pn, params) {
 if (exists("panel_cluster_size", inherits = FALSE)) {
   register_panel(panel_cluster_size)
 }
+
+if (exists("panel_sample_composition", inherits = FALSE)) {
+  register_panel(panel_sample_composition)
+}

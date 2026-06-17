@@ -67,8 +67,10 @@ panel_cluster_size <- list(
     p <- plotly::layout(
       p,
       xaxis = list(
-        title = "Cluster",
-        type  = "category"
+        title    = "Cluster",
+        type     = "category",
+        categoryorder = "array",
+        categoryarray = df$cluster
       ),
       yaxis = list(
         title = "Number of Cells"

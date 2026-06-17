@@ -16,22 +16,31 @@
 # Test 2 — Cluster Size panel:
 # - Cluster Size barplot appears below the marker table
 # - Bar colours match the UMAP cluster colours
-# - Hovering on a bar shows cell count + percentage
-# - Marker table + UMAP still work as before
+# - Hover on a bar shows cell count + percentage
+# - Clusters are sorted numerically (0, 1, 2, ... not 0, 1, 10, 11)
+#
+# Test 3 — Sample Composition panel:
+# - Stacked bar chart shows cluster distribution per sample
+# - Each bar = one sample, segments = clusters
+# - Hover shows sample, cluster, count, % within sample
+# - Legend shows cluster names with matching colours
 
 library(plotly)
 library(htmltools)
 library(jsonlite)
 
-# Source package files (alphabetical order: panel_cluster_size.R before panels.R)
+# Source package files (alphabetical order: panel_*.R before panels.R)
 source("R/utils.R")
 source("R/build_umap.R")
 source("R/panel_cluster_size.R")
+source("R/panel_sample_composition.R")
 source("R/panels.R")
 source("R/sc_report.R")
 
-# Verify cluster_size is registered
+# Verify both panels are registered
 stopifnot("cluster_size" %in% list_panels())
+stopifnot("sample_composition" %in% list_panels())
+cat("Panels registered:", paste(list_panels(), collapse=", "), "\n\n")
 
 set.seed(42)
 
@@ -108,7 +117,7 @@ marker_df$avg_log2FC[neg_idx] <- -marker_df$avg_log2FC[neg_idx]
 # =============================================================================
 outfile1 <- file.path(tempdir(), "scReportLite_v014_default.html")
 
-cat("\n=============================================\n")
+cat("=============================================\n")
 cat("  scReportLite v0.1.4 — Test 1: Default\n")
 cat("=============================================\n")
 cat(sprintf("Cells:    %d\n", nrow(umap_df)))
@@ -137,7 +146,7 @@ sc_report(
 cat("  Default report OK.\n")
 
 # =============================================================================
-# Test 2 — With Cluster Size panel
+# Test 2 — Cluster Size panel
 # =============================================================================
 outfile2 <- file.path(tempdir(), "scReportLite_v014_cluster_size.html")
 
@@ -165,14 +174,14 @@ sc_report(
 cat("  Cluster Size report OK.\n")
 
 # =============================================================================
-# Test 3 — UMAP only (no marker table)
+# Test 3 — Sample Composition panel
 # =============================================================================
-outfile3 <- file.path(tempdir(), "scReportLite_v014_umap_only.html")
+outfile3 <- file.path(tempdir(), "scReportLite_v014_sample_composition.html")
 
 cat("\n=============================================\n")
-cat("  scReportLite v0.1.4 — Test 3: UMAP Only\n")
+cat("  scReportLite v0.1.4 — Test 3: Sample Composition\n")
 cat("=============================================\n")
-cat(sprintf("Panels:   umap\n"))
+cat(sprintf("Panels:   umap, marker_table, sample_composition\n"))
 cat(sprintf("Output:   %s\n\n", outfile3))
 
 sc_report(
@@ -182,6 +191,34 @@ sc_report(
   sample_col   = "sample",
   marker_df    = marker_df,
   output       = outfile3,
+  title        = "scReportLite v0.1.4 — Sample Composition",
+  point_size   = 4,
+  point_alpha  = 0.85,
+  dim_opacity  = 0.05,
+  marker_n_top = 15,
+  panels       = c("umap", "marker_table", "sample_composition")
+)
+
+cat("  Sample Composition report OK.\n")
+
+# =============================================================================
+# Test 4 — UMAP only
+# =============================================================================
+outfile4 <- file.path(tempdir(), "scReportLite_v014_umap_only.html")
+
+cat("\n=============================================\n")
+cat("  scReportLite v0.1.4 — Test 4: UMAP Only\n")
+cat("=============================================\n")
+cat(sprintf("Panels:   umap\n"))
+cat(sprintf("Output:   %s\n\n", outfile4))
+
+sc_report(
+  umap_df      = umap_df,
+  cluster_col  = "cluster",
+  cell_col     = "cell",
+  sample_col   = "sample",
+  marker_df    = marker_df,
+  output       = outfile4,
   title        = "scReportLite v0.1.4 — UMAP Only",
   point_size   = 4,
   point_alpha  = 0.85,
@@ -192,24 +229,50 @@ sc_report(
 cat("  UMAP-only report OK.\n")
 
 # =============================================================================
+# Test 5 — All panels
+# =============================================================================
+outfile5 <- file.path(tempdir(), "scReportLite_v014_all.html")
+
+cat("\n=============================================\n")
+cat("  scReportLite v0.1.4 — Test 5: All Panels\n")
+cat("=============================================\n")
+cat(sprintf("Panels:   umap, marker_table, cluster_size, sample_composition\n"))
+cat(sprintf("Output:   %s\n\n", outfile5))
+
+sc_report(
+  umap_df      = umap_df,
+  cluster_col  = "cluster",
+  cell_col     = "cell",
+  sample_col   = "sample",
+  marker_df    = marker_df,
+  output       = outfile5,
+  title        = "scReportLite v0.1.4 — All Panels",
+  point_size   = 4,
+  point_alpha  = 0.85,
+  dim_opacity  = 0.05,
+  marker_n_top = 15,
+  panels       = c("umap", "marker_table", "cluster_size", "sample_composition")
+)
+
+cat("  All-panels report OK.\n")
+
+# =============================================================================
 # Summary
 # =============================================================================
 cat("\n=============================================\n")
 cat("  All tests complete. Open in browser:\n")
 cat("=============================================\n")
-cat(sprintf("  Test 1 (default):       %s\n", outfile1))
-cat(sprintf("  Test 2 (cluster size):   %s\n", outfile2))
-cat(sprintf("  Test 3 (UMAP only):      %s\n", outfile3))
+cat(sprintf("  Test 1 (default):               %s\n", outfile1))
+cat(sprintf("  Test 2 (cluster size):           %s\n", outfile2))
+cat(sprintf("  Test 3 (sample composition):     %s\n", outfile3))
+cat(sprintf("  Test 4 (UMAP only):              %s\n", outfile4))
+cat(sprintf("  Test 5 (all panels):             %s\n", outfile5))
 
-cat("\nManual checks for Test 2 (Cluster Size):\n")
-cat("  1. UMAP renders with 6 clusters\n")
-cat("  2. Sidebar has cluster + sample lists\n")
-cat("  3. Cluster Size barplot appears below marker table\n")
-cat("  4. Bar colours match UMAP cluster colours\n")
-cat("  5. Hover on a bar shows: 'Cluster N / X cells (Y.Y%)'\n")
-cat("  6. Clicking a cluster in sidebar still works\n")
-cat("  7. Marker table still updates on cluster click\n")
-cat("  8. Cell Info Panel still works on cell click\n")
-cat("  9. Double-click UMAP resets all selections\n")
-cat(" 10. All panels have consistent card styling\n")
-cat(" 11. Bar heights match cell counts shown in sidebar\n\n")
+cat("\nManual checks for Test 3 (Sample Composition):\n")
+cat("  1. Stacked bar chart with 3 bars (Control, Treatment_A, Treatment_B)\n")
+cat("  2. Each bar has 6 coloured segments (clusters 1-6)\n")
+cat("  3. Hover shows 'Sample: X / Cluster: Y / N cells (Z.Z% of sample)'\n")
+cat("  4. Legend shows cluster names with colours matching UMAP\n")
+cat("  5. Treatment_A has more cluster 3-4 cells, Control has more 1-2\n")
+cat("  6. UMAP, sidebar, marker table still work alongside\n")
+cat("  7. No 'Unknown panel' warnings\n\n")

@@ -4,6 +4,7 @@
 source("R/utils.R")
 source("R/build_umap.R")
 source("R/panel_cluster_size.R")
+source("R/panel_sample_composition.R")
 source("R/panels.R")
 source("R/sc_report.R")
 
@@ -15,3 +16,4 @@ cat('Has "panels":', "panels" %in% names(a), "\n")
 cat('Default value of panels:', deparse(a$panels), "\n")
 cat("list_panels():", paste(list_panels(), collapse=", "), "\n")
 cat('"cluster_size" registered:', "cluster_size" %in% list_panels(), "\n")
+cat('"sample_composition" registered:', "sample_composition" %in% list_panels(), "\n")
