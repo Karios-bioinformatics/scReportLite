@@ -1,5 +1,5 @@
 # scReportLite: Main entry point + HTML assembly + embedded CSS/JS ----------------
-# v0.1.3 — Cell Info Panel, Multi-Cluster Highlight, Sample Highlight
+# v0.1.4 — Panel system: cluster_size barplot, reusable panel architecture
 
 
 # ---- CSS template --------------------------------------------------------------
@@ -319,21 +319,42 @@ body {
   text-align: center;
 }
 
-/* --- Marker panel --- */
-.marker-section {
-  max-height: 320px;
-  overflow-y: auto;
+/* --- Panel sections (shared card style) --- */
+.panel-section {
   padding: 16px;
   background: #fff;
   margin: 6px 12px 12px 0;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
-.marker-section .section-title {
+.panel-section .section-title {
   font-size: 0.95em;
   font-weight: 600;
   margin-bottom: 10px;
   color: #2d3436;
+}
+
+/* Panel body — wraps panel content (plotly widgets, tables, etc.) */
+.panel-body {
+  min-height: 200px;
+}
+.panel-cluster_size .panel-body {
+  height: 400px;
+}
+
+/* Force htmlwidget children to fill panel body */
+.panel-body > *,
+.panel-body .html-widget,
+.panel-body .plotly,
+.panel-body .js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Marker section (panel variant — adds scroll constraints) */
+.marker-section {
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 .marker-table {
@@ -605,6 +626,7 @@ function updateSidebarUI() {
 function updateMarkerTable(clusterId) {
   var titleEl = document.getElementById("marker-title");
   var container = document.getElementById("marker-table-container");
+  if (!container) return;
 
   if (!window._MARKER_DATA || window._MARKER_DATA.length === 0) {
     titleEl.textContent = "Marker Genes";
@@ -661,9 +683,11 @@ function updateMarkerTable(clusterId) {
 }
 
 function clearMarkerTable() {
+  var container = document.getElementById("marker-table-container");
+  if (!container) return;
   document.getElementById("marker-title").textContent =
     "Click a cluster to view marker genes";
-  document.getElementById("marker-table-container").innerHTML =
+  container.innerHTML =
     "<p class=\\"no-data\\">Select a cluster from the sidebar to see its marker genes.</p>";
 }
 
@@ -830,7 +854,8 @@ onPlotlyReady(function(gd) {
 #' @keywords internal
 assemble_report <- function(umap_plot, umap_df, marker_df,
                              cluster_col, cell_col, sample_col,
-                             output, title, dim_opacity, marker_n_top) {
+                             output, title, dim_opacity, marker_n_top,
+                             panels = c("umap", "marker_table")) {
 
   clusters     <- sort(unique(umap_df[[cluster_col]]))
   cluster_cols <- cluster_color_map(clusters)
@@ -920,6 +945,42 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
     ))
   }
 
+  # ---- Build panel sections for content area ----
+  has_umap         <- "umap" %in% panels
+  non_umap_panels  <- setdiff(panels, "umap")
+
+  # Prepare shared panel params
+  panel_params <- list(
+    umap_df        = umap_df,
+    marker_df      = marker_df,
+    cluster_col    = cluster_col,
+    cell_col       = cell_col,
+    sample_col     = sample_col,
+    cluster_colors = cluster_cols,
+    n_total        = n_total
+  )
+
+  # Render each non-UMAP panel section
+  panel_sections_html <- lapply(non_umap_panels, function(pn) {
+    if (pn == "marker_table") {
+      tags$div(class = "panel-section marker-section",
+        tags$div(class = "section-title", id = "marker-title",
+          "Click a cluster to view marker genes"
+        ),
+        tags$div(id = "marker-table-container",
+          tags$p(class = "no-data",
+            "Select a cluster from the sidebar to see its marker genes.")
+        )
+      )
+    } else {
+      render_panel_section(pn, panel_params)
+    }
+  })
+
+  # Collect extra CSS and JS from panels
+  panel_css_extra <- collect_panel_css(non_umap_panels)
+  panel_js_extra  <- collect_panel_js(non_umap_panels)
+
   # ---- Assemble full page ----
   page <- tags$html(
     tags$head(
@@ -929,7 +990,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         content = "width=device-width, initial-scale=1.0"
       ),
       tags$title(title),
-      tags$style(htmltools::HTML(report_css()))
+      tags$style(htmltools::HTML(paste(report_css(), panel_css_extra, sep = "\n")))
     ),
     tags$body(
       tags$div(class = "container",
@@ -949,52 +1010,43 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
           # ---- Sidebar ----
           tags$div(class = "sidebar", sidebar_sections),
 
-          # ---- Content area ----
+          # ---- Content area (built from panels) ----
           tags$div(class = "content-area",
-
-            # UMAP plot
-            tags$div(class = "umap-section",
-              tags$div(class = "section-title",
-                "UMAP — click a cell to inspect, cluster to highlight"
-              ),
-              tags$div(class = "umap-container", id = "umap-container",
-                umap_tags
-              )
-            ),
-
-            # Cell Info Panel (hidden until a cell is clicked)
-            tags$div(class = "cell-info-panel", id = "cell-info-panel",
-              style = "display:none;",
-              tags$div(class = "cell-info-header",
-                tags$div(
-                  tags$span(class = "cell-info-title", "Cell Information"),
-                  tags$span(" — "),
-                  tags$span(class = "cell-info-cellid", id = "cell-info-cellid", "")
+            # UMAP section (if "umap" is in panels)
+            if (has_umap) list(
+              tags$div(class = "umap-section",
+                tags$div(class = "section-title",
+                  "UMAP — click a cell to inspect, cluster to highlight"
                 ),
-                tags$button(
-                  class = "copy-btn",
-                  id = "copy-cell-btn",
-                  onclick = "copyCellId()",
-                  "Copy Cell ID"
+                tags$div(class = "umap-container", id = "umap-container",
+                  umap_tags
                 )
               ),
-              tags$div(
-                id = "cell-info-content",
-                tags$p(class = "cell-info-hint",
-                  "Click a cell on the UMAP to view its details")
+              # Cell Info Panel (hidden until a cell is clicked)
+              tags$div(class = "cell-info-panel", id = "cell-info-panel",
+                style = "display:none;",
+                tags$div(class = "cell-info-header",
+                  tags$div(
+                    tags$span(class = "cell-info-title", "Cell Information"),
+                    tags$span(" — "),
+                    tags$span(class = "cell-info-cellid", id = "cell-info-cellid", "")
+                  ),
+                  tags$button(
+                    class = "copy-btn",
+                    id = "copy-cell-btn",
+                    onclick = "copyCellId()",
+                    "Copy Cell ID"
+                  )
+                ),
+                tags$div(
+                  id = "cell-info-content",
+                  tags$p(class = "cell-info-hint",
+                    "Click a cell on the UMAP to view its details")
+                )
               )
             ),
-
-            # Marker table
-            tags$div(class = "marker-section",
-              tags$div(class = "section-title", id = "marker-title",
-                "Click a cluster to view marker genes"
-              ),
-              tags$div(id = "marker-table-container",
-                tags$p(class = "no-data",
-                  "Select a cluster from the sidebar to see its marker genes.")
-              )
-            )
+            # Additional panel sections (rendered in order from panels)
+            panel_sections_html
           )
         )
       ),
@@ -1008,7 +1060,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         dim_opacity,
         if (has_samples) "true" else "false"
       ))),
-      tags$script(htmltools::HTML(report_js()))
+      tags$script(htmltools::HTML(paste(report_js(), panel_js_extra, sep = "\n")))
     )
   )
 
@@ -1057,6 +1109,11 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 #' @param marker_n_top Number of top marker genes to show per cluster
 #'   (sorted by p_val_adj ascending, then |avg_log2FC| descending).
 #'   Default: \code{20}.
+#' @param panels Character vector specifying which content sections to
+#'   include and their order. Built-in options: \code{"umap"} (interactive
+#'   UMAP plot), \code{"marker_table"} (marker gene table). Additional
+#'   registered panels (e.g. \code{"cluster_size"}) can be added.
+#'   Default: \code{c("umap", "marker_table")}.
 #' @param use_webgl Use plotly WebGL (scattergl) rendering instead of SVG
 #'   (scatter). Recommended for datasets with >10k cells to avoid
 #'   browser slowdown. Default: \code{TRUE}.
@@ -1094,6 +1151,7 @@ sc_report <- function(umap_df,
                        point_alpha  = 0.9,
                        dim_opacity  = 0.06,
                        marker_n_top = 20,
+                       panels       = c("umap", "marker_table"),
                        use_webgl    = TRUE) {
 
   # ---- Validate inputs ----
@@ -1111,6 +1169,17 @@ sc_report <- function(umap_df,
     stop("dim_opacity must be in [0, 1]", call. = FALSE)
   }
   if (marker_n_top < 1) stop("marker_n_top must be >= 1", call. = FALSE)
+
+  if (!is.character(panels) || length(panels) < 1) {
+    stop("panels must be a character vector with at least one element",
+         call. = FALSE)
+  }
+  unknown_panels <- setdiff(panels, c("umap", "marker_table", list_panels()))
+  if (length(unknown_panels) > 0) {
+    warning("Unknown panel(s) in 'panels': ",
+            paste(unknown_panels, collapse = ", "),
+            ". They will be skipped.", call. = FALSE)
+  }
 
   # ---- Build plot ----
   message("scReportLite: building interactive UMAP plot...")
@@ -1131,6 +1200,7 @@ sc_report <- function(umap_df,
     output        = output,
     title         = title,
     dim_opacity   = dim_opacity,
-    marker_n_top  = marker_n_top
+    marker_n_top  = marker_n_top,
+    panels        = panels
   )
 }
