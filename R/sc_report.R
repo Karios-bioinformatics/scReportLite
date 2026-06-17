@@ -63,33 +63,39 @@ body {
   overflow: hidden;
 }
 
-/* Sidebar sections (clusters + samples) */
-.sidebar-section {
+/* Sidebar tab bar */
+.sidebar-tabs {
   display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.sidebar-section.clusters {
-  flex: 1;
-}
-.sidebar-section.samples {
-  flex: 0 1 auto;
-  max-height: 40%;
-  border-top: 1px solid #dfe6e9;
-}
-
-.sidebar-header {
-  padding: 12px 16px;
-  font-weight: 600;
-  font-size: 0.85em;
-  color: #636e72;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  border-bottom: 1px solid #dfe6e9;
   flex-shrink: 0;
 }
+.sidebar-tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px 8px;
+  cursor: pointer;
+  font-size: 0.85em;
+  font-weight: 500;
+  color: #636e72;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  user-select: none;
+}
+.sidebar-tab:hover { color: #2d3436; }
+.sidebar-tab.active {
+  color: #1F77B4;
+  border-bottom-color: #1F77B4;
+}
+
+/* Sidebar content areas (one per tab) */
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.sidebar-content.hidden { display: none; }
 
 .cluster-list, .sample-list {
-  overflow-y: auto;
   padding: 4px 0;
 }
 
@@ -105,16 +111,13 @@ body {
   user-select: none;
   gap: 8px;
 }
-.cluster-item:hover {
-  background: #f0f1f5;
-}
+.cluster-item:hover { background: #f0f1f5; }
 .cluster-item.active {
   background: #e8ecf8;
   border-left-color: #1F77B4;
   font-weight: 600;
 }
 
-/* Checkbox indicator */
 .cluster-check {
   width: 16px;
   height: 16px;
@@ -154,7 +157,7 @@ body {
   flex-shrink: 0;
 }
 
-/* --- Sample items (single-select radio style) --- */
+/* --- Sample items (single-select, same highlight as clusters) --- */
 .sample-item {
   display: flex;
   align-items: center;
@@ -166,12 +169,10 @@ body {
   user-select: none;
   gap: 8px;
 }
-.sample-item:hover {
-  background: #f0f1f5;
-}
+.sample-item:hover { background: #f0f1f5; }
 .sample-item.active {
-  background: #fef3e2;
-  border-left-color: #F58231;
+  background: #e8ecf8;
+  border-left-color: #1F77B4;
   font-weight: 600;
 }
 
@@ -182,9 +183,7 @@ body {
   flex-shrink: 0;
   background: #dfe6e9;
 }
-.sample-item.active .sample-dot {
-  background: #F58231;
-}
+.sample-item.active .sample-dot { background: #1F77B4; }
 
 .sample-name {
   flex: 1;
@@ -440,6 +439,99 @@ var ORIG_COLORS = [];
 var _HAS_SAMPLES = false;
 var _CELL_SAMPLE = {};   // cellId → sample (built from customdata)
 var _TRACE_CELLS = [];   // per-trace cell ID arrays (built from customdata)
+var _ACTIVE_MODE = "cluster";  // "cluster" or "sample" — controls panel visibility
+
+// =========================================================================
+// Tab Switching & Panel Visibility
+// =========================================================================
+
+function switchTab(mode) {
+  _ACTIVE_MODE = mode;
+  var tabC = document.getElementById("tab-clusters");
+  var tabS = document.getElementById("tab-samples");
+  var contC = document.getElementById("sidebar-clusters");
+  var contS = document.getElementById("sidebar-samples");
+  if (tabC) tabC.classList.toggle("active", mode === "cluster");
+  if (tabS) tabS.classList.toggle("active", mode === "sample");
+  if (contC) contC.classList.toggle("hidden", mode !== "cluster");
+  if (contS) contS.classList.toggle("hidden", mode !== "sample");
+  updatePanelVisibility();
+}
+
+function updatePanelVisibility() {
+  var markerPanel = document.querySelector(".marker-section");
+  var sampleCompPanel = document.getElementById("srl-panel-sample_composition");
+  if (_ACTIVE_MODE === "cluster") {
+    if (markerPanel) markerPanel.style.display = "";
+    if (sampleCompPanel) sampleCompPanel.style.display = "none";
+  } else {
+    if (markerPanel) markerPanel.style.display = "none";
+    if (sampleCompPanel) sampleCompPanel.style.display = "";
+  }
+}
+
+// =========================================================================
+// Sample Composition (JS-driven, single sample)
+// =========================================================================
+
+function updateSampleComposition(sampleId) {
+  var container = document.getElementById("srl-panel-sample_composition");
+  if (!container) return;
+  var body = container.querySelector(".panel-body");
+  if (!body) return;
+
+  var data = window._SAMPLE_COMP_DATA;
+  var colors = window._CLUSTER_COLORS || {};
+
+  if (!data || !data[sampleId]) {
+    body.innerHTML = "<p class=\"no-data\">No composition data available for this sample.</p>";
+    return;
+  }
+
+  var sampleData = data[sampleId];
+  var clNames = Object.keys(sampleData);
+  var clCounts = clNames.map(function(k) { return sampleData[k]; });
+  var total = clCounts.reduce(function(a, b) { return a + b; }, 0);
+
+  // Sort clusters numerically if possible
+  var clNumeric = clNames.map(function(x) { var n = Number(x); return isNaN(n) ? null : n; });
+  var allNumeric = clNumeric.every(function(x) { return x !== null; });
+  var order = allNumeric
+    ? clNames.map(function(_, i) { return i; }).sort(function(a, b) { return clNumeric[a] - clNumeric[b]; })
+    : clNames.map(function(_, i) { return i; }).sort(function(a, b) { return clNames[a].localeCompare(clNames[b]); });
+  clNames = order.map(function(i) { return clNames[i]; });
+  clCounts = order.map(function(i) { return clCounts[i]; });
+
+  // Build hover text
+  var hover = clNames.map(function(cl, i) {
+    var pct = (clCounts[i] / total * 100).toFixed(1);
+    return "Cluster " + cl + "<br>" + clCounts[i] + " cells (" + pct + "%)";
+  });
+
+  // Bar colours from UMAP cluster colour map
+  var barColors = clNames.map(function(cl) { return colors[cl] || "#888888"; });
+
+  var trace = {
+    x: clNames,
+    y: clCounts,
+    type: "bar",
+    marker: { color: barColors, line: { color: "#ffffff", width: 1 } },
+    text: hover,
+    hoverinfo: "text",
+    hoverlabel: { bgcolor: "#2d3436", font: { color: "#ffffff" } }
+  };
+
+  var layout = {
+    title: "Sample: " + sampleId,
+    xaxis: { title: "Cluster", type: "category", categoryorder: "array", categoryarray: clNames },
+    yaxis: { title: "Number of Cells" },
+    margin: { l: 60, r: 30, b: 60, t: 40 },
+    showlegend: false,
+    bargap: 0.25
+  };
+
+  Plotly.react(body, [trace], layout, { displayModeBar: false, displaylogo: false });
+}
 
 // Cache the plotly graph div on first use
 var _gdCache = null;
@@ -534,7 +626,7 @@ function applyHighlight() {
 }
 
 // =========================================================================
-// Cluster Toggle (Multi-Select)
+// Cluster Toggle (Multi-Select) — switches to cluster mode
 // =========================================================================
 
 function toggleCluster(clusterId) {
@@ -546,10 +638,14 @@ function toggleCluster(clusterId) {
     SELECTED_CLUSTERS.add(clusterId);
   }
 
+  // Switch to cluster mode so marker table is visible
+  if (SELECTED_CLUSTERS.size > 0) {
+    switchTab("cluster");
+  }
+
   updateSidebarUI();
   applyHighlight();
 
-  // Show markers for the most recently toggled cluster (if any selected)
   if (SELECTED_CLUSTERS.size > 0) {
     updateMarkerTable(clusterId);
   } else {
@@ -558,7 +654,7 @@ function toggleCluster(clusterId) {
 }
 
 // =========================================================================
-// Sample Highlight (Single-Select)
+// Sample Highlight (Single-Select) — switches to sample mode, updates composition
 // =========================================================================
 
 function selectSample(sampleId) {
@@ -568,10 +664,17 @@ function selectSample(sampleId) {
     SELECTED_SAMPLE = null;
   } else {
     SELECTED_SAMPLE = sampleId;
+    // Switch to sample mode → show sample composition
+    switchTab("sample");
   }
 
   updateSidebarUI();
   applyHighlight();
+
+  // Update single-sample composition chart
+  if (SELECTED_SAMPLE) {
+    updateSampleComposition(SELECTED_SAMPLE);
+  }
 }
 
 // =========================================================================
@@ -581,6 +684,7 @@ function selectSample(sampleId) {
 function resetAll() {
   SELECTED_CLUSTERS.clear();
   SELECTED_SAMPLE = null;
+  switchTab("cluster");
   updateSidebarUI();
   applyHighlight();
   clearMarkerTable();
@@ -830,6 +934,9 @@ onPlotlyReady(function(gd) {
   gd.on("plotly_doubleclick", function() {
     resetAll();
   });
+
+  // ---- Initial panel visibility (cluster mode) ----
+  updatePanelVisibility();
 });
 '
 }
@@ -920,30 +1027,49 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   # ---- UMAP plot as tags ----
   umap_tags <- htmltools::as.tags(umap_plot)
 
-  # ---- Sidebar sections assembly ----
-  sidebar_sections <- list(
-    tags$div(
-      class = "sidebar-section clusters",
-      tags$div(
-        class = "sidebar-header",
-        sprintf("Clusters (%d)", length(clusters))
-      ),
+  # ---- Sidebar: tab-based layout ----
+  sidebar_tabs <- list(
+    tags$div(class = "sidebar-tab active", id = "tab-clusters",
+             onclick = "switchTab('clusters')", "Clusters")
+  )
+  sidebar_contents <- list(
+    tags$div(class = "sidebar-content", id = "sidebar-clusters",
       tags$div(class = "cluster-list", cluster_html)
     )
   )
 
   if (has_samples) {
-    sidebar_sections <- c(sidebar_sections, list(
-      tags$div(
-        class = "sidebar-section samples",
-        tags$div(
-          class = "sidebar-header",
-          sprintf("Samples (%d)", length(samples))
-        ),
+    sidebar_tabs <- c(sidebar_tabs, list(
+      tags$div(class = "sidebar-tab", id = "tab-samples",
+               onclick = "switchTab('samples')", "Samples")
+    ))
+    sidebar_contents <- c(sidebar_contents, list(
+      tags$div(class = "sidebar-content hidden", id = "sidebar-samples",
         tags$div(class = "sample-list", sample_html)
       )
     ))
   }
+
+  sidebar_html <- c(
+    list(tags$div(class = "sidebar-tabs", sidebar_tabs)),
+    sidebar_contents
+  )
+
+  # ---- Build per-sample composition data (for JS-driven chart) ----
+  sample_comp_json <- "{}"
+  if (has_samples) {
+    comp_counts <- table(umap_df[[sample_col]], umap_df[[cluster_col]])
+    comp_list <- lapply(rownames(comp_counts), function(s) {
+      row <- as.list(as.integer(comp_counts[s, ]))
+      names(row) <- colnames(comp_counts)
+      row
+    })
+    names(comp_list) <- rownames(comp_counts)
+    sample_comp_json <- jsonlite::toJSON(comp_list, auto_unbox = TRUE)
+  }
+
+  # ---- Cluster colours as JSON (for JS-driven charts) ----
+  cluster_colors_json <- jsonlite::toJSON(as.list(cluster_cols), auto_unbox = TRUE)
 
   # ---- Build panel sections for content area ----
   has_umap         <- "umap" %in% panels
@@ -1008,7 +1134,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         tags$div(class = "main-layout",
 
           # ---- Sidebar ----
-          tags$div(class = "sidebar", sidebar_sections),
+          tags$div(class = "sidebar", sidebar_html),
 
           # ---- Content area (built from panels) ----
           tags$div(class = "content-area",
@@ -1059,6 +1185,14 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         marker_n_top,
         dim_opacity,
         if (has_samples) "true" else "false"
+      ))),
+      tags$script(htmltools::HTML(sprintf(
+        "window._SAMPLE_COMP_DATA = %s;",
+        sample_comp_json
+      ))),
+      tags$script(htmltools::HTML(sprintf(
+        "window._CLUSTER_COLORS = %s;",
+        cluster_colors_json
       ))),
       tags$script(htmltools::HTML(paste(report_js(), panel_js_extra, sep = "\n")))
     )
