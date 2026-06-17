@@ -1030,7 +1030,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   # ---- Sidebar: tab-based layout ----
   sidebar_tabs <- list(
     tags$div(class = "sidebar-tab active", id = "tab-clusters",
-             onclick = "switchTab('clusters')", "Clusters")
+             onclick = "switchTab('cluster')", "Clusters")
   )
   sidebar_contents <- list(
     tags$div(class = "sidebar-content", id = "sidebar-clusters",
@@ -1041,7 +1041,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   if (has_samples) {
     sidebar_tabs <- c(sidebar_tabs, list(
       tags$div(class = "sidebar-tab", id = "tab-samples",
-               onclick = "switchTab('samples')", "Samples")
+               onclick = "switchTab('sample')", "Samples")
     ))
     sidebar_contents <- c(sidebar_contents, list(
       tags$div(class = "sidebar-content hidden", id = "sidebar-samples",
