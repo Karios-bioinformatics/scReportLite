@@ -1077,7 +1077,7 @@ function renderPcLoading() {
   area.style.display = "";
 
   if (!_PCA_LOADING || _PCA_LOADING.length === 0) {
-    content.innerHTML = "<p class=\"no-data\">No PCA loading data provided.</p>";
+    content.innerHTML = "<p class=\\"no-data\\">No PCA loading data provided.</p>";
     return;
   }
 
@@ -1091,7 +1091,7 @@ function renderPcLoading() {
   }
 
   if (rows.length === 0) {
-    content.innerHTML = "<p class=\"no-data\">No loading data for " + pc + ".</p>";
+    content.innerHTML = "<p class=\\"no-data\\">No loading data for " + pc + ".</p>";
     return;
   }
 
