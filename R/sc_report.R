@@ -878,8 +878,8 @@ function pcaSortGroups(arr) {
 // Natural sort for PC column names: PC_1, PC_2, ..., PC_10, ...
 function pcaSortPcNames(arr) {
   return arr.slice().sort(function(a, b) {
-    var ma = a.match(/^PC_(\d+)$/);
-    var mb = b.match(/^PC_(\d+)$/);
+    var ma = a.match(/^PC_([0-9]+)$/);
+    var mb = b.match(/^PC_([0-9]+)$/);
     if (ma && mb) return Number(ma[1]) - Number(mb[1]);
     return String(a).localeCompare(String(b));
   });
@@ -1273,7 +1273,7 @@ function initPcaPlot() {
     var keys = Object.keys(_PCA_DATA);
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i];
-      if (/^PC_\d+$/.test(k)) {
+      if (/^PC_[0-9]+$/.test(k)) {
         _PCA_SCORES[k] = _PCA_DATA[k];
       }
     }
