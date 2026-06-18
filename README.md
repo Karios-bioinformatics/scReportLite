@@ -264,10 +264,16 @@ Planned features:
 
 ### Changelog
 
+**v0.2.1** — PCA colour-by support
+- New `pca_color_by` parameter: colour PCA by any metadata column (default `"cluster"`)
+- Set `pca_color_by = "sample"` to colour PCA points by sample/condition
+- Fallback: missing column → warning + fallback to `"cluster"`
+- Hover text always includes cluster assignment regardless of colour grouping
+
 **v0.2.0** — PCA module
 - New `pca_df` parameter: provide PCA coordinates to enable the PCA view
 - New `"pca"` panel in `panels`: includes PCA in the report
-- Top-level PCA | UMAP switch in sidebar (above Clusters / Samples / Genes)
+- Top-level PCA | UMAP switch above the main content area
 - PCA plot: PC_1 vs PC_2, cluster-coloured, with Cell/Cluster/PC_1/PC_2/Sample hover
 - When `pca_df = NULL` or `"pca"` not in panels: behaviour identical to v0.1.5
 - No changes to UMAP, gene expression mode, sample composition, or marker table

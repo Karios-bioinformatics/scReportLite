@@ -1,5 +1,5 @@
 # scReportLite: Main entry point + HTML assembly + embedded CSS/JS ----------------
-# v0.2.0 — PCA module with top-level PCA / UMAP view switch
+# v0.2.1 — pca_color_by parameter for PCA metadata colour grouping
 
 
 # ---- CSS template --------------------------------------------------------------
@@ -1324,6 +1324,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                              gene_expr_df = NULL,
                              pca_df = NULL,
                              pca_plot = NULL,
+                             pca_color_by = "cluster",
                              output, title, dim_opacity, marker_n_top,
                              panels = c("umap", "marker_table")) {
 
@@ -1724,6 +1725,7 @@ sc_report <- function(umap_df,
                        marker_df     = NULL,
                        gene_expr_df  = NULL,
                        pca_df        = NULL,
+                       pca_color_by  = "cluster",
                        output        = "sc_report.html",
                        title         = "scRNA-seq Report",
                        point_size    = 3,
@@ -1793,7 +1795,7 @@ sc_report <- function(umap_df,
     message("scReportLite: building PCA plot...")
     pca_plot <- build_pca_plotly(
       pca_df, cluster_col, cell_col, sample_col,
-      point_size, point_alpha, use_webgl
+      pca_color_by, point_size, point_alpha, use_webgl
     )
   } else if (is.null(pca_df) && "pca" %in% panels) {
     warning("PCA panel requested but pca_df is NULL. Skipping PCA panel.",
@@ -1812,6 +1814,7 @@ sc_report <- function(umap_df,
     gene_expr_df  = gene_expr_df,
     pca_df        = pca_df,
     pca_plot      = pca_plot,
+    pca_color_by  = pca_color_by,
     output        = output,
     title         = title,
     dim_opacity   = dim_opacity,
