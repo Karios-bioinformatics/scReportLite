@@ -1,5 +1,5 @@
 # scReportLite: Main entry point + HTML assembly + embedded CSS/JS ----------------
-# v0.1.5 — Gene Expression Mode: gene-level UMAP coloring + summary panel
+# v0.2.0 — PCA module with top-level PCA / UMAP view switch
 
 
 # ---- CSS template --------------------------------------------------------------
@@ -22,6 +22,63 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* --- View tabs (PCA / UMAP top-level switch) --- */
+.view-tabs {
+  display: flex;
+  border-bottom: 1px solid #dfe6e9;
+  flex-shrink: 0;
+}
+.view-tab {
+  flex: 1;
+  text-align: center;
+  padding: 7px 8px;
+  cursor: pointer;
+  font-size: 0.82em;
+  font-weight: 600;
+  color: #636e72;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  user-select: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.view-tab:hover { color: #2d3436; }
+.view-tab.active {
+  color: #00b894;
+  border-bottom-color: #00b894;
+}
+
+/* --- PCA plot section --- */
+.pca-section {
+  height: 650px;
+  flex-shrink: 0;
+  padding: 16px;
+  background: #fff;
+  margin: 12px 12px 6px 0;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  display: none;
+  flex-direction: column;
+}
+.pca-section .section-title {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #636e72;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.pca-container {
+  height: 600px;
+  flex-shrink: 0;
+}
+.pca-container > *,
+.pca-container .html-widget,
+.pca-container .plotly,
+.pca-container .js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* --- Header --- */
@@ -485,6 +542,61 @@ var _ACTIVE_MODE = "cluster";  // "cluster" or "sample" — controls panel visib
 var _SELECTED_GENE = null;
 var _ORIG_COLORS_SAVED = [];  // saved cluster colors for gene mode restore
 var _GENE_LIST = [];           // cached gene name list
+var _ACTIVE_VIEW = "umap";    // "umap" or "pca" — top-level view switch (v0.2.0)
+
+// =========================================================================
+// View Switching — PCA / UMAP top-level (v0.2.0)
+// =========================================================================
+
+function switchView(view) {
+  _ACTIVE_VIEW = view;
+
+  // Toggle view tabs
+  var tabU = document.getElementById("view-tab-umap");
+  var tabP = document.getElementById("view-tab-pca");
+  if (tabU) tabU.classList.toggle("active", view === "umap");
+  if (tabP) tabP.classList.toggle("active", view === "pca");
+
+  // Toggle plot sections
+  var umapSec = document.getElementById("umap-section");
+  var pcaSec  = document.getElementById("pca-section");
+  if (umapSec) umapSec.style.display = (view === "umap") ? "" : "none";
+  if (pcaSec)  pcaSec.style.display  = (view === "pca")  ? "" : "none";
+
+  // Cell info panel — UMAP only
+  var ciPanel = document.getElementById("cell-info-panel");
+  if (ciPanel) ciPanel.style.display = (view === "umap") ? "" : "none";
+
+  // Sidebar tabs + content
+  var sidebarTabsDiv = document.querySelector(".sidebar > .sidebar-tabs");
+
+  if (view === "pca") {
+    // Hide secondary tabs (Clusters / Samples / Genes don't apply to PCA)
+    if (sidebarTabsDiv) sidebarTabsDiv.style.display = "none";
+    document.querySelectorAll(".sidebar > .sidebar-content").forEach(function(el) {
+      el.style.display = "none";
+    });
+    // Hide all panel sections (marker table, cluster_size, etc.)
+    document.querySelectorAll(".content-area > .panel-section").forEach(function(el) {
+      el.style.display = "none";
+    });
+  } else {
+    // Restore UMAP sidebar state
+    if (sidebarTabsDiv) sidebarTabsDiv.style.display = "";
+    updateSidebarUI();
+    applyHighlight();
+    updateMarkerPanel();
+    updatePanelVisibility();
+  }
+
+  // Resize newly shown plot
+  setTimeout(function() {
+    var container = (view === "umap")
+      ? document.getElementById("umap-container")
+      : document.getElementById("pca-container");
+    if (container) Plotly.Plots.resize(container);
+  }, 100);
+}
 
 // =========================================================================
 // Tab Switching & Panel Visibility
@@ -1208,6 +1320,8 @@ window.addEventListener("resize", function() {
 assemble_report <- function(umap_plot, umap_df, marker_df,
                              cluster_col, cell_col, sample_col,
                              gene_expr_df = NULL,
+                             pca_df = NULL,
+                             pca_plot = NULL,
                              output, title, dim_opacity, marker_n_top,
                              panels = c("umap", "marker_table")) {
 
@@ -1215,6 +1329,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   cluster_cols <- cluster_color_map(clusters)
   n_total      <- nrow(umap_df)
   has_samples  <- !is.null(sample_col)
+  has_pca      <- !is.null(pca_df) && !is.null(pca_plot) && "pca" %in% panels
 
   # ---- Sidebar: Cluster section ----
   cluster_html <- lapply(clusters, function(cl) {
@@ -1273,6 +1388,9 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
   # ---- UMAP plot as tags ----
   umap_tags <- htmltools::as.tags(umap_plot)
+
+  # ---- PCA plot as tags (v0.2.0) ----
+  pca_tags <- if (has_pca) htmltools::as.tags(pca_plot) else NULL
 
   # ---- Sidebar: tab-based layout ----
   sidebar_tabs <- list(
@@ -1335,7 +1453,17 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
     gene_expr_json <- jsonlite::toJSON(gene_list, auto_unbox = TRUE)
   }
 
+  # ---- Sidebar assembly ----
   sidebar_html <- c(
+    # View tabs (PCA / UMAP — only when PCA is available, v0.2.0)
+    if (has_pca) list(
+      tags$div(class = "view-tabs",
+        tags$div(class = "view-tab", id = "view-tab-pca",
+                 onclick = "switchView('pca')", "PCA"),
+        tags$div(class = "view-tab active", id = "view-tab-umap",
+                 onclick = "switchView('umap')", "UMAP")
+      )
+    ),
     list(tags$div(class = "sidebar-tabs", sidebar_tabs)),
     sidebar_contents
   )
@@ -1423,9 +1551,17 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
           # ---- Content area (built from panels) ----
           tags$div(class = "content-area",
+            # PCA section (hidden by default, v0.2.0)
+            if (has_pca) tags$div(
+              class = "pca-section",
+              id    = "pca-section",
+              style = "display:none;",
+              tags$div(class = "section-title", "PCA — PC_1 vs PC_2"),
+              tags$div(class = "pca-container", id = "pca-container", pca_tags)
+            ),
             # UMAP section (if "umap" is in panels)
             if (has_umap) list(
-              tags$div(class = "umap-section",
+              tags$div(class = "umap-section", id = "umap-section",
                 tags$div(class = "section-title",
                   "UMAP — click a cell to inspect, cluster to highlight"
                 ),
@@ -1575,6 +1711,7 @@ sc_report <- function(umap_df,
                        sample_col    = NULL,
                        marker_df     = NULL,
                        gene_expr_df  = NULL,
+                       pca_df        = NULL,
                        output        = "sc_report.html",
                        title         = "scRNA-seq Report",
                        point_size    = 3,
@@ -1590,6 +1727,19 @@ sc_report <- function(umap_df,
   # Validate gene expression data if provided
   if (!is.null(gene_expr_df)) {
     validate_gene_expr_df(gene_expr_df, umap_df, cell_col)
+  }
+
+  # Validate PCA data if provided (v0.2.0)
+  if (!is.null(pca_df)) {
+    if (!is.data.frame(pca_df)) {
+      stop("pca_df must be a data.frame or NULL", call. = FALSE)
+    }
+    required_pca <- c(cell_col, "PC_1", "PC_2", "cluster")
+    missing_pca <- setdiff(required_pca, colnames(pca_df))
+    if (length(missing_pca) > 0) {
+      stop("pca_df is missing required columns: ",
+           paste(missing_pca, collapse = ", "), call. = FALSE)
+    }
   }
 
   if (!is.character(output) || length(output) != 1) {
@@ -1609,19 +1759,29 @@ sc_report <- function(umap_df,
     stop("panels must be a character vector with at least one element",
          call. = FALSE)
   }
-  unknown_panels <- setdiff(panels, c("umap", "marker_table", list_panels()))
+  unknown_panels <- setdiff(panels, c("umap", "marker_table", "pca", list_panels()))
   if (length(unknown_panels) > 0) {
     warning("Unknown panel(s) in 'panels': ",
             paste(unknown_panels, collapse = ", "),
             ". They will be skipped.", call. = FALSE)
   }
 
-  # ---- Build plot ----
+  # ---- Build plots ----
   message("scReportLite: building interactive UMAP plot...")
   umap_plot <- build_umap_plotly(
     umap_df, cluster_col, cell_col, sample_col,
     point_size, point_alpha, use_webgl
   )
+
+  # Build PCA plot (v0.2.0)
+  pca_plot <- NULL
+  if (!is.null(pca_df) && "pca" %in% panels) {
+    message("scReportLite: building PCA plot...")
+    pca_plot <- build_pca_plotly(
+      pca_df, cluster_col, cell_col, sample_col,
+      point_size, point_alpha, use_webgl
+    )
+  }
 
   # ---- Assemble and write HTML ----
   message("scReportLite: assembling HTML report...")
@@ -1633,6 +1793,8 @@ sc_report <- function(umap_df,
     cell_col      = cell_col,
     sample_col    = sample_col,
     gene_expr_df  = gene_expr_df,
+    pca_df        = pca_df,
+    pca_plot      = pca_plot,
     output        = output,
     title         = title,
     dim_opacity   = dim_opacity,
