@@ -264,11 +264,15 @@ Planned features:
 
 ### Changelog
 
-**v0.2.1** — PCA colour-by support
-- New `pca_color_by` parameter: colour PCA by any metadata column (default `"cluster"`)
-- Set `pca_color_by = "sample"` to colour PCA points by sample/condition
-- Fallback: missing column → warning + fallback to `"cluster"`
-- Hover text always includes cluster assignment regardless of colour grouping
+**v0.2.1** — Interactive PCA controls
+- PCA view now includes interactive colour-mode and group-highlight controls
+- Colour by Cluster or Sample (when sample column available) with toggle buttons
+- Click any group in the PCA controls sidebar to highlight that group (dim others)
+- Reset highlight button restores full-colour view
+- Client-side Plotly.react rendering — fast switching without page reload
+- New `pca_color_by` parameter sets initial colour mode (default `"cluster"`)
+- Fallback: missing colour column → warning + fallback to `"cluster"`
+- Hover text always shows Cell/Cluster/PC_1/PC_2/Sample regardless of colour mode
 
 **v0.2.0** — PCA module
 - New `pca_df` parameter: provide PCA coordinates to enable the PCA view

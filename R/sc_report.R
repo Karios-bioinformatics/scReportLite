@@ -64,33 +64,130 @@ body {
   overflow-y: auto;
 }
 
-/* --- PCA plot section --- */
-.pca-section {
-  height: 650px;
-  flex-shrink: 0;
-  padding: 16px;
+/* --- PCA layout (v0.2.1) --- */
+.pca-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.pca-controls {
+  width: 220px;
+  min-width: 220px;
   background: #fff;
-  margin: 12px 12px 6px 0;
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border-right: 1px solid #dfe6e9;
+  overflow-y: auto;
+  padding: 12px;
   display: flex;
   flex-direction: column;
+  gap: 10px;
 }
-.pca-section .section-title {
+
+.pca-controls-label {
+  font-size: 0.78em;
+  font-weight: 600;
+  color: #b2bec3;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.pca-cm-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.pca-cm-btn {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #dfe6e9;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8em;
+  color: #636e72;
+  transition: background 0.15s, color 0.15s;
+}
+.pca-cm-btn:hover { background: #f0f1f5; }
+.pca-cm-btn.active {
+  background: #00b894;
+  color: #fff;
+  border-color: #00b894;
+}
+
+.pca-group-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.pca-group-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 0.82em;
+  gap: 6px;
+  transition: background 0.1s;
+  user-select: none;
+}
+.pca-group-item:hover { background: #f0f1f5; }
+.pca-group-item.active {
+  background: #e8ecf8;
+  font-weight: 600;
+}
+
+.pca-group-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pca-group-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pca-reset-btn {
+  width: 100%;
+  padding: 5px 12px;
+  border: 1px solid #dfe6e9;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.82em;
+  color: #636e72;
+  transition: background 0.15s;
+}
+.pca-reset-btn:hover { background: #f0f1f5; }
+
+.pca-plot-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 16px;
+}
+
+.pca-plot-area .section-title {
   font-size: 0.85em;
   font-weight: 600;
   color: #636e72;
   margin-bottom: 8px;
   flex-shrink: 0;
 }
-.pca-container {
-  height: 600px;
-  flex-shrink: 0;
+
+.pca-plot-area .pca-container {
+  flex: 1;
+  min-height: 0;
 }
-.pca-container > *,
-.pca-container .html-widget,
-.pca-container .plotly,
-.pca-container .js-plotly-plot {
+.pca-plot-area .pca-container > *,
+.pca-plot-area .pca-container .html-widget,
+.pca-plot-area .pca-container .plotly,
+.pca-plot-area .pca-container .js-plotly-plot {
   width: 100% !important;
   height: 100% !important;
 }
@@ -576,6 +673,8 @@ function switchView(view) {
     umapView.style.display = "none";
     if (tabP) tabP.classList.add("active");
     if (tabU) tabU.classList.remove("active");
+    // Lazy-init PCA on first view
+    if (!_PCA_INITIALIZED && typeof _PCA_DATA !== "undefined") initPcaPlot();
     // Trigger plotly resize after display change
     setTimeout(function() {
       var plots = document.querySelectorAll("#sr-view-pca .js-plotly-plot, #sr-view-pca .plotly");
@@ -598,6 +697,187 @@ function switchView(view) {
       window.dispatchEvent(new Event("resize"));
     }, 100);
   }
+}
+
+// =========================================================================
+// PCA Interactive Controls (v0.2.1)
+// =========================================================================
+
+var _PCA_CELLS     = [];
+var _PCA_PC1       = [];
+var _PCA_PC2       = [];
+var _PCA_CLUSTERS  = [];
+var _PCA_SAMPLES   = [];
+var _PCA_HAS_SAMPLE = false;
+var _PCA_COLORS     = {};
+var _PCA_USE_WEBGL  = true;
+var _PCA_INIT_MODE  = "cluster";
+
+var _PCA_COLOR_MODE = "cluster";
+var _PCA_HIGHLIGHT  = null;
+
+function pcaSortGroups(arr) {
+  return arr.slice().sort(function(a, b) {
+    var na = Number(a), nb = Number(b);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return String(a).localeCompare(String(b));
+  });
+}
+
+function getPcaGroups() {
+  var arr = (_PCA_COLOR_MODE === "cluster") ? _PCA_CLUSTERS : _PCA_SAMPLES;
+  var seen = {}, groups = [];
+  for (var i = 0; i < arr.length; i++) {
+    var v = String(arr[i]);
+    if (!seen[v]) { seen[v] = true; groups.push(v); }
+  }
+  return pcaSortGroups(groups);
+}
+
+function buildPcaGroupIndices() {
+  var groups  = getPcaGroups();
+  var arr     = (_PCA_COLOR_MODE === "cluster") ? _PCA_CLUSTERS : _PCA_SAMPLES;
+  var indices = {};
+  for (var i = 0; i < groups.length; i++) indices[groups[i]] = [];
+  for (var i = 0; i < arr.length; i++) {
+    indices[String(arr[i])].push(i);
+  }
+  return { groups: groups, indices: indices };
+}
+
+function renderPcaPlot() {
+  var container = document.getElementById("pca-container");
+  if (!container) return;
+
+  var gi      = buildPcaGroupIndices();
+  var groups  = gi.groups;
+  var indices = gi.indices;
+  var traces  = [];
+
+  for (var gi = 0; gi < groups.length; gi++) {
+    var g = groups[gi];
+    var idx = indices[g];
+    var n = idx.length;
+    var x = new Array(n), y = new Array(n);
+    var text = new Array(n), cd2 = new Array(n);
+    var op = new Array(n);
+
+    for (var k = 0; k < n; k++) {
+      var i = idx[k];
+      x[k] = _PCA_PC1[i];
+      y[k] = _PCA_PC2[i];
+      var h = "Cell: " + _PCA_CELLS[i] +
+        "<br>Cluster: " + _PCA_CLUSTERS[i] +
+        "<br>PC_1: " + _PCA_PC1[i].toFixed(3) +
+        "<br>PC_2: " + _PCA_PC2[i].toFixed(3);
+      if (_PCA_HAS_SAMPLE) h += "<br>Sample: " + _PCA_SAMPLES[i];
+      text[k] = h;
+      cd2[k]  = [_PCA_CELLS[i], _PCA_CLUSTERS[i],
+                 _PCA_SAMPLES[i], _PCA_PC1[i], _PCA_PC2[i]];
+      op[k] = (_PCA_HIGHLIGHT !== null && g !== _PCA_HIGHLIGHT) ? 0.12 : 0.9;
+    }
+
+    var mc = (_PCA_HIGHLIGHT !== null && g !== _PCA_HIGHLIGHT)
+      ? "#D0D0D0" : (_PCA_COLORS[g] || "#888888");
+
+    traces.push({
+      x: x, y: y,
+      type: _PCA_USE_WEBGL ? "scattergl" : "scatter",
+      mode: "markers",
+      marker: { color: mc, size: 3, opacity: op },
+      text: text, hoverinfo: "text",
+      customdata: cd2, name: "pca_" + g, showlegend: false
+    });
+  }
+
+  Plotly.react(container, traces, {
+    xaxis: { title: "PC_1", showgrid: false, zeroline: false, showticklabels: true },
+    yaxis: { title: "PC_2", showgrid: false, zeroline: false, showticklabels: true,
+             scaleanchor: "x", scaleratio: 1 },
+    hovermode: "closest", margin: { l: 60, r: 30, b: 60, t: 30 }, dragmode: "pan"
+  }, {
+    displayModeBar: true,
+    modeBarButtonsToRemove: ["sendDataToCloud", "lasso2d", "select2d",
+      "autoScale2d", "toggleSpikelines"],
+    displaylogo: false
+  });
+}
+
+function renderPcaGroupList() {
+  var list = document.getElementById("pca-group-list");
+  if (!list) return;
+  var groups = getPcaGroups();
+  list.innerHTML = "";
+  for (var i = 0; i < groups.length; i++) {
+    var g = groups[i];
+    var color = _PCA_COLORS[g] || "#888888";
+    var active = (_PCA_HIGHLIGHT === g);
+
+    var item = document.createElement("div");
+    item.className = "pca-group-item" + (active ? " active" : "");
+
+    var dot = document.createElement("span");
+    dot.className = "pca-group-dot";
+    dot.style.background = color;
+
+    var nameEl = document.createElement("span");
+    nameEl.className = "pca-group-name";
+    nameEl.textContent = g;
+
+    item.appendChild(dot);
+    item.appendChild(nameEl);
+
+    (function(gv) { item.onclick = function() { highlightPcaGroup(gv); }; })(g);
+
+    list.appendChild(item);
+  }
+}
+
+function switchPcaColorMode(mode) {
+  _PCA_COLOR_MODE = mode;
+  _PCA_HIGHLIGHT  = null;
+  var btnC = document.getElementById("pca-cm-cluster");
+  var btnS = document.getElementById("pca-cm-sample");
+  if (btnC) btnC.classList.toggle("active", mode === "cluster");
+  if (btnS) btnS.classList.toggle("active", mode === "sample");
+  renderPcaGroupList();
+  renderPcaPlot();
+}
+
+function highlightPcaGroup(value) {
+  _PCA_HIGHLIGHT = (_PCA_HIGHLIGHT === value) ? null : value;
+  renderPcaGroupList();
+  renderPcaPlot();
+}
+
+function resetPcaHighlight() {
+  _PCA_HIGHLIGHT = null;
+  renderPcaGroupList();
+  renderPcaPlot();
+}
+
+var _PCA_INITIALIZED = false;
+
+function initPcaPlot() {
+  if (_PCA_INITIALIZED) return;
+  _PCA_INITIALIZED = true;
+  _PCA_CELLS      = _PCA_DATA.cells;
+  _PCA_PC1        = _PCA_DATA.PC_1;
+  _PCA_PC2        = _PCA_DATA.PC_2;
+  _PCA_CLUSTERS   = _PCA_DATA.cluster;
+  _PCA_SAMPLES    = _PCA_DATA.sample || [];
+  _PCA_HAS_SAMPLE = _PCA_HAS_SAMPLE;
+  _PCA_USE_WEBGL  = _PCA_USE_WEBGL;
+  _PCA_INIT_MODE  = _PCA_INIT_MODE;
+  _PCA_COLORS     = _PCA_COLORS;
+  _PCA_COLOR_MODE = _PCA_INIT_MODE;
+  _PCA_HIGHLIGHT  = null;
+  var btnC = document.getElementById("pca-cm-cluster");
+  var btnS = document.getElementById("pca-cm-sample");
+  if (btnC) btnC.classList.toggle("active", _PCA_COLOR_MODE === "cluster");
+  if (btnS) btnS.classList.toggle("active", _PCA_COLOR_MODE === "sample");
+  renderPcaGroupList();
+  renderPcaPlot();
 }
 
 // =========================================================================
@@ -1323,7 +1603,8 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                              cluster_col, cell_col, sample_col,
                              gene_expr_df = NULL,
                              pca_df = NULL,
-                             pca_plot = NULL,
+                             pca_data_json = "null",
+                             pca_has_sample = FALSE,
                              pca_color_by = "cluster",
                              output, title, dim_opacity, marker_n_top,
                              panels = c("umap", "marker_table")) {
@@ -1332,7 +1613,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   cluster_cols <- cluster_color_map(clusters)
   n_total      <- nrow(umap_df)
   has_samples  <- !is.null(sample_col)
-  has_pca      <- !is.null(pca_df) && !is.null(pca_plot) && "pca" %in% panels
+  has_pca      <- !is.null(pca_df) && "pca" %in% panels
 
   # ---- Sidebar: Cluster section ----
   cluster_html <- lapply(clusters, function(cl) {
@@ -1391,9 +1672,6 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
   # ---- UMAP plot as tags ----
   umap_tags <- htmltools::as.tags(umap_plot)
-
-  # ---- PCA plot as tags (v0.2.0) ----
-  pca_tags <- if (has_pca) htmltools::as.tags(pca_plot) else NULL
 
   # ---- Sidebar: tab-based layout ----
   sidebar_tabs <- list(
@@ -1598,14 +1876,37 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
             )
           ),
 
-          # ---- PCA view container (hidden by default, v0.2.0) ----
+          # ---- PCA view container (hidden by default, v0.2.1) ----
           if (has_pca) tags$div(
             id    = "sr-view-pca",
             class = "sr-view-pca",
             style = "display:none;",
-            tags$div(class = "pca-section", id = "pca-section",
-              tags$div(class = "section-title", "PCA — PC_1 vs PC_2"),
-              tags$div(class = "pca-container", id = "pca-container", pca_tags)
+            tags$div(class = "pca-layout",
+              # PCA controls (left)
+              tags$div(class = "pca-controls",
+                tags$div(class = "pca-controls-section",
+                  tags$div(class = "pca-controls-label", "Colour by"),
+                  tags$div(class = "pca-cm-buttons",
+                    tags$button(class = "pca-cm-btn active", id = "pca-cm-cluster",
+                                onclick = "switchPcaColorMode('cluster')", "Cluster"),
+                    if (pca_has_sample) tags$button(class = "pca-cm-btn", id = "pca-cm-sample",
+                                onclick = "switchPcaColorMode('sample')", "Sample")
+                  )
+                ),
+                tags$div(class = "pca-controls-section",
+                  tags$div(class = "pca-controls-label", "Groups"),
+                  tags$div(class = "pca-group-list", id = "pca-group-list")
+                ),
+                tags$div(class = "pca-controls-section",
+                  tags$button(class = "pca-reset-btn",
+                              onclick = "resetPcaHighlight()", "Reset highlight")
+                )
+              ),
+              # PCA plot (right)
+              tags$div(class = "pca-plot-area",
+                tags$div(class = "section-title", "PCA — PC_1 vs PC_2"),
+                tags$div(class = "pca-container", id = "pca-container")
+              )
             )
           )
         )
@@ -1632,7 +1933,20 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         "window._GENE_EXPR_DATA = %s;",
         gene_expr_json
       ))),
-      tags$script(htmltools::HTML(paste(report_js(), panel_js_extra, sep = "\n")))
+      if (has_pca) list(
+        tags$script(htmltools::HTML(sprintf(
+          "window._PCA_DATA = %s;\nwindow._PCA_HAS_SAMPLE = %s;\nwindow._PCA_USE_WEBGL = %s;\nwindow._PCA_INIT_MODE = %s;\nwindow._PCA_COLORS = %s;",
+          pca_data_json,
+          if (pca_has_sample) "true" else "false",
+          if (use_webgl) "true" else "false",
+          jsonlite::toJSON(pca_color_by, auto_unbox = TRUE),
+          cluster_colors_json
+        )))
+      ),
+      tags$script(htmltools::HTML(paste(report_js(), panel_js_extra, sep = "\n"))),
+      if (has_pca) tags$script(htmltools::HTML(
+        "window._PCA_COLORS = window._PCA_COLORS || {};"
+      ))
     )
   )
 
@@ -1789,14 +2103,29 @@ sc_report <- function(umap_df,
     point_size, point_alpha, use_webgl
   )
 
-  # Build PCA plot (v0.2.0)
-  pca_plot <- NULL
+  # Serialize PCA data for client-side rendering (v0.2.1)
+  pca_data_json <- "null"
+  pca_has_sample <- FALSE
   if (!is.null(pca_df) && "pca" %in% panels) {
-    message("scReportLite: building PCA plot...")
-    pca_plot <- build_pca_plotly(
-      pca_df, cluster_col, cell_col, sample_col,
-      pca_color_by, point_size, point_alpha, use_webgl
-    )
+    message("scReportLite: serializing PCA data for interactive plot...")
+    # Resolve colour mode: warn if requested column missing, fall back to cluster
+    pca_init_mode <- pca_color_by
+    if (!is.null(pca_color_by) && !pca_color_by %in% colnames(pca_df)) {
+      warning("PCA colour column '", pca_color_by,
+              "' not found in pca_df. Falling back to '", cluster_col, "'.",
+              call. = FALSE)
+      pca_init_mode <- cluster_col
+    }
+    # Update pca_color_by with resolved value for assemble_report
+    pca_color_by <- pca_init_mode
+    pca_has_sample <- !is.null(sample_col) && sample_col %in% colnames(pca_df)
+    pca_data_json <- jsonlite::toJSON(list(
+      cells   = as.character(pca_df[[cell_col]]),
+      PC_1    = pca_df[["PC_1"]],
+      PC_2    = pca_df[["PC_2"]],
+      cluster = as.character(pca_df[[cluster_col]]),
+      sample  = if (pca_has_sample) as.character(pca_df[[sample_col]]) else character(0)
+    ), auto_unbox = TRUE)
   } else if (is.null(pca_df) && "pca" %in% panels) {
     warning("PCA panel requested but pca_df is NULL. Skipping PCA panel.",
             call. = FALSE)
@@ -1813,8 +2142,9 @@ sc_report <- function(umap_df,
     sample_col    = sample_col,
     gene_expr_df  = gene_expr_df,
     pca_df        = pca_df,
-    pca_plot      = pca_plot,
-    pca_color_by  = pca_color_by,
+    pca_data_json  = pca_data_json,
+    pca_has_sample = pca_has_sample,
+    pca_color_by   = pca_color_by,
     output        = output,
     title         = title,
     dim_opacity   = dim_opacity,
