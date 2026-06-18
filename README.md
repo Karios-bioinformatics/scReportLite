@@ -264,6 +264,16 @@ Planned features:
 
 ### Changelog
 
+**v0.2.2** — PC Selector with pair/score/loading views
+- PC selector list in PCA controls: choose 1 or 2 PCs to inspect
+- 1 PC selected: single-PC score distribution plot + loading/composition table
+- 2 PCs selected: pair scatter (generalized from v0.2.1, now works with any PC pair, default PC_1 vs PC_2)
+- PC loading table shows top N genes by absolute loading, coloured by direction
+- New parameters: `pca_loading_df` (gene loading data) and `pca_loading_top_n` (default 10)
+- Dynamic PC column detection: any `PC_*` columns in `pca_df` are auto-detected
+- Default visual matches v0.2.1 (PC_1 vs PC_2 scatter on load)
+- Group highlight, colour mode, and reset all work seamlessly across pair and single-PC views
+
 **v0.2.1** — Interactive PCA controls
 - PCA view now includes interactive colour-mode and group-highlight controls
 - Colour by Cluster or Sample (when sample column available) with toggle buttons

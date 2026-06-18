@@ -1,5 +1,5 @@
 # scReportLite: Main entry point + HTML assembly + embedded CSS/JS ----------------
-# v0.2.1 — pca_color_by parameter for PCA metadata colour grouping
+# v0.2.2 — PC Selector with pair/score/loading views
 
 
 # ---- CSS template --------------------------------------------------------------
@@ -64,7 +64,7 @@ body {
   overflow-y: auto;
 }
 
-/* --- PCA layout (v0.2.1) --- */
+/* --- PCA layout (v0.2.2) --- */
 .pca-layout {
   display: flex;
   flex: 1;
@@ -81,6 +81,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.pca-controls-section {
+  /* wrapper for each logical group in PCA controls */
 }
 
 .pca-controls-label {
@@ -115,6 +119,49 @@ body {
   border-color: #00b894;
 }
 
+/* --- PC selector list --- */
+.pca-pc-list {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.pca-pc-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 0.82em;
+  gap: 6px;
+  transition: background 0.1s;
+  user-select: none;
+}
+.pca-pc-item:hover { background: #f0f1f5; }
+.pca-pc-item.active {
+  background: #e8ecf8;
+  font-weight: 600;
+}
+
+.pca-pc-check {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #b2bec3;
+  border-radius: 3px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.pca-pc-item.active .pca-pc-check {
+  background: #00b894;
+  border-color: #00b894;
+  color: #fff;
+}
+
+/* --- Group list --- */
 .pca-group-list {
   max-height: 360px;
   overflow-y: auto;
@@ -164,6 +211,7 @@ body {
 }
 .pca-reset-btn:hover { background: #f0f1f5; }
 
+/* --- PCA plot area (pair scatter, single-PC, loading) --- */
 .pca-plot-area {
   flex: 1;
   display: flex;
@@ -190,6 +238,96 @@ body {
 .pca-plot-area .pca-container .js-plotly-plot {
   width: 100% !important;
   height: 100% !important;
+}
+
+/* Single-PC score area */
+.pca-single-pc-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.pca-single-pc-area .section-title {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #636e72;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.pca-single-pc-area .pca-container {
+  flex: 1;
+  min-height: 0;
+}
+.pca-single-pc-area .pca-container > *,
+.pca-single-pc-area .pca-container .html-widget,
+.pca-single-pc-area .pca-container .plotly,
+.pca-single-pc-area .pca-container .js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Pair scatter area */
+.pca-pair-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.pca-pair-area .section-title {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #636e72;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.pca-pair-area .pca-container {
+  flex: 1;
+  min-height: 0;
+}
+.pca-pair-area .pca-container > *,
+.pca-pair-area .pca-container .html-widget,
+.pca-pair-area .pca-container .plotly,
+.pca-pair-area .pca-container .js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* PC loading / composition area */
+.pca-loading-area {
+  max-height: 360px;
+  overflow-y: auto;
+}
+.pca-loading-area .section-title {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #636e72;
+  margin-bottom: 8px;
+}
+
+.pca-loading-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82em;
+}
+.pca-loading-table thead {
+  position: sticky;
+  top: 0;
+  background: #f8f9fc;
+}
+.pca-loading-table th {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 2px solid #dfe6e9;
+  font-weight: 600;
+  color: #636e72;
+  font-size: 0.85em;
+}
+.pca-loading-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #f0f1f5;
+}
+.pca-loading-table tbody tr:hover {
+  background: #f8f9fc;
 }
 
 /* --- Header --- */
@@ -700,7 +838,7 @@ function switchView(view) {
 }
 
 // =========================================================================
-// PCA Interactive Controls (v0.2.1)
+// PCA Interactive Controls (v0.2.2)
 // =========================================================================
 
 var _PCA_PALETTE = [
@@ -713,8 +851,6 @@ var _PCA_PALETTE = [
 ];
 
 var _PCA_CELLS     = [];
-var _PCA_PC1       = [];
-var _PCA_PC2       = [];
 var _PCA_CLUSTERS  = [];
 var _PCA_SAMPLES   = [];
 var _PCA_HAS_SAMPLE = false;
@@ -725,10 +861,26 @@ var _PCA_INIT_MODE  = "cluster";
 var _PCA_COLOR_MODE = "cluster";
 var _PCA_HIGHLIGHT  = null;
 
+var _PCA_SCORES        = {};      // {PC_1: [...], PC_2: [...], ...}
+var _PCA_ALL_PCS        = [];     // sorted PC column names
+var _PCA_SELECTED_PCS   = ["PC_1", "PC_2"];  // default pair
+var _PCA_LOADING        = [];     // loading data
+var _PCA_LOADING_TOP_N  = 10;
+
 function pcaSortGroups(arr) {
   return arr.slice().sort(function(a, b) {
     var na = Number(a), nb = Number(b);
     if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return String(a).localeCompare(String(b));
+  });
+}
+
+// Natural sort for PC column names: PC_1, PC_2, ..., PC_10, ...
+function pcaSortPcNames(arr) {
+  return arr.slice().sort(function(a, b) {
+    var ma = a.match(/^PC_(\d+)$/);
+    var mb = b.match(/^PC_(\d+)$/);
+    if (ma && mb) return Number(ma[1]) - Number(mb[1]);
     return String(a).localeCompare(String(b));
   });
 }
@@ -754,16 +906,37 @@ function buildPcaGroupIndices() {
   return { groups: groups, indices: indices };
 }
 
+// ---- Main PCA render dispatcher ----
 function renderPcaPlot() {
+  if (_PCA_SELECTED_PCS.length === 1) {
+    renderSinglePcPlot();
+    renderPcLoading();
+  } else {
+    renderPcaPairScatter();
+    clearSinglePcView();
+  }
+}
+
+// ---- Pair scatter (generalized from v0.2.1 for any PC pair) ----
+function renderPcaPairScatter() {
   var container = document.getElementById("pca-container");
-  if (!container) return;
+  var titleEl = document.getElementById("pca-pair-title");
+  var pairArea = document.getElementById("pca-pair-area");
+  if (!container || !pairArea) return;
+
+  var pcX = _PCA_SELECTED_PCS[0];
+  var pcY = _PCA_SELECTED_PCS[1];
+  var scoreX = _PCA_SCORES[pcX];
+  var scoreY = _PCA_SCORES[pcY];
+
+  if (titleEl) titleEl.textContent = "PCA — " + pcX + " vs " + pcY;
+  pairArea.style.display = "";
 
   var gi      = buildPcaGroupIndices();
   var groups  = gi.groups;
   var indices = gi.indices;
   var traces  = [];
 
-  // Pre-compute group colours (cluster map first, palette fallback)
   var groupColors = {};
   for (var ci = 0; ci < groups.length; ci++) {
     var cg = groups[ci];
@@ -782,16 +955,16 @@ function renderPcaPlot() {
 
     for (var k = 0; k < n; k++) {
       var i = idx[k];
-      x[k] = _PCA_PC1[i];
-      y[k] = _PCA_PC2[i];
+      x[k] = scoreX[i];
+      y[k] = scoreY[i];
       var h = "Cell: " + _PCA_CELLS[i] +
         "<br>Cluster: " + _PCA_CLUSTERS[i] +
-        "<br>PC_1: " + _PCA_PC1[i].toFixed(3) +
-        "<br>PC_2: " + _PCA_PC2[i].toFixed(3);
+        "<br>" + pcX + ": " + scoreX[i].toFixed(3) +
+        "<br>" + pcY + ": " + scoreY[i].toFixed(3);
       if (_PCA_HAS_SAMPLE) h += "<br>Sample: " + _PCA_SAMPLES[i];
       text[k] = h;
       cd2[k]  = [_PCA_CELLS[i], _PCA_CLUSTERS[i],
-                 _PCA_SAMPLES[i], _PCA_PC1[i], _PCA_PC2[i]];
+                 _PCA_SAMPLES[i], scoreX[i], scoreY[i]];
       op[k] = (_PCA_HIGHLIGHT !== null && g !== _PCA_HIGHLIGHT) ? 0.12 : 0.9;
     }
 
@@ -809,8 +982,8 @@ function renderPcaPlot() {
   }
 
   Plotly.react(container, traces, {
-    xaxis: { title: "PC_1", showgrid: false, zeroline: false, showticklabels: true },
-    yaxis: { title: "PC_2", showgrid: false, zeroline: false, showticklabels: true,
+    xaxis: { title: pcX, showgrid: false, zeroline: false, showticklabels: true },
+    yaxis: { title: pcY, showgrid: false, zeroline: false, showticklabels: true,
              scaleanchor: "x", scaleratio: 1 },
     hovermode: "closest", margin: { l: 60, r: 30, b: 60, t: 30 }, dragmode: "pan"
   }, {
@@ -821,6 +994,207 @@ function renderPcaPlot() {
   });
 }
 
+// ---- Single-PC score distribution plot ----
+function renderSinglePcPlot() {
+  var area = document.getElementById("pca-single-pc-area");
+  var container = document.getElementById("pca-single-pc-container");
+  var titleEl = document.getElementById("pca-single-pc-title");
+  if (!area || !container) return;
+
+  area.style.display = "";
+  var pc = _PCA_SELECTED_PCS[0];
+  var scores = _PCA_SCORES[pc];
+  if (titleEl) titleEl.textContent = "Single-PC score — " + pc;
+  if (!scores) return;
+
+  var gi      = buildPcaGroupIndices();
+  var groups  = gi.groups;
+  var indices = gi.indices;
+  var traces  = [];
+
+  var groupColors = {};
+  for (var ci = 0; ci < groups.length; ci++) {
+    var cg = groups[ci];
+    groupColors[cg] = (_PCA_COLORS && _PCA_COLORS[cg])
+      ? _PCA_COLORS[cg]
+      : _PCA_PALETTE[ci % _PCA_PALETTE.length];
+  }
+
+  for (var gi = 0; gi < groups.length; gi++) {
+    var g = groups[gi];
+    var idx = indices[g];
+    var n = idx.length;
+    var x = new Array(n), y = new Array(n);
+    var text = new Array(n);
+    var op = new Array(n);
+
+    for (var k = 0; k < n; k++) {
+      var i = idx[k];
+      // Jitter X by index spread (not random) for consistent layout
+      x[k] = k * 0.8 - n * 0.4;
+      y[k] = scores[i];
+      var h = "Cell: " + _PCA_CELLS[i] +
+        "<br>Cluster: " + _PCA_CLUSTERS[i] +
+        "<br>" + pc + ": " + scores[i].toFixed(3);
+      if (_PCA_HAS_SAMPLE) h += "<br>Sample: " + _PCA_SAMPLES[i];
+      text[k] = h;
+      op[k] = (_PCA_HIGHLIGHT !== null && g !== _PCA_HIGHLIGHT) ? 0.12 : 0.9;
+    }
+
+    var mc = (_PCA_HIGHLIGHT !== null && g !== _PCA_HIGHLIGHT)
+      ? "#D0D0D0" : groupColors[g];
+
+    traces.push({
+      x: x, y: y,
+      type: _PCA_USE_WEBGL ? "scattergl" : "scatter",
+      mode: "markers",
+      marker: { color: mc, size: 3, opacity: op },
+      text: text, hoverinfo: "text",
+      name: "pca_single_" + g, showlegend: false
+    });
+  }
+
+  Plotly.react(container, traces, {
+    xaxis: { title: "", showgrid: false, zeroline: false, showticklabels: false },
+    yaxis: { title: pc + " score", showgrid: true, zeroline: true, showticklabels: true },
+    hovermode: "closest", margin: { l: 60, r: 30, b: 40, t: 30 }, dragmode: "pan"
+  }, {
+    displayModeBar: true,
+    modeBarButtonsToRemove: ["sendDataToCloud", "lasso2d", "select2d",
+      "autoScale2d", "toggleSpikelines"],
+    displaylogo: false
+  });
+}
+
+// ---- PC loading / composition table ----
+function renderPcLoading() {
+  var area = document.getElementById("pca-loading-area");
+  var content = document.getElementById("pca-loading-content");
+  if (!area || !content) return;
+
+  area.style.display = "";
+
+  if (!_PCA_LOADING || _PCA_LOADING.length === 0) {
+    content.innerHTML = "<p class=\"no-data\">No PCA loading data provided.</p>";
+    return;
+  }
+
+  var pc = _PCA_SELECTED_PCS[0];
+
+  // Filter to current PC, sort by abs_loading descending
+  var rows = [];
+  for (var i = 0; i < _PCA_LOADING.length; i++) {
+    var r = _PCA_LOADING[i];
+    if (r.PC === pc) rows.push(r);
+  }
+
+  if (rows.length === 0) {
+    content.innerHTML = "<p class=\"no-data\">No loading data for " + pc + ".</p>";
+    return;
+  }
+
+  rows.sort(function(a, b) { return b.abs_loading - a.abs_loading; });
+  var topN = Math.min(_PCA_LOADING_TOP_N, rows.length);
+  rows = rows.slice(0, topN);
+
+  var table = document.createElement("table");
+  table.className = "pca-loading-table";
+
+  var thead = document.createElement("thead");
+  var tr = document.createElement("tr");
+  var th1 = document.createElement("th"); th1.textContent = "#";
+  var th2 = document.createElement("th"); th2.textContent = "Gene";
+  var th3 = document.createElement("th"); th3.textContent = "Loading";
+  var th4 = document.createElement("th"); th4.textContent = "Direction";
+  tr.appendChild(th1); tr.appendChild(th2); tr.appendChild(th3); tr.appendChild(th4);
+  thead.appendChild(tr);
+  table.appendChild(thead);
+
+  var tbody = document.createElement("tbody");
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var trb = document.createElement("tr");
+    var td1 = document.createElement("td");
+    td1.style.color = "#b2bec3"; td1.style.fontSize = "0.8em";
+    td1.textContent = String(i + 1);
+    var td2 = document.createElement("td");
+    td2.style.fontFamily = "monospace"; td2.style.fontStyle = "italic";
+    td2.textContent = row.gene;
+    var td3 = document.createElement("td");
+    td3.style.fontFamily = "monospace"; td3.style.fontWeight = "500";
+    td3.style.color = row.direction === "positive" ? "#d63031" : "#0984e3";
+    td3.textContent = (row.loading >= 0 ? "+" : "") + row.loading.toFixed(4);
+    var td4 = document.createElement("td");
+    td4.textContent = row.direction || "";
+    trb.appendChild(td1); trb.appendChild(td2); trb.appendChild(td3); trb.appendChild(td4);
+    tbody.appendChild(trb);
+  }
+  table.appendChild(tbody);
+
+  content.innerHTML = "";
+  content.appendChild(table);
+}
+
+// ---- Clear single-PC view (show pair scatter, hide score + loading) ----
+function clearSinglePcView() {
+  var single = document.getElementById("pca-single-pc-area");
+  var loading = document.getElementById("pca-loading-area");
+  var pair = document.getElementById("pca-pair-area");
+  if (single) single.style.display = "none";
+  if (loading) loading.style.display = "none";
+  if (pair) pair.style.display = "";
+}
+
+// ---- PC selector ----
+function togglePcSelection(pc) {
+  var idx = _PCA_SELECTED_PCS.indexOf(pc);
+  if (idx >= 0) {
+    if (_PCA_SELECTED_PCS.length === 2) {
+      _PCA_SELECTED_PCS.splice(idx, 1);  // remove, leave 1
+    }
+    // if length is 1, do nothing (keep at least 1)
+  } else {
+    if (_PCA_SELECTED_PCS.length < 2) {
+      _PCA_SELECTED_PCS.push(pc);
+    } else {
+      _PCA_SELECTED_PCS = [pc];  // clear and select
+    }
+  }
+  renderPcSelector();
+  renderPcaPlot();
+}
+
+function renderPcSelector() {
+  var list = document.getElementById("pca-pc-list");
+  if (!list) return;
+
+  list.innerHTML = "";
+  for (var i = 0; i < _PCA_ALL_PCS.length; i++) {
+    var pc = _PCA_ALL_PCS[i];
+    var selected = _PCA_SELECTED_PCS.indexOf(pc) >= 0;
+
+    var item = document.createElement("div");
+    item.className = "pca-pc-item" + (selected ? " active" : "");
+
+    var check = document.createElement("span");
+    check.className = "pca-pc-check";
+    if (selected) check.textContent = "✓";
+
+    var nameEl = document.createElement("span");
+    nameEl.textContent = pc;
+
+    item.appendChild(check);
+    item.appendChild(nameEl);
+
+    (function(pcName) {
+      item.onclick = function() { togglePcSelection(pcName); };
+    })(pc);
+
+    list.appendChild(item);
+  }
+}
+
+// ---- Group list renderer ----
 function renderPcaGroupList() {
   var list = document.getElementById("pca-group-list");
   if (!list) return;
@@ -853,6 +1227,7 @@ function renderPcaGroupList() {
   }
 }
 
+// ---- Colour mode, highlight, reset (updated to call renderPcaPlot for dispatch) ----
 function switchPcaColorMode(mode) {
   _PCA_COLOR_MODE = mode;
   _PCA_HIGHLIGHT  = null;
@@ -876,14 +1251,14 @@ function resetPcaHighlight() {
   renderPcaPlot();
 }
 
+// ---- PCA lazy initialisation ----
 var _PCA_INITIALIZED = false;
 
 function initPcaPlot() {
   if (_PCA_INITIALIZED) return;
   _PCA_INITIALIZED = true;
+
   _PCA_CELLS      = _PCA_DATA.cells;
-  _PCA_PC1        = _PCA_DATA.PC_1;
-  _PCA_PC2        = _PCA_DATA.PC_2;
   _PCA_CLUSTERS   = _PCA_DATA.cluster;
   _PCA_SAMPLES    = _PCA_DATA.sample || [];
   _PCA_HAS_SAMPLE = _PCA_HAS_SAMPLE;
@@ -892,10 +1267,38 @@ function initPcaPlot() {
   _PCA_COLORS     = _PCA_COLORS;
   _PCA_COLOR_MODE = _PCA_INIT_MODE;
   _PCA_HIGHLIGHT  = null;
+
+  // Copy PC scores from _PCA_DATA (all PC_* keys) into _PCA_SCORES
+  if (_PCA_DATA) {
+    var keys = Object.keys(_PCA_DATA);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (/^PC_\d+$/.test(k)) {
+        _PCA_SCORES[k] = _PCA_DATA[k];
+      }
+    }
+  }
+
+  // Build sorted PC list
+  _PCA_ALL_PCS = pcaSortPcNames(Object.keys(_PCA_SCORES));
+
+  // Default selection: pair PC_1 + PC_2
+  if (_PCA_ALL_PCS.length >= 2) {
+    _PCA_SELECTED_PCS = ["PC_1", "PC_2"];
+  } else if (_PCA_ALL_PCS.length === 1) {
+    _PCA_SELECTED_PCS = [_PCA_ALL_PCS[0]];
+  }
+
+  // Copy loading data
+  _PCA_LOADING = window._PCA_LOADING_DATA || [];
+  _PCA_LOADING_TOP_N = window._PCA_LOADING_TOP_N || 10;
+
   var btnC = document.getElementById("pca-cm-cluster");
   var btnS = document.getElementById("pca-cm-sample");
   if (btnC) btnC.classList.toggle("active", _PCA_COLOR_MODE === "cluster");
   if (btnS) btnS.classList.toggle("active", _PCA_COLOR_MODE === "sample");
+
+  renderPcSelector();
   renderPcaGroupList();
   renderPcaPlot();
 }
@@ -1626,6 +2029,9 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                              pca_data_json = "null",
                              pca_has_sample = FALSE,
                              pca_color_by = "cluster",
+                             pca_all_pcs_json = "[]",
+                             pca_loading_json = "[]",
+                             pca_loading_top_n = 10,
                              output, title, dim_opacity, marker_n_top,
                              panels = c("umap", "marker_table")) {
 
@@ -1914,6 +2320,10 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                   )
                 ),
                 tags$div(class = "pca-controls-section",
+                  tags$div(class = "pca-controls-label", "PCs"),
+                  tags$div(class = "pca-pc-list", id = "pca-pc-list")
+                ),
+                tags$div(class = "pca-controls-section",
                   tags$div(class = "pca-controls-label", "Groups"),
                   tags$div(class = "pca-group-list", id = "pca-group-list")
                 ),
@@ -1923,9 +2333,26 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                 )
               ),
               # PCA plot (right)
-              tags$div(class = "pca-plot-area",
-                tags$div(class = "section-title", "PCA — PC_1 vs PC_2"),
-                tags$div(class = "pca-container", id = "pca-container")
+              tags$div(class = "pca-plot-area", id = "pca-plot-area",
+                # Single-PC view (hidden by default)
+                tags$div(class = "pca-single-pc-area", id = "pca-single-pc-area",
+                         style = "display:none;",
+                  tags$div(class = "section-title", id = "pca-single-pc-title",
+                           "Single-PC score — PC_1"),
+                  tags$div(class = "pca-container", id = "pca-single-pc-container")
+                ),
+                # PC loading area (hidden by default)
+                tags$div(class = "pca-loading-area", id = "pca-loading-area",
+                         style = "display:none;",
+                  tags$div(class = "section-title", "PC loading / composition"),
+                  tags$div(id = "pca-loading-content")
+                ),
+                # Pair scatter view (shown by default)
+                tags$div(class = "pca-pair-area", id = "pca-pair-area",
+                  tags$div(class = "section-title", id = "pca-pair-title",
+                           "PCA — PC_1 vs PC_2"),
+                  tags$div(class = "pca-container", id = "pca-container")
+                )
               )
             )
           )
@@ -1955,12 +2382,15 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
       ))),
       if (has_pca) list(
         tags$script(htmltools::HTML(sprintf(
-          "window._PCA_DATA = %s;\nwindow._PCA_HAS_SAMPLE = %s;\nwindow._PCA_USE_WEBGL = %s;\nwindow._PCA_INIT_MODE = %s;\nwindow._PCA_COLORS = %s;",
+          "window._PCA_DATA = %s;\nwindow._PCA_HAS_SAMPLE = %s;\nwindow._PCA_USE_WEBGL = %s;\nwindow._PCA_INIT_MODE = %s;\nwindow._PCA_COLORS = %s;\nwindow._PCA_ALL_PCS = %s;\nwindow._PCA_LOADING_DATA = %s;\nwindow._PCA_LOADING_TOP_N = %d;",
           pca_data_json,
           if (pca_has_sample) "true" else "false",
           if (use_webgl) "true" else "false",
           jsonlite::toJSON(pca_color_by, auto_unbox = TRUE),
-          cluster_colors_json
+          cluster_colors_json,
+          pca_all_pcs_json,
+          pca_loading_json,
+          pca_loading_top_n
         )))
       ),
       tags$script(htmltools::HTML(paste(report_js(), panel_js_extra, sep = "\n"))),
@@ -2060,6 +2490,8 @@ sc_report <- function(umap_df,
                        gene_expr_df  = NULL,
                        pca_df        = NULL,
                        pca_color_by  = "cluster",
+                       pca_loading_df = NULL,
+                       pca_loading_top_n = 10,
                        output        = "sc_report.html",
                        title         = "scRNA-seq Report",
                        point_size    = 3,
@@ -2077,16 +2509,17 @@ sc_report <- function(umap_df,
     validate_gene_expr_df(gene_expr_df, umap_df, cell_col)
   }
 
-  # Validate PCA data if provided (v0.2.0)
+  # Validate PCA data if provided (v0.2.2)
   if (!is.null(pca_df)) {
     if (!is.data.frame(pca_df)) {
       stop("pca_df must be a data.frame or NULL", call. = FALSE)
     }
-    required_pca <- c(cell_col, "PC_1", "PC_2", "cluster")
+    pc_cols <- grep("^PC_[0-9]+$", colnames(pca_df), value = TRUE)
+    required_pca <- c(cell_col, cluster_col)
     missing_pca <- setdiff(required_pca, colnames(pca_df))
-    if (length(missing_pca) > 0) {
-      warning("PCA panel requested but pca_df is missing required columns: ",
-              paste(missing_pca, collapse = ", "), ". Skipping PCA panel.",
+    if (length(missing_pca) > 0 || length(pc_cols) < 2) {
+      warning("PCA panel requested but pca_df is missing required columns. ",
+              "Need at least cell, cluster, and 2 PC columns. Skipping PCA panel.",
               call. = FALSE)
       pca_df <- NULL
     }
@@ -2123,9 +2556,11 @@ sc_report <- function(umap_df,
     point_size, point_alpha, use_webgl
   )
 
-  # Serialize PCA data for client-side rendering (v0.2.1)
+  # Serialize PCA data for client-side rendering (v0.2.2)
   pca_data_json <- "null"
   pca_has_sample <- FALSE
+  pca_all_pcs_json <- "[]"
+  pca_loading_json <- "[]"
   if (!is.null(pca_df) && "pca" %in% panels) {
     message("scReportLite: serializing PCA data for interactive plot...")
     # Resolve colour mode: warn if requested column missing, fall back to cluster
@@ -2139,13 +2574,51 @@ sc_report <- function(umap_df,
     # Update pca_color_by with resolved value for assemble_report
     pca_color_by <- pca_init_mode
     pca_has_sample <- !is.null(sample_col) && sample_col %in% colnames(pca_df)
-    pca_data_json <- jsonlite::toJSON(list(
+
+    # Dynamically find all PC columns
+    pc_cols <- grep("^PC_[0-9]+$", colnames(pca_df), value = TRUE)
+    pc_cols <- pc_cols[order(as.integer(gsub("PC_", "", pc_cols)))]
+    pca_all_pcs_json <- jsonlite::toJSON(pc_cols, auto_unbox = TRUE)
+
+    # Build PCA data object with all PC scores + metadata
+    pca_list <- list(
       cells   = as.character(pca_df[[cell_col]]),
-      PC_1    = pca_df[["PC_1"]],
-      PC_2    = pca_df[["PC_2"]],
       cluster = as.character(pca_df[[cluster_col]]),
       sample  = if (pca_has_sample) as.character(pca_df[[sample_col]]) else character(0)
-    ), auto_unbox = TRUE)
+    )
+    for (pc in pc_cols) {
+      pca_list[[pc]] <- pca_df[[pc]]
+    }
+    pca_data_json <- jsonlite::toJSON(pca_list, auto_unbox = TRUE)
+
+    # Process loading data if provided
+    if (!is.null(pca_loading_df)) {
+      if (!is.data.frame(pca_loading_df)) {
+        warning("pca_loading_df is not a data.frame. Ignoring loading data.",
+                call. = FALSE)
+      } else {
+        required_lc <- c("gene", "PC", "loading")
+        missing_lc <- setdiff(required_lc, colnames(pca_loading_df))
+        if (length(missing_lc) > 0) {
+          warning("pca_loading_df missing columns: ",
+                  paste(missing_lc, collapse = ", "),
+                  ". Ignoring loading data.", call. = FALSE)
+        } else {
+          # Filter to existing PC columns
+          pca_loading_df <- pca_loading_df[pca_loading_df$PC %in% pc_cols, , drop = FALSE]
+          # Compute abs_loading and direction if missing
+          if (!"abs_loading" %in% colnames(pca_loading_df)) {
+            pca_loading_df$abs_loading <- abs(pca_loading_df$loading)
+          }
+          if (!"direction" %in% colnames(pca_loading_df)) {
+            pca_loading_df$direction <- ifelse(pca_loading_df$loading >= 0,
+                                               "positive", "negative")
+          }
+          pca_loading_json <- jsonlite::toJSON(pca_loading_df,
+                                               dataframe = "rows", auto_unbox = TRUE)
+        }
+      }
+    }
   } else if (is.null(pca_df) && "pca" %in% panels) {
     warning("PCA panel requested but pca_df is NULL. Skipping PCA panel.",
             call. = FALSE)
@@ -2165,6 +2638,9 @@ sc_report <- function(umap_df,
     pca_data_json  = pca_data_json,
     pca_has_sample = pca_has_sample,
     pca_color_by   = pca_color_by,
+    pca_all_pcs_json = pca_all_pcs_json,
+    pca_loading_json = pca_loading_json,
+    pca_loading_top_n = pca_loading_top_n,
     output        = output,
     title         = title,
     dim_opacity   = dim_opacity,
