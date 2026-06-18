@@ -17,7 +17,19 @@ scReportLite converts UMAP coordinates and marker gene tables into a lightweight
     
 - **Cell Information Panel** — click any cell on the UMAP to inspect its metadata (Cell ID, Cluster, Sample, UMAP coordinates); Copy Cell ID button for downstream use
     
+- **Colour by any column** — `color_by` parameter colours the UMAP by any discrete or continuous variable in `umap_df`
+    
+- **Custom hover fields** — `hover_cols` adds arbitrary metadata columns to the hover tooltip
+    
+- **Annotation field** — `annotation_col` displays extra cell-level annotation in hover and the cell info panel
+    
+- **Cluster labels** — centroid labels on the UMAP (toggle with `show_cluster_label`)
+    
+- **Report summary** — cell count, cluster count, marker gene stats, colour mapping, and version info at a glance
+    
 - Marker gene exploration
+    
+- Gene expression mode — colour UMAP by gene expression (grey-to-red scale)
     
 - Automatic cluster statistics
     
@@ -87,12 +99,33 @@ marker_df <- markers[
 ```r
 library(scReportLite)
 
+# Basic usage
 sc_report(
   umap_df,
   marker_df = marker_df,
   sample_col = "sample",   # optional — enables sample highlight
   output = "report.html",
   title = "My scRNA-seq Report"
+)
+
+# With custom hover fields and colour mapping
+sc_report(
+  umap_df,
+  marker_df    = marker_df,
+  sample_col   = "sample",
+  hover_cols   = c("nCount_RNA", "percent.mt"),   # extra metadata in tooltips
+  color_by     = "celltype",                       # colour UMAP by cell type
+  annotation_col = "celltype",                     # show cell type in hover + info panel
+  output       = "report_celltype.html",
+  title        = "Cell-type Report"
+)
+
+# Hide cluster labels for cleaner UMAP
+sc_report(
+  umap_df,
+  marker_df          = marker_df,
+  show_cluster_label = FALSE,
+  output             = "report_nolabel.html"
 )
 ```
 
@@ -142,19 +175,23 @@ Required columns:
 
 The generated report includes:
 
-- Interactive UMAP
+- Interactive UMAP with cluster labels (toggleable)
     
 - Multi-select cluster sidebar with checkboxes
     
 - Sample / condition sidebar (when `sample_col` is provided)
     
+- Gene expression mode sidebar (when `gene_expr_df` is provided)
+    
 - Cell Information Panel (click a cell to inspect metadata, copy Cell ID)
+    
+- Report summary card (cell / cluster / marker counts, colour mapping, version)
     
 - Cluster statistics
     
 - Marker gene table
     
-- Hover information for individual cells
+- Hover information including custom fields (`hover_cols`)
     
 
 **Multi-cluster highlight:** Click multiple clusters to compare their spatial
@@ -166,8 +203,13 @@ that condition. Compose with cluster selection to see, for example,
 "Cluster 4 cells in Treatment_A" (intersection query).
 
 **Cell Information Panel:** Click any cell on the UMAP to pin its metadata.
-Displays Cell ID, Cluster, Sample, and UMAP coordinates. Use the Copy Cell ID
-button to grab the barcode for downstream analysis in R.
+Displays Cell ID, Cluster, Sample, UMAP coordinates, and annotation
+(when `annotation_col` is set). Use the Copy Cell ID button to grab the
+barcode for downstream analysis in R.
+
+**Colour by any column:** Set `color_by = "celltype"` to recolour the UMAP
+by a different categorical or continuous variable. Discrete variables get
+a categorical palette + legend; continuous variables use the Viridis scale.
 
 ---
 
@@ -220,15 +262,39 @@ Recommended for datasets containing more than 10,000 cells.
 
 Planned features:
 
-- Cell Focus (neighbor search, local clustering — downstream workflow)
+- Cell Focus (neighbour search, local clustering — downstream workflow)
     
-- Custom color palettes
+- Custom colour palettes
     
 - Additional embeddings (t-SNE, PCA)
     
 - Cell-type annotation panel
     
 - Enhanced report customization
+    
+
+### Changelog
+
+**v0.1.6** — UMAP metadata enhancement
+- New `hover_cols` parameter: add arbitrary metadata columns to hover tooltips
+- New `color_by` parameter: colour UMAP by any discrete or continuous column
+- New `annotation_col` parameter: display annotation in hover + cell info panel
+- New `show_cluster_label` parameter: toggle cluster centroid labels on/off
+- Report summary card: cell/cluster/marker counts, colour mapping, version
+- Per-point colour highlighting fixed for `color_by` mode (Array.isArray guard)
+- Extended customdata: annotation value available in cell info panel
+
+**v0.1.5** — Gene Expression Mode
+- New `gene_expr_df` parameter: colour UMAP by gene expression (grey-to-red)
+- Gene sidebar tab with search/filter
+- Gene expression summary panel (cells expressed, mean, max)
+- Full mode isolation between cluster/sample/gene tabs
+
+**v0.1.4** — Panel system + sample composition
+- JS-driven sample composition barplot (syncs with cluster colour map)
+- Panel registry system for extensible report sections
+- Natural sort for sample/cluster labels
+- Responsive resize across all plotly charts
     
 
 ---
@@ -238,7 +304,7 @@ Planned features:
 If you use scReportLite in research projects, please cite:
 
 > Park, K. K. (2026).
-> scReportLite v0.1.3-alpha.
+> scReportLite v0.1.6.
 > Zenodo.
 > https://doi.org/10.5281/zenodo.20697746
 

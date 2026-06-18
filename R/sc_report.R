@@ -1,11 +1,11 @@
 # scReportLite: Main entry point + HTML assembly + embedded CSS/JS ----------------
-# v0.1.5 — Gene Expression Mode: gene-level UMAP coloring + summary panel
+# v0.1.6 — UMAP metadata: hover_cols, color_by, annotation_col, cluster labels
 
 
 # ---- CSS template --------------------------------------------------------------
 
 report_css <- function() {
-'/* === scReportLite v0.1.3 Styles === */
+'/* === scReportLite v0.1.6 Styles === */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -22,6 +22,16 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* --- Report Summary --- */
+.report-summary {
+  margin: 12px 12px 6px 12px !important;
+}
+.report-summary table td {
+  padding: 3px 8px;
+  vertical-align: top;
+  font-size: 0.88em;
 }
 
 /* --- Header --- */
@@ -470,7 +480,7 @@ body {
 
 report_js <- function() {
 '
-// === scReportLite v0.1.3 Interaction Logic ===
+// === scReportLite v0.1.6 Interaction Logic ===
 
 var SELECTED_CLUSTERS = new Set();
 var SELECTED_SAMPLE = null;
@@ -823,7 +833,7 @@ function applyHighlight() {
       }
 
       if (clusterActive && sampleActive) {
-        traceColors[j] = ORIG_COLORS[i];
+        traceColors[j] = Array.isArray(ORIG_COLORS[i]) ? ORIG_COLORS[i][j] : ORIG_COLORS[i];
         traceOpacities[j] = DEFAULT_OPACITY;
       } else {
         traceColors[j] = DIM_COLOR;
@@ -1034,7 +1044,7 @@ function clearMarkerTable() {
 // =========================================================================
 
 function showCellInfoFromCD(cd) {
-  // cd = [cell_id, cluster, sample, UMAP_1, UMAP_2]
+  // cd = [cell_id, cluster, sample, UMAP_1, UMAP_2, annotation]
   var cellId  = String(cd[0]);
   var cluster = String(cd[1]);
   var sample  = cd[2];
@@ -1064,6 +1074,13 @@ function showCellInfoFromCD(cd) {
     "<td class=\\"ci-value\\">" + umap1.toFixed(4) + "</td></tr>";
   html += "<tr><td class=\\"ci-label\\">UMAP_2</td>" +
     "<td class=\\"ci-value\\">" + umap2.toFixed(4) + "</td></tr>";
+
+  // Annotation column (customdata index 5) — v0.1.6
+  if (cd.length >= 6 && cd[5] && String(cd[5]) !== "") {
+    html += "<tr><td class=\\"ci-label\\">" + escHtml(String(_ANNO_COL_NAME || "Annotation")) + "</td>" +
+      "<td class=\\"ci-value\\">" + escHtml(String(cd[5])) + "</td></tr>";
+  }
+
   html += "</table>";
 
   content.innerHTML = html;
@@ -1208,6 +1225,10 @@ window.addEventListener("resize", function() {
 assemble_report <- function(umap_plot, umap_df, marker_df,
                              cluster_col, cell_col, sample_col,
                              gene_expr_df = NULL,
+                             hover_cols = NULL,
+                             color_by = NULL,
+                             annotation_col = NULL,
+                             show_cluster_label = TRUE,
                              output, title, dim_opacity, marker_n_top,
                              panels = c("umap", "marker_table")) {
 
@@ -1412,6 +1433,16 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
             sprintf("%d cells | %d clusters | %s",
                     n_total, length(clusters),
                     format(Sys.time(), "%Y-%m-%d %H:%M"))
+          ),
+          if (!is.null(color_by) && color_by != cluster_col) {
+            tags$span(class = "report-meta",
+              style = "margin-left: 14px;",
+              sprintf("Colour: %s", color_by)
+            )
+          },
+          tags$span(class = "report-meta",
+            style = "margin-left: 14px; color: #b2bec3;",
+            "v0.1.6"
           )
         ),
 
@@ -1423,6 +1454,41 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
           # ---- Content area (built from panels) ----
           tags$div(class = "content-area",
+            # Report summary
+            tags$div(class = "panel-section report-summary",
+              tags$div(class = "section-title", "Report Summary"),
+              tags$table(style = "width:100%;",
+                tags$tr(
+                  tags$td(style = "color:#636e72; width:140px; padding:2px 0;", "Total cells"),
+                  tags$td(n_total)
+                ),
+                tags$tr(
+                  tags$td(style = "color:#636e72;", "Clusters"),
+                  tags$td(length(clusters))
+                ),
+                if (!is.null(marker_df)) tags$tr(
+                  tags$td(style = "color:#636e72;", "Marker genes"),
+                  tags$td(sprintf("%d (across %d clusters)", nrow(marker_df),
+                          length(unique(marker_df$cluster))))
+                ),
+                tags$tr(
+                  tags$td(style = "color:#636e72;", "Coloured by"),
+                  tags$td(if (!is.null(color_by) && color_by != cluster_col) color_by else paste0("cluster (", cluster_col, ")"))
+                ),
+                if (!is.null(annotation_col)) tags$tr(
+                  tags$td(style = "color:#636e72;", "Annotation"),
+                  tags$td(annotation_col)
+                ),
+                tags$tr(
+                  tags$td(style = "color:#636e72;", "Generated"),
+                  tags$td(format(Sys.time(), "%Y-%m-%d %H:%M:%S"))
+                ),
+                tags$tr(
+                  tags$td(style = "color:#636e72;", "Version"),
+                  tags$td("scReportLite v0.1.6")
+                )
+              )
+            ),
             # UMAP section (if "umap" is in panels)
             if (has_umap) list(
               tags$div(class = "umap-section",
@@ -1464,12 +1530,13 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
       # ---- Embedded data & JS ----
       tags$script(htmltools::HTML(sprintf(
-        "window._MARKER_DATA = %s;\nwindow._CLUSTERS = %s;\nwindow._MARKER_NTOP = %d;\nwindow._DIM_OPACITY = %s;\nwindow._HAS_SAMPLES = %s;",
+        "window._MARKER_DATA = %s;\nwindow._CLUSTERS = %s;\nwindow._MARKER_NTOP = %d;\nwindow._DIM_OPACITY = %s;\nwindow._HAS_SAMPLES = %s;\nwindow._ANNO_COL_NAME = %s;",
         marker_json,
         clusters_json,
         marker_n_top,
         dim_opacity,
-        if (has_samples) "true" else "false"
+        if (has_samples) "true" else "false",
+        if (!is.null(annotation_col)) jsonlite::toJSON(annotation_col, auto_unbox = TRUE) else "null"
       ))),
       tags$script(htmltools::HTML(sprintf(
         "window._SAMPLE_COMP_DATA = %s;",
@@ -1570,19 +1637,23 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 #' sc_report(umap_df, marker_df = marker_df, sample_col = "condition")
 #' }
 sc_report <- function(umap_df,
-                       cluster_col   = "cluster",
-                       cell_col      = "cell",
-                       sample_col    = NULL,
-                       marker_df     = NULL,
-                       gene_expr_df  = NULL,
-                       output        = "sc_report.html",
-                       title         = "scRNA-seq Report",
-                       point_size    = 3,
-                       point_alpha   = 0.9,
-                       dim_opacity   = 0.06,
-                       marker_n_top  = 20,
-                       panels        = c("umap", "marker_table"),
-                       use_webgl     = TRUE) {
+                       cluster_col        = "cluster",
+                       cell_col           = "cell",
+                       sample_col         = NULL,
+                       marker_df          = NULL,
+                       gene_expr_df       = NULL,
+                       hover_cols         = NULL,
+                       color_by           = NULL,
+                       annotation_col     = NULL,
+                       show_cluster_label = TRUE,
+                       output             = "sc_report.html",
+                       title              = "scRNA-seq Report",
+                       point_size         = 3,
+                       point_alpha        = 0.9,
+                       dim_opacity        = 0.06,
+                       marker_n_top       = 20,
+                       panels             = c("umap", "marker_table"),
+                       use_webgl          = TRUE) {
 
   # ---- Validate inputs ----
   validate_inputs(umap_df, marker_df, cluster_col, cell_col, sample_col)
@@ -1590,6 +1661,30 @@ sc_report <- function(umap_df,
   # Validate gene expression data if provided
   if (!is.null(gene_expr_df)) {
     validate_gene_expr_df(gene_expr_df, umap_df, cell_col)
+  }
+
+  # Validate hover_cols (column checks inside build_umap_plotly — type check here)
+  if (!is.null(hover_cols) && !is.character(hover_cols)) {
+    stop("hover_cols must be a character vector or NULL", call. = FALSE)
+  }
+
+  # Validate color_by
+  if (!is.null(color_by)) {
+    if (!is.character(color_by) || length(color_by) != 1) {
+      stop("color_by must be a single column name string or NULL", call. = FALSE)
+    }
+  }
+
+  # Validate annotation_col
+  if (!is.null(annotation_col)) {
+    if (!is.character(annotation_col) || length(annotation_col) != 1) {
+      stop("annotation_col must be a single column name string or NULL", call. = FALSE)
+    }
+  }
+
+  # Validate show_cluster_label
+  if (!is.logical(show_cluster_label) || length(show_cluster_label) != 1 || is.na(show_cluster_label)) {
+    stop("show_cluster_label must be TRUE or FALSE", call. = FALSE)
   }
 
   if (!is.character(output) || length(output) != 1) {
@@ -1620,23 +1715,28 @@ sc_report <- function(umap_df,
   message("scReportLite: building interactive UMAP plot...")
   umap_plot <- build_umap_plotly(
     umap_df, cluster_col, cell_col, sample_col,
+    hover_cols, color_by, annotation_col, show_cluster_label,
     point_size, point_alpha, use_webgl
   )
 
   # ---- Assemble and write HTML ----
   message("scReportLite: assembling HTML report...")
   assemble_report(
-    umap_plot     = umap_plot,
-    umap_df       = umap_df,
-    marker_df     = marker_df,
-    cluster_col   = cluster_col,
-    cell_col      = cell_col,
-    sample_col    = sample_col,
-    gene_expr_df  = gene_expr_df,
-    output        = output,
-    title         = title,
-    dim_opacity   = dim_opacity,
-    marker_n_top  = marker_n_top,
-    panels        = panels
+    umap_plot          = umap_plot,
+    umap_df            = umap_df,
+    marker_df          = marker_df,
+    cluster_col        = cluster_col,
+    cell_col           = cell_col,
+    sample_col         = sample_col,
+    gene_expr_df       = gene_expr_df,
+    hover_cols         = hover_cols,
+    color_by           = color_by,
+    annotation_col     = annotation_col,
+    show_cluster_label = show_cluster_label,
+    output             = output,
+    title              = title,
+    dim_opacity        = dim_opacity,
+    marker_n_top       = marker_n_top,
+    panels             = panels
   )
 }
