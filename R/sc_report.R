@@ -571,7 +571,7 @@ function switchView(view) {
   var sidebarTabsDiv = document.querySelector(".sidebar > .sidebar-tabs");
 
   if (view === "pca") {
-    // Hide secondary tabs (Clusters / Samples / Genes don't apply to PCA)
+    // Hide secondary tabs (Clusters / Samples / Genes do not apply to PCA)
     if (sidebarTabsDiv) sidebarTabsDiv.style.display = "none";
     document.querySelectorAll(".sidebar > .sidebar-content").forEach(function(el) {
       el.style.display = "none";
