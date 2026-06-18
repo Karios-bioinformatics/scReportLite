@@ -50,6 +50,20 @@ body {
   border-bottom-color: #00b894;
 }
 
+/* --- View containers (v0.2.0) --- */
+.sr-view-umap {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.sr-view-pca {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
 /* --- PCA plot section --- */
 .pca-section {
   height: 650px;
@@ -106,7 +120,6 @@ body {
   display: flex;
   flex: 1;
   min-height: 0;
-  height: calc(100vh - 60px);
 }
 
 /* --- Sidebar --- */
@@ -551,51 +564,40 @@ var _ACTIVE_VIEW = "umap";    // "umap" or "pca" — top-level view switch (v0.2
 function switchView(view) {
   _ACTIVE_VIEW = view;
 
-  // Toggle view tabs
-  var tabU = document.getElementById("view-tab-umap");
-  var tabP = document.getElementById("view-tab-pca");
-  if (tabU) tabU.classList.toggle("active", view === "umap");
-  if (tabP) tabP.classList.toggle("active", view === "pca");
+  var pcaView  = document.getElementById("sr-view-pca");
+  var umapView = document.getElementById("sr-view-umap");
+  var tabP     = document.getElementById("view-tab-pca");
+  var tabU     = document.getElementById("view-tab-umap");
 
-  // Toggle plot sections
-  var umapSec = document.getElementById("umap-section");
-  var pcaSec  = document.getElementById("pca-section");
-  if (umapSec) umapSec.style.display = (view === "umap") ? "" : "none";
-  if (pcaSec)  pcaSec.style.display  = (view === "pca")  ? "" : "none";
-
-  // Cell info panel — UMAP only
-  var ciPanel = document.getElementById("cell-info-panel");
-  if (ciPanel) ciPanel.style.display = (view === "umap") ? "" : "none";
-
-  // Sidebar tabs + content
-  var sidebarTabsDiv = document.querySelector(".sidebar > .sidebar-tabs");
+  if (!pcaView || !umapView) return;
 
   if (view === "pca") {
-    // Hide secondary tabs (Clusters / Samples / Genes do not apply to PCA)
-    if (sidebarTabsDiv) sidebarTabsDiv.style.display = "none";
-    document.querySelectorAll(".sidebar > .sidebar-content").forEach(function(el) {
-      el.style.display = "none";
-    });
-    // Hide all panel sections (marker table, cluster_size, etc.)
-    document.querySelectorAll(".content-area > .panel-section").forEach(function(el) {
-      el.style.display = "none";
-    });
+    pcaView.style.display  = "";
+    umapView.style.display = "none";
+    if (tabP) tabP.classList.add("active");
+    if (tabU) tabU.classList.remove("active");
+    // Trigger plotly resize after display change
+    setTimeout(function() {
+      var plots = document.querySelectorAll("#sr-view-pca .js-plotly-plot, #sr-view-pca .plotly");
+      for (var i = 0; i < plots.length; i++) {
+        if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(plots[i]);
+      }
+      window.dispatchEvent(new Event("resize"));
+    }, 100);
   } else {
-    // Restore UMAP sidebar state
-    if (sidebarTabsDiv) sidebarTabsDiv.style.display = "";
-    updateSidebarUI();
-    applyHighlight();
-    updateMarkerPanel();
-    updatePanelVisibility();
+    pcaView.style.display  = "none";
+    umapView.style.display = "";
+    if (tabU) tabU.classList.add("active");
+    if (tabP) tabP.classList.remove("active");
+    // Restore UMAP plot size
+    setTimeout(function() {
+      var plots = document.querySelectorAll("#sr-view-umap .js-plotly-plot, #sr-view-umap .plotly");
+      for (var i = 0; i < plots.length; i++) {
+        if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(plots[i]);
+      }
+      window.dispatchEvent(new Event("resize"));
+    }, 100);
   }
-
-  // Resize newly shown plot
-  setTimeout(function() {
-    var container = (view === "umap")
-      ? document.getElementById("umap-container")
-      : document.getElementById("pca-container");
-    if (container) Plotly.Plots.resize(container);
-  }, 100);
 }
 
 // =========================================================================
@@ -1455,17 +1457,17 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
   # ---- Sidebar assembly ----
   sidebar_html <- c(
-    # View tabs (PCA / UMAP — only when PCA is available, v0.2.0)
-    if (has_pca) list(
-      tags$div(class = "view-tabs",
-        tags$div(class = "view-tab", id = "view-tab-pca",
-                 onclick = "switchView('pca')", "PCA"),
-        tags$div(class = "view-tab active", id = "view-tab-umap",
-                 onclick = "switchView('umap')", "UMAP")
-      )
-    ),
     list(tags$div(class = "sidebar-tabs", sidebar_tabs)),
     sidebar_contents
+  )
+
+  # ---- View tabs (standalone, between header and main-layout, v0.2.0) ----
+  view_tabs_html <- if (has_pca) tags$div(
+    class = "view-tabs",
+    tags$div(class = "view-tab", id = "view-tab-pca",
+             onclick = "switchView('pca')", "PCA"),
+    tags$div(class = "view-tab active", id = "view-tab-umap",
+             onclick = "switchView('umap')", "UMAP")
   )
 
   # ---- Build per-sample composition data (for JS-driven chart) ----
@@ -1543,57 +1545,67 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
           )
         ),
 
-        # Main layout
+        # View tabs (standalone, only when PCA is available, v0.2.0)
+        view_tabs_html,
+
+        # Main layout with view containers
         tags$div(class = "main-layout",
 
-          # ---- Sidebar ----
-          tags$div(class = "sidebar", sidebar_html),
+          # ---- UMAP view container ----
+          tags$div(id = "sr-view-umap", class = "sr-view-umap",
 
-          # ---- Content area (built from panels) ----
-          tags$div(class = "content-area",
-            # PCA section (hidden by default, v0.2.0)
-            if (has_pca) tags$div(
-              class = "pca-section",
-              id    = "pca-section",
-              style = "display:none;",
-              tags$div(class = "section-title", "PCA — PC_1 vs PC_2"),
-              tags$div(class = "pca-container", id = "pca-container", pca_tags)
-            ),
-            # UMAP section (if "umap" is in panels)
-            if (has_umap) list(
-              tags$div(class = "umap-section", id = "umap-section",
-                tags$div(class = "section-title",
-                  "UMAP — click a cell to inspect, cluster to highlight"
-                ),
-                tags$div(class = "umap-container", id = "umap-container",
-                  umap_tags
-                )
-              ),
-              # Cell Info Panel (hidden until a cell is clicked)
-              tags$div(class = "cell-info-panel", id = "cell-info-panel",
-                style = "display:none;",
-                tags$div(class = "cell-info-header",
-                  tags$div(
-                    tags$span(class = "cell-info-title", "Cell Information"),
-                    tags$span(" — "),
-                    tags$span(class = "cell-info-cellid", id = "cell-info-cellid", "")
+            # ---- Sidebar ----
+            tags$div(class = "sidebar", sidebar_html),
+
+            # ---- Content area (UMAP + panels) ----
+            tags$div(class = "content-area",
+              # UMAP section (if "umap" is in panels)
+              if (has_umap) list(
+                tags$div(class = "umap-section", id = "umap-section",
+                  tags$div(class = "section-title",
+                    "UMAP — click a cell to inspect, cluster to highlight"
                   ),
-                  tags$button(
-                    class = "copy-btn",
-                    id = "copy-cell-btn",
-                    onclick = "copyCellId()",
-                    "Copy Cell ID"
+                  tags$div(class = "umap-container", id = "umap-container",
+                    umap_tags
                   )
                 ),
-                tags$div(
-                  id = "cell-info-content",
-                  tags$p(class = "cell-info-hint",
-                    "Click a cell on the UMAP to view its details")
+                # Cell Info Panel (hidden until a cell is clicked)
+                tags$div(class = "cell-info-panel", id = "cell-info-panel",
+                  style = "display:none;",
+                  tags$div(class = "cell-info-header",
+                    tags$div(
+                      tags$span(class = "cell-info-title", "Cell Information"),
+                      tags$span(" — "),
+                      tags$span(class = "cell-info-cellid", id = "cell-info-cellid", "")
+                    ),
+                    tags$button(
+                      class = "copy-btn",
+                      id = "copy-cell-btn",
+                      onclick = "copyCellId()",
+                      "Copy Cell ID"
+                    )
+                  ),
+                  tags$div(
+                    id = "cell-info-content",
+                    tags$p(class = "cell-info-hint",
+                      "Click a cell on the UMAP to view its details")
+                  )
                 )
-              )
-            ),
-            # Additional panel sections (rendered in order from panels)
-            panel_sections_html
+              ),
+              # Additional panel sections (rendered in order from panels)
+              panel_sections_html
+            )
+          ),
+
+          # ---- PCA view container (hidden by default, v0.2.0) ----
+          if (has_pca) tags$div(
+            id    = "sr-view-pca",
+            class = "sr-view-pca",
+            style = "display:none;",
+            tags$div(class = "pca-section", id = "pca-section",
+              tags$div(class = "section-title", "PCA — PC_1 vs PC_2"),
+              tags$div(class = "pca-container", id = "pca-container", pca_tags)
+            )
           )
         )
       ),
