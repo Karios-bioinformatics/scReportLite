@@ -73,7 +73,7 @@ body {
   margin: 12px 12px 6px 0;
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  display: none;
+  display: flex;
   flex-direction: column;
 }
 .pca-section .section-title {
