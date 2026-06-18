@@ -703,6 +703,15 @@ function switchView(view) {
 // PCA Interactive Controls (v0.2.1)
 // =========================================================================
 
+var _PCA_PALETTE = [
+  "#E6194B","#3CB44B","#FFE119","#0082C8","#F58231","#911EB4",
+  "#46F0F0","#F032E6","#BCF60C","#E6BEFF","#008080","#A52A2A",
+  "#AA6E28","#800000","#22B14C","#808000","#000080","#808080",
+  "#DC143C","#0A751C","#FF6600","#6200EA","#B8860B","#00CED1",
+  "#6A1B9A","#9E9D24","#E91E63","#0288D1","#388E3C","#D81B60",
+  "#8D6E63","#7C4DFF"
+];
+
 var _PCA_CELLS     = [];
 var _PCA_PC1       = [];
 var _PCA_PC2       = [];
@@ -754,6 +763,15 @@ function renderPcaPlot() {
   var indices = gi.indices;
   var traces  = [];
 
+  // Pre-compute group colours (cluster map first, palette fallback)
+  var groupColors = {};
+  for (var ci = 0; ci < groups.length; ci++) {
+    var cg = groups[ci];
+    groupColors[cg] = (_PCA_COLORS && _PCA_COLORS[cg])
+      ? _PCA_COLORS[cg]
+      : _PCA_PALETTE[ci % _PCA_PALETTE.length];
+  }
+
   for (var gi = 0; gi < groups.length; gi++) {
     var g = groups[gi];
     var idx = indices[g];
@@ -778,7 +796,7 @@ function renderPcaPlot() {
     }
 
     var mc = (_PCA_HIGHLIGHT !== null && g !== _PCA_HIGHLIGHT)
-      ? "#D0D0D0" : (_PCA_COLORS[g] || "#888888");
+      ? "#D0D0D0" : groupColors[g];
 
     traces.push({
       x: x, y: y,
@@ -810,7 +828,9 @@ function renderPcaGroupList() {
   list.innerHTML = "";
   for (var i = 0; i < groups.length; i++) {
     var g = groups[i];
-    var color = _PCA_COLORS[g] || "#888888";
+    var color = (_PCA_COLORS && _PCA_COLORS[g])
+      ? _PCA_COLORS[g]
+      : _PCA_PALETTE[i % _PCA_PALETTE.length];
     var active = (_PCA_HIGHLIGHT === g);
 
     var item = document.createElement("div");
