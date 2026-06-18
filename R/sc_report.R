@@ -1486,7 +1486,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
   # ---- Build panel sections for content area ----
   has_umap         <- "umap" %in% panels
-  non_umap_panels  <- setdiff(panels, "umap")
+  non_umap_panels  <- setdiff(panels, c("umap", "pca"))
 
   # Prepare shared panel params
   panel_params <- list(
@@ -1737,8 +1737,10 @@ sc_report <- function(umap_df,
     required_pca <- c(cell_col, "PC_1", "PC_2", "cluster")
     missing_pca <- setdiff(required_pca, colnames(pca_df))
     if (length(missing_pca) > 0) {
-      stop("pca_df is missing required columns: ",
-           paste(missing_pca, collapse = ", "), call. = FALSE)
+      warning("PCA panel requested but pca_df is missing required columns: ",
+              paste(missing_pca, collapse = ", "), ". Skipping PCA panel.",
+              call. = FALSE)
+      pca_df <- NULL
     }
   }
 
@@ -1781,6 +1783,9 @@ sc_report <- function(umap_df,
       pca_df, cluster_col, cell_col, sample_col,
       point_size, point_alpha, use_webgl
     )
+  } else if (is.null(pca_df) && "pca" %in% panels) {
+    warning("PCA panel requested but pca_df is NULL. Skipping PCA panel.",
+            call. = FALSE)
   }
 
   # ---- Assemble and write HTML ----
