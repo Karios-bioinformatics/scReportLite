@@ -1,5 +1,5 @@
 # scReportLite: Main entry point + HTML assembly + embedded CSS/JS ----------------
-# v0.2.2 — PC Selector with pair/score/loading views
+# v0.3.0 — Plot view with QC diagnostic plots
 
 
 # ---- CSS template --------------------------------------------------------------
@@ -328,6 +328,98 @@ body {
 }
 .pca-loading-table tbody tr:hover {
   background: #f8f9fc;
+}
+
+/* --- Plot view (v0.3.0) --- */
+.sr-view-plot {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.plot-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.plot-controls {
+  width: 220px;
+  min-width: 220px;
+  background: #fff;
+  border-right: 1px solid #dfe6e9;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.plot-controls-section {
+  /* wrapper for each logical group in Plot controls */
+}
+
+.plot-controls-label {
+  font-size: 0.78em;
+  font-weight: 600;
+  color: #b2bec3;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.plot-qc-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.82em;
+  color: #636e72;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  user-select: none;
+  border-left: 3px solid transparent;
+  gap: 6px;
+}
+.plot-qc-item:hover { background: #f0f1f5; }
+.plot-qc-item.active {
+  background: #e8ecf8;
+  border-left-color: #00b894;
+  font-weight: 600;
+  color: #2d3436;
+}
+
+.plot-qc-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #00b894;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.plot-qc-item.active .plot-qc-dot {
+  opacity: 1;
+}
+
+.plot-area {
+  flex: 1;
+  min-width: 0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.plot-area .qc-container {
+  flex: 1;
+  min-height: 0;
+}
+.plot-area .qc-container > *,
+.plot-area .qc-container .html-widget,
+.plot-area .qc-container .plotly,
+.plot-area .qc-container .js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* --- Header --- */
@@ -793,24 +885,44 @@ var _GENE_LIST = [];           // cached gene name list
 var _ACTIVE_VIEW = "umap";    // "umap" or "pca" — top-level view switch (v0.2.0)
 
 // =========================================================================
-// View Switching — PCA / UMAP top-level (v0.2.0)
+// View Switching — Plot / PCA / UMAP top-level (v0.3.0)
 // =========================================================================
 
 function switchView(view) {
   _ACTIVE_VIEW = view;
 
+  var plotView = document.getElementById("sr-view-plot");
   var pcaView  = document.getElementById("sr-view-pca");
   var umapView = document.getElementById("sr-view-umap");
+  var tabPlot  = document.getElementById("view-tab-plot");
   var tabP     = document.getElementById("view-tab-pca");
   var tabU     = document.getElementById("view-tab-umap");
 
-  if (!pcaView || !umapView) return;
+  // Hide all views and deactivate all tabs
+  if (plotView) plotView.style.display = "none";
+  if (pcaView)  pcaView.style.display  = "none";
+  if (umapView) umapView.style.display = "none";
+  if (tabPlot)  tabPlot.classList.remove("active");
+  if (tabP)     tabP.classList.remove("active");
+  if (tabU)     tabU.classList.remove("active");
 
-  if (view === "pca") {
-    pcaView.style.display  = "";
-    umapView.style.display = "none";
+  if (view === "plot" && plotView) {
+    plotView.style.display = "";
+    if (tabPlot) tabPlot.classList.add("active");
+    setTimeout(function() {
+      var visible = plotView.querySelector(".qc-container:not([style*='display: none'])");
+      if (!visible) visible = plotView.querySelector(".qc-container");
+      if (visible) {
+        var plots = visible.querySelectorAll(".js-plotly-plot, .plotly");
+        for (var i = 0; i < plots.length; i++) {
+          if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(plots[i]);
+        }
+      }
+      window.dispatchEvent(new Event("resize"));
+    }, 100);
+  } else if (view === "pca" && pcaView) {
+    pcaView.style.display = "";
     if (tabP) tabP.classList.add("active");
-    if (tabU) tabU.classList.remove("active");
     // Lazy-init PCA on first view (defensive: must not break UMAP)
     try {
       if (!_PCA_INITIALIZED && typeof _PCA_DATA !== "undefined") initPcaPlot();
@@ -823,11 +935,9 @@ function switchView(view) {
       }
       window.dispatchEvent(new Event("resize"));
     }, 100);
-  } else {
-    pcaView.style.display  = "none";
+  } else if (view === "umap" && umapView) {
     umapView.style.display = "";
     if (tabU) tabU.classList.add("active");
-    if (tabP) tabP.classList.remove("active");
     // Restore UMAP plot size
     setTimeout(function() {
       var plots = document.querySelectorAll("#sr-view-umap .js-plotly-plot, #sr-view-umap .plotly");
@@ -836,6 +946,43 @@ function switchView(view) {
       }
       window.dispatchEvent(new Event("resize"));
     }, 100);
+  }
+}
+
+// =========================================================================
+// QC Plot switching within Plot view (v0.3.0)
+// =========================================================================
+
+var _ACTIVE_QC = "nCount_RNA";
+
+function switchQcPlot(mode) {
+  _ACTIVE_QC = mode;
+
+  var plotView = document.getElementById("sr-view-plot");
+  if (!plotView) return;
+
+  // Hide all QC containers
+  var containers = plotView.querySelectorAll(".qc-container");
+  for (var i = 0; i < containers.length; i++) {
+    containers[i].style.display = "none";
+  }
+
+  // Show selected
+  var active = document.getElementById("plot-qc-" + mode.replace(/\./g, "_"));
+  if (active) {
+    active.style.display = "";
+    // Resize plotly
+    var plots = active.querySelectorAll(".js-plotly-plot, .plotly");
+    for (var j = 0; j < plots.length; j++) {
+      if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(plots[j]);
+    }
+    window.dispatchEvent(new Event("resize"));
+  }
+
+  // Update active state on QC items
+  var items = plotView.querySelectorAll(".plot-qc-item");
+  for (var k = 0; k < items.length; k++) {
+    items[k].classList.toggle("active", items[k].getAttribute("data-qc") === mode);
   }
 }
 
@@ -2050,6 +2197,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                              pca_all_pcs_json = "[]",
                              pca_loading_json = "[]",
                              pca_loading_top_n = 10,
+                             qc_plots = NULL,
                              output, title, dim_opacity, marker_n_top,
                              panels = c("umap", "marker_table")) {
 
@@ -2058,6 +2206,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   n_total      <- nrow(umap_df)
   has_samples  <- !is.null(sample_col)
   has_pca      <- !is.null(pca_df) && "pca" %in% panels
+  has_plot     <- !is.null(qc_plots) && "plot" %in% panels
 
   # ---- Sidebar: Cluster section ----
   cluster_html <- lapply(clusters, function(cl) {
@@ -2184,14 +2333,28 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
     sidebar_contents
   )
 
-  # ---- View tabs (standalone, between header and main-layout, v0.2.0) ----
-  view_tabs_html <- if (has_pca) tags$div(
-    class = "view-tabs",
-    tags$div(class = "view-tab", id = "view-tab-pca",
-             onclick = "switchView('pca')", "PCA"),
-    tags$div(class = "view-tab active", id = "view-tab-umap",
-             onclick = "switchView('umap')", "UMAP")
-  )
+  # ---- View tabs (standalone, between header and main-layout, v0.3.0) ----
+  view_tabs_html <- if (has_plot) {
+    # Plot view exists → Plot | PCA | UMAP (Plot active by default)
+    tags$div(
+      class = "view-tabs",
+      tags$div(class = "view-tab active", id = "view-tab-plot",
+               onclick = "switchView('plot')", "Plot"),
+      if (has_pca) tags$div(class = "view-tab", id = "view-tab-pca",
+               onclick = "switchView('pca')", "PCA"),
+      tags$div(class = "view-tab", id = "view-tab-umap",
+               onclick = "switchView('umap')", "UMAP")
+    )
+  } else if (has_pca) {
+    # Only PCA → PCA | UMAP (UMAP active by default, old behaviour)
+    tags$div(
+      class = "view-tabs",
+      tags$div(class = "view-tab", id = "view-tab-pca",
+               onclick = "switchView('pca')", "PCA"),
+      tags$div(class = "view-tab active", id = "view-tab-umap",
+               onclick = "switchView('umap')", "UMAP")
+    )
+  }
 
   # ---- Build per-sample composition data (for JS-driven chart) ----
   sample_comp_json <- "{}"
@@ -2211,7 +2374,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
   # ---- Build panel sections for content area ----
   has_umap         <- "umap" %in% panels
-  non_umap_panels  <- setdiff(panels, c("umap", "pca"))
+  non_umap_panels  <- setdiff(panels, c("umap", "pca", "plot"))
 
   # Prepare shared panel params
   panel_params <- list(
@@ -2274,8 +2437,71 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         # Main layout with view containers
         tags$div(class = "main-layout",
 
+          # ---- Plot view container (v0.3.0) ----
+          if (has_plot) tags$div(
+            id    = "sr-view-plot",
+            class = "sr-view-plot",
+            tags$div(class = "plot-layout",
+              # Plot controls (left)
+              tags$div(class = "plot-controls",
+                tags$div(class = "plot-controls-section",
+                  tags$div(class = "plot-controls-label", "QC"),
+                  tags$div(
+                    class = "plot-qc-item active",
+                    `data-qc` = "nCount_RNA",
+                    onclick = "switchQcPlot('nCount_RNA')",
+                    tags$span(class = "plot-qc-dot"),
+                    "nCount_RNA"
+                  ),
+                  tags$div(
+                    class = "plot-qc-item",
+                    `data-qc` = "nFeature_RNA",
+                    onclick = "switchQcPlot('nFeature_RNA')",
+                    tags$span(class = "plot-qc-dot"),
+                    "nFeature_RNA"
+                  ),
+                  tags$div(
+                    class = "plot-qc-item",
+                    `data-qc` = "percent_mt",
+                    onclick = "switchQcPlot('percent_mt')",
+                    tags$span(class = "plot-qc-dot"),
+                    "percent.mt"
+                  ),
+                  tags$div(
+                    class = "plot-qc-item",
+                    `data-qc` = "ncount_vs_nfeature",
+                    onclick = "switchQcPlot('ncount_vs_nfeature')",
+                    tags$span(class = "plot-qc-dot"),
+                    "nCount vs nFeature"
+                  )
+                )
+              ),
+              # Plot area (right)
+              tags$div(class = "plot-area",
+                tags$div(class = "qc-container", id = "plot-qc-nCount_RNA",
+                  htmltools::as.tags(qc_plots[["nCount_RNA"]])
+                ),
+                tags$div(class = "qc-container", id = "plot-qc-nFeature_RNA",
+                  style = "display:none;",
+                  htmltools::as.tags(qc_plots[["nFeature_RNA"]])
+                ),
+                tags$div(class = "qc-container", id = "plot-qc-percent_mt",
+                  style = "display:none;",
+                  htmltools::as.tags(qc_plots[["percent_mt"]])
+                ),
+                tags$div(class = "qc-container", id = "plot-qc-ncount_vs_nfeature",
+                  style = "display:none;",
+                  htmltools::as.tags(qc_plots[["ncount_vs_nfeature"]])
+                )
+              )
+            )
+          ),
+
           # ---- UMAP view container ----
-          tags$div(id = "sr-view-umap", class = "sr-view-umap",
+          tags$div(
+            id    = "sr-view-umap",
+            class = "sr-view-umap",
+            style = if (has_plot) "display:none;" else "",
 
             # ---- Sidebar ----
             tags$div(class = "sidebar", sidebar_html),
@@ -2509,6 +2735,7 @@ sc_report <- function(umap_df,
                        pca_color_by  = "cluster",
                        pca_loading_df = NULL,
                        pca_loading_top_n = 10,
+                       qc_df         = NULL,
                        output        = "sc_report.html",
                        title         = "scRNA-seq Report",
                        point_size    = 3,
@@ -2542,6 +2769,27 @@ sc_report <- function(umap_df,
     }
   }
 
+  # Validate QC data if provided (v0.3.0)
+  if (!is.null(qc_df) && "plot" %in% panels) {
+    if (!is.data.frame(qc_df)) {
+      stop("qc_df must be a data.frame or NULL", call. = FALSE)
+    }
+    qc_sample_default <- if (!is.null(sample_col)) sample_col else "sample"
+    qc_required <- c(cell_col, qc_sample_default, "nCount_RNA", "nFeature_RNA", "percent.mt")
+    qc_missing <- setdiff(qc_required, colnames(qc_df))
+    if (length(qc_missing) > 0) {
+      warning("Plot panel requested but qc_df is missing required columns: ",
+              paste(qc_missing, collapse = ", "),
+              ".  Need at least: ", cell_col, ", sample, nCount_RNA, nFeature_RNA, percent.mt.",
+              "  Skipping Plot view.",
+              call. = FALSE)
+      qc_df <- NULL
+    }
+  } else if (is.null(qc_df) && "plot" %in% panels) {
+    warning("Plot panel requested but qc_df is NULL. Skipping Plot view.",
+            call. = FALSE)
+  }
+
   if (!is.character(output) || length(output) != 1) {
     stop("output must be a single file path string", call. = FALSE)
   }
@@ -2559,7 +2807,8 @@ sc_report <- function(umap_df,
     stop("panels must be a character vector with at least one element",
          call. = FALSE)
   }
-  unknown_panels <- setdiff(panels, c("umap", "marker_table", "pca", list_panels()))
+  known_panels  <- c("umap", "marker_table", "pca", "plot", list_panels())
+  unknown_panels <- setdiff(panels, known_panels)
   if (length(unknown_panels) > 0) {
     warning("Unknown panel(s) in 'panels': ",
             paste(unknown_panels, collapse = ", "),
@@ -2572,6 +2821,27 @@ sc_report <- function(umap_df,
     umap_df, cluster_col, cell_col, sample_col,
     point_size, point_alpha, use_webgl
   )
+
+  # ---- Build QC plots (v0.3.0) ----
+  qc_plots <- NULL
+  if (!is.null(qc_df) && "plot" %in% panels) {
+    qc_sample_col <- if (!is.null(sample_col) && sample_col %in% colnames(qc_df)) {
+      sample_col
+    } else if ("sample" %in% colnames(qc_df)) {
+      "sample"
+    } else {
+      stop("qc_df must have a sample column (either 'sample' or the value of sample_col)",
+           call. = FALSE)
+    }
+    message("scReportLite: building QC diagnostic plots...")
+    qc_plots <- build_qc_plotly(
+      qc_df,
+      cluster_col = cluster_col,
+      cell_col    = cell_col,
+      sample_col  = qc_sample_col,
+      use_webgl   = use_webgl
+    )
+  }
 
   # Serialize PCA data for client-side rendering (v0.2.2)
   pca_data_json <- "null"
@@ -2652,6 +2922,7 @@ sc_report <- function(umap_df,
     sample_col    = sample_col,
     gene_expr_df  = gene_expr_df,
     pca_df        = pca_df,
+    qc_plots      = qc_plots,
     pca_data_json  = pca_data_json,
     pca_has_sample = pca_has_sample,
     pca_color_by   = pca_color_by,
