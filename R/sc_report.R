@@ -1103,6 +1103,37 @@ var _SELECTED_GENE = null;
 var _ORIG_COLORS_SAVED = [];  // saved cluster colors for gene mode restore
 var _GENE_LIST = [];           // cached gene name list
 var _ACTIVE_VIEW = "umap";    // "umap" or "pca" — top-level view switch (v0.2.0)
+var _SR_ACTIVE_VIEW = "umap"; // canonical active view for lazy rendering guards
+
+// ---- Lazy rendering helpers ----
+function _SR_isActiveView(viewName) {
+  return window._SR_ACTIVE_VIEW === viewName;
+}
+function _SR_isPlotReady(el) {
+  return !!(el && el.data && Array.isArray(el.data) && el.data.length > 0);
+}
+function _SR_resizePlotsInView(viewEl) {
+  if (!viewEl || !window.Plotly) return;
+  var plots = viewEl.querySelectorAll(".js-plotly-plot");
+  for (var i = 0; i < plots.length; i++) {
+    if (_SR_isPlotReady(plots[i])) {
+      try { Plotly.Plots.resize(plots[i]); } catch(e) {}
+    }
+  }
+}
+function _SR_purgePlotlyInContainer(container) {
+  if (!container || !window.Plotly) return;
+  var plots = container.querySelectorAll(".js-plotly-plot");
+  for (var i = 0; i < plots.length; i++) {
+    if (_SR_isPlotReady(plots[i])) {
+      try { Plotly.purge(plots[i]); } catch(e) {}
+    }
+  }
+  // Clear the container after purging (keeps the container itself)
+  while (container.firstChild) {
+    container.removeChild(container.firstChild);
+  }
+}
 
 // =========================================================================
 // View Switching — Plot / PCA / UMAP top-level (v0.3.0)
@@ -1110,6 +1141,7 @@ var _ACTIVE_VIEW = "umap";    // "umap" or "pca" — top-level view switch (v0.2
 
 function switchView(view) {
   _ACTIVE_VIEW = view;
+  _SR_ACTIVE_VIEW = view;  // canonical active view for lazy rendering
 
   var plotView = document.getElementById("sr-view-plot");
   var pcaView  = document.getElementById("sr-view-pca");
@@ -1126,46 +1158,30 @@ function switchView(view) {
   if (tabP)     tabP.classList.remove("active");
   if (tabU)     tabU.classList.remove("active");
 
+  // Show active view
+  var activeViewEl = null;
   if (view === "plot" && plotView) {
+    activeViewEl = plotView;
     plotView.style.display = "";
     if (tabPlot) tabPlot.classList.add("active");
-    // Lazy-init Plot/QC state on first view (v0.3.1)
     try { _PLOT_ensureInit(); } catch(e) {}
-    setTimeout(function() {
-      var visible = plotView.querySelector(".qc-container.qc-visible");
-      if (!visible) visible = plotView.querySelector(".qc-container");
-      if (visible) {
-        var plots = visible.querySelectorAll(".js-plotly-plot, .plotly");
-        for (var i = 0; i < plots.length; i++) {
-          if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(plots[i]);
-        }
-      }
-      window.dispatchEvent(new Event("resize"));
-    }, 100);
   } else if (view === "pca" && pcaView) {
+    activeViewEl = pcaView;
     pcaView.style.display = "";
     if (tabP) tabP.classList.add("active");
-    // Lazy-init PCA on first view (defensive: must not break UMAP)
     try {
       if (!_PCA_INITIALIZED && typeof _PCA_DATA !== "undefined") initPcaPlot();
     } catch(e) {}
-    // Trigger plotly resize after display change
-    setTimeout(function() {
-      var plots = document.querySelectorAll("#sr-view-pca .js-plotly-plot, #sr-view-pca .plotly");
-      for (var i = 0; i < plots.length; i++) {
-        if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(plots[i]);
-      }
-      window.dispatchEvent(new Event("resize"));
-    }, 100);
   } else if (view === "umap" && umapView) {
+    activeViewEl = umapView;
     umapView.style.display = "";
     if (tabU) tabU.classList.add("active");
-    // Restore UMAP plot size
+  }
+
+  // Only resize plots in the active view — never touch hidden views
+  if (activeViewEl) {
     setTimeout(function() {
-      var plots = document.querySelectorAll("#sr-view-umap .js-plotly-plot, #sr-view-umap .plotly");
-      for (var i = 0; i < plots.length; i++) {
-        if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(plots[i]);
-      }
+      _SR_resizePlotsInView(activeViewEl);
       window.dispatchEvent(new Event("resize"));
     }, 100);
   }
@@ -1264,6 +1280,7 @@ function _PLOT_updateNav(activeView) {
 // Switch QC sub-view + show correct right pane
 // =========================================================================
 function _PLOT_selectQcView(view) {
+  if (!_SR_isActiveView("plot")) return;
   _PLOT_QC_VIEW = view;
   _PLOT_updateNav(view);
 
@@ -1318,6 +1335,7 @@ function _PLOT_applyOvView() {
 }
 
 function _PLOT_setOvMode(mode) {
+  if (!_SR_isActiveView("plot")) return;
   _PLOT_OV_MODE = mode;
   var btnMetric = document.getElementById("plot-ov-mode-metric");
   var btnSample = document.getElementById("plot-ov-mode-sample");
@@ -1327,6 +1345,7 @@ function _PLOT_setOvMode(mode) {
 }
 
 function _PLOT_setOvFocus(focus) {
+  if (!_SR_isActiveView("plot")) return;
   _PLOT_OV_FOCUS = focus;
   var bV = document.getElementById("plot-ov-focus-violin");
   var bP = document.getElementById("plot-ov-focus-point");
@@ -1367,6 +1386,7 @@ function _PLOT_applySmView() {
 }
 
 function _PLOT_setSmMode(mode) {
+  if (!_SR_isActiveView("plot")) return;
   _PLOT_SM_MODE = mode;
   var btnMetric = document.getElementById("plot-sm-mode-metric");
   var btnSample = document.getElementById("plot-sm-mode-sample");
@@ -1376,6 +1396,7 @@ function _PLOT_setSmMode(mode) {
 }
 
 function _PLOT_setSmMetric(metric) {
+  if (!_SR_isActiveView("plot")) return;
   _PLOT_SM_METRIC = metric;
   if (_PLOT_QC_VIEW === "single" && _PLOT_SM_MODE === "metric") {
     _PLOT_refreshSmMetric();
@@ -1397,6 +1418,7 @@ function _PLOT_refreshSmMetric() {
 }
 
 function _PLOT_setSmSample(sample) {
+  if (!_SR_isActiveView("plot")) return;
   _PLOT_SM_SAMPLE = sample;
   if (_PLOT_QC_VIEW === "single" && _PLOT_SM_MODE === "sample") {
     _PLOT_refreshSmSample();
@@ -1417,6 +1439,7 @@ function _PLOT_refreshSmSample() {
 }
 
 function _PLOT_setSmFocus(focus) {
+  if (!_SR_isActiveView("plot")) return;
   _PLOT_SM_FOCUS = focus;
   var bV = document.getElementById("plot-sm-focus-violin");
   var bP = document.getElementById("plot-sm-focus-point");
@@ -1438,6 +1461,7 @@ function _PLOT_applyScView() {
 }
 
 function _PLOT_selectScSample(sample) {
+  if (!_SR_isActiveView("plot")) return;
   _PLOT_SC_SAMPLE = sample;
 
   // Update active state on sample list items
@@ -1594,15 +1618,22 @@ function buildPcaGroupIndices() {
 
 // ---- Main PCA render dispatcher ----
 function renderPcaPlot() {
+  if (!_SR_isActiveView("pca")) return;
+
   if (_PCA_SELECTED_PCS.length === 1) {
-    // Hide pair scatter (no residual pair plot in single-PC mode)
+    // Purge pair scatter to free resources, then render single-PC
+    _SR_purgePlotlyInContainer(document.getElementById("pca-container"));
     var pair = document.getElementById("pca-pair-area");
     if (pair) pair.style.display = "none";
     renderSinglePcPlot();
     renderPcLoading();
   } else {
-    renderPcaPairScatter();
+    // Purge single-PC + loading areas, then render pair scatter
+    _SR_purgePlotlyInContainer(document.getElementById("pca-single-pc-container"));
+    var loadingContent = document.getElementById("pca-loading-content");
+    if (loadingContent) loadingContent.innerHTML = "";
     clearSinglePcView();
+    renderPcaPairScatter();
   }
 }
 
@@ -1836,6 +1867,7 @@ function clearSinglePcView() {
 
 // ---- PC selector ----
 function togglePcSelection(pc) {
+  if (!_SR_isActiveView("pca")) return;
   if (!_PCA_INITIALIZED) return;
   try {
   var idx = _PCA_SELECTED_PCS.indexOf(pc);
@@ -1888,6 +1920,7 @@ function renderPcSelector() {
 
 // ---- Group list renderer ----
 function renderPcaGroupList() {
+  if (!_SR_isActiveView("pca")) return;
   var list = document.getElementById("pca-group-list");
   if (!list) return;
   var groups = getPcaGroups();
@@ -1921,6 +1954,7 @@ function renderPcaGroupList() {
 
 // ---- Colour mode, highlight, reset (updated to call renderPcaPlot for dispatch) ----
 function switchPcaColorMode(mode) {
+  if (!_SR_isActiveView("pca")) return;
   if (!_PCA_INITIALIZED) return;
   try {
   _PCA_COLOR_MODE = mode;
@@ -1935,6 +1969,7 @@ function switchPcaColorMode(mode) {
 }
 
 function highlightPcaGroup(value) {
+  if (!_SR_isActiveView("pca")) return;
   if (!_PCA_INITIALIZED) return;
   try {
   _PCA_HIGHLIGHT = (_PCA_HIGHLIGHT === value) ? null : value;
@@ -1944,6 +1979,7 @@ function highlightPcaGroup(value) {
 }
 
 function resetPcaHighlight() {
+  if (!_SR_isActiveView("pca")) return;
   if (!_PCA_INITIALIZED) return;
   try {
   _PCA_HIGHLIGHT = null;
@@ -2071,6 +2107,7 @@ function updatePanelVisibility() {
 // =========================================================================
 
 function selectGene(geneName) {
+  if (!_SR_isActiveView("umap")) return;
   // Switching to gene tab
   switchTab("gene");
 
@@ -2389,6 +2426,7 @@ function showMultiClusterMessage() {
 // =========================================================================
 
 function toggleCluster(clusterId) {
+  if (!_SR_isActiveView("umap")) return;
   clusterId = String(clusterId);
 
   if (SELECTED_CLUSTERS.has(clusterId)) {
@@ -2412,6 +2450,7 @@ function toggleCluster(clusterId) {
 // =========================================================================
 
 function selectSample(sampleId) {
+  if (!_SR_isActiveView("umap")) return;
   sampleId = String(sampleId);
 
   if (SELECTED_SAMPLE === sampleId) {
@@ -3439,7 +3478,7 @@ sc_report <- function(umap_df,
       cluster_col = cluster_col,
       cell_col    = cell_col,
       sample_col  = qc_sample_col,
-      use_webgl   = use_webgl
+      use_webgl   = FALSE  # SVG for QC — avoid too many WebGL contexts
     )
   }
 
