@@ -910,7 +910,14 @@ function switchView(view) {
     plotView.style.display = "";
     if (tabPlot) tabPlot.classList.add("active");
     setTimeout(function() {
-      var visible = plotView.querySelector(".qc-container:not([style*='display: none'])");
+      var visible = null;
+      var qcContainers = plotView.querySelectorAll(".qc-container");
+      for (var i = 0; i < qcContainers.length; i++) {
+        if (qcContainers[i].style.display !== "none") {
+          visible = qcContainers[i];
+          break;
+        }
+      }
       if (!visible) visible = plotView.querySelector(".qc-container");
       if (visible) {
         var plots = visible.querySelectorAll(".js-plotly-plot, .plotly");
