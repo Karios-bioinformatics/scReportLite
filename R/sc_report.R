@@ -975,7 +975,7 @@ function switchQcPlot(mode) {
   }
 
   // Show selected
-  var active = document.getElementById("plot-qc-" + mode.replace(/\./g, "_"));
+  var active = document.getElementById("plot-qc-" + String(mode).split(".").join("_"));
   if (active) {
     active.style.display = "";
     // Resize plotly
