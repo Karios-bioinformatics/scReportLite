@@ -1,6 +1,5 @@
 # scReportLite: QC diagnostic plots for Plot view ---------------------------------
-# v0.3.0 — QC violin distributions (raw + log1p) + nCount vs nFeature scatter.
-# v0.3.1 — Right-sidebar controls: scope, sample, display focus, show points, scale.
+# v0.3.0 — QC violin distributions + nCount vs nFeature scatter.
 #
 # Architecture:
 #   build_qc_plotly() takes qc_df and returns a named list of plotly
@@ -11,19 +10,18 @@
 #     Layer 1 — violin (primary visual, summary hover)
 #     Layer 2 — faint jitter scatter (per-cell hover, deliberately weak)
 #
-#   Both raw-scale and log1p-scale versions are built so that the
-#   right-sidebar Scale control can switch between them without
-#   client-side data recomputation.
+#   Only raw-scale plots are built.  Log1p was removed in v0.3.0 — QC
+#   thresholding should be done on raw values for clarity.
 
 
 #' Build QC diagnostic plotly widgets
 #'
 #' Returns a named list of plotly htmlwidget objects:
 #' \describe{
-#'   \item{nCount_RNA_raw / nCount_RNA_log}{Distribution of UMI counts, violin by sample}
-#'   \item{nFeature_RNA_raw / nFeature_RNA_log}{Distribution of detected genes, violin by sample}
-#'   \item{percent_mt_raw / percent_mt_log}{Distribution of MT%, violin by sample}
+#'   \item{nCount_RNA / nFeature_RNA / percent_mt}{Full-size distribution violin by sample}
+#'   \item{ov_ncount / ov_nfeature / ov_pctmt}{Compact overview panels}
 #'   \item{ncount_vs_nfeature}{Scatter plot of nCount_RNA vs nFeature_RNA, coloured by sample}
+#'   \item{qc_samples}{Character vector of sample names (metadata for JS)}
 #' }
 #'
 #' @param qc_df Data frame with QC metrics. Must contain columns:
@@ -79,13 +77,8 @@ build_qc_plotly <- function(qc_df,
   # Two-layer architecture per sample:
   #   Layer 1 — violin (primary visual, summary hover)
   #   Layer 2 — faint jitter scatter (per-cell hover, deliberately weak)
-  #
-  # When log1p=TRUE, y-values are log1p-transformed and the axis title
-  # is prefixed with "log1p ".
-  build_dist_plot <- function(metric, y_title, log1p = FALSE) {
+  build_dist_plot <- function(metric, y_title) {
     p <- plotly::plot_ly()
-
-    y_label <- if (log1p) paste("log1p", y_title) else y_title
 
     for (si in seq_along(samples)) {
       s   <- samples[si]
@@ -94,13 +87,11 @@ build_qc_plotly <- function(qc_df,
       n   <- nrow(sub)
       if (n == 0) next
 
-      y_vals <- if (log1p) log1p(sub[[metric]]) else sub[[metric]]
-
       # ---- Layer 1: Violin (the main visual) ----
       p <- plotly::add_trace(
         p,
         x          = rep(si, n),
-        y          = y_vals,
+        y          = sub[[metric]],
         type       = "violin",
         points     = FALSE,
         name       = s,
@@ -120,7 +111,7 @@ build_qc_plotly <- function(qc_df,
       p <- plotly::add_trace(
         p,
         x          = jitter_x,
-        y          = y_vals,
+        y          = sub[[metric]],
         text       = hover_texts,
         hoverinfo  = "text",
         type       = trace_type,
@@ -138,14 +129,14 @@ build_qc_plotly <- function(qc_df,
 
     p <- plotly::layout(
       p,
-      title  = sprintf("QC \u2014 %s", y_label),
+      title  = sprintf("QC \u2014 %s", y_title),
       xaxis  = list(
         title     = "",
         ticktext  = as.character(samples),
         tickvals  = seq_along(samples),
         showgrid  = FALSE
       ),
-      yaxis  = list(title = y_label, showgrid = TRUE),
+      yaxis  = list(title = y_title, showgrid = TRUE),
       hovermode = "closest",
       margin    = list(l = 80, r = 30, b = 80, t = 50),
       dragmode  = "pan"
@@ -214,26 +205,21 @@ build_qc_plotly <- function(qc_df,
     p
   }
 
-  # ---- Build distribution plots (raw + log1p) ----
-  message("  Building nCount_RNA (raw + log1p)...")
-  p_ncount_raw <- build_dist_plot("nCount_RNA", "nCount_RNA", log1p = FALSE)
-  p_ncount_log <- build_dist_plot("nCount_RNA", "nCount_RNA", log1p = TRUE)
+  # ---- Build distribution plots (raw only) ----
+  message("  Building nCount_RNA distribution...")
+  p_ncount <- build_dist_plot("nCount_RNA", "nCount_RNA")
 
-  message("  Building nFeature_RNA (raw + log1p)...")
-  p_nfeature_raw <- build_dist_plot("nFeature_RNA", "nFeature_RNA", log1p = FALSE)
-  p_nfeature_log <- build_dist_plot("nFeature_RNA", "nFeature_RNA", log1p = TRUE)
+  message("  Building nFeature_RNA distribution...")
+  p_nfeature <- build_dist_plot("nFeature_RNA", "nFeature_RNA")
 
-  message("  Building percent.mt (raw + log1p)...")
-  p_pctmt_raw <- build_dist_plot("percent.mt", "percent.mt", log1p = FALSE)
-  p_pctmt_log <- build_dist_plot("percent.mt", "percent.mt", log1p = TRUE)
+  message("  Building percent.mt distribution...")
+  p_pctmt <- build_dist_plot("percent.mt", "percent.mt")
 
   message("  Building nCount vs nFeature scatter...")
   p_scatter <- build_scatter()
 
-  # ---- Build overview-only plots (compact, no individual titles) ----
-  # These are used in the overview view where three violins are shown together.
-  # Margin is tighter and title is omitted to avoid clutter.
-  build_overview_panel <- function(metric, y_label, log1p = FALSE) {
+  # ---- Build overview panels (compact, no individual titles) ----
+  build_overview_panel <- function(metric, y_label) {
     p <- plotly::plot_ly()
 
     for (si in seq_along(samples)) {
@@ -243,12 +229,10 @@ build_qc_plotly <- function(qc_df,
       n   <- nrow(sub)
       if (n == 0) next
 
-      y_vals <- if (log1p) log1p(sub[[metric]]) else sub[[metric]]
-
       p <- plotly::add_trace(
         p,
         x          = rep(si, n),
-        y          = y_vals,
+        y          = sub[[metric]],
         type       = "violin",
         points     = FALSE,
         name       = s,
@@ -265,7 +249,7 @@ build_qc_plotly <- function(qc_df,
       p <- plotly::add_trace(
         p,
         x          = jitter_x,
-        y          = y_vals,
+        y          = sub[[metric]],
         text       = hover_texts,
         hoverinfo  = "text",
         type       = trace_type,
@@ -281,14 +265,12 @@ build_qc_plotly <- function(qc_df,
       )
     }
 
-    # For overview panels, use compact margin and include the metric as
-    # a y-axis label (not a plotly title) so the user knows what they see.
     tick_vals <- if (length(samples) > 0) seq_along(samples) else list()
     tick_texts <- if (length(samples) > 0) as.character(samples) else list()
 
     p <- plotly::layout(
       p,
-      title     = "",  # no title — overview panels are labelled by metric
+      title     = "",
       xaxis     = list(
         title     = "",
         ticktext  = tick_texts,
@@ -313,32 +295,19 @@ build_qc_plotly <- function(qc_df,
     p
   }
 
-  message("  Building overview panels (raw + log1p)...")
-  ov_ncount_raw <- build_overview_panel("nCount_RNA",   "nCount_RNA",   log1p = FALSE)
-  ov_ncount_log <- build_overview_panel("nCount_RNA",   "log1p nCount_RNA",   log1p = TRUE)
-  ov_nfeat_raw  <- build_overview_panel("nFeature_RNA", "nFeature_RNA", log1p = FALSE)
-  ov_nfeat_log  <- build_overview_panel("nFeature_RNA", "log1p nFeature_RNA", log1p = TRUE)
-  ov_pctmt_raw  <- build_overview_panel("percent.mt",   "percent.mt",   log1p = FALSE)
-  ov_pctmt_log  <- build_overview_panel("percent.mt",   "log1p percent.mt",   log1p = TRUE)
+  message("  Building overview panels...")
+  ov_ncount  <- build_overview_panel("nCount_RNA",   "nCount_RNA")
+  ov_nfeature <- build_overview_panel("nFeature_RNA", "nFeature_RNA")
+  ov_pctmt    <- build_overview_panel("percent.mt",   "percent.mt")
 
   list(
-    # Single-metric distribution plots (full size)
-    nCount_RNA_raw     = p_ncount_raw,
-    nCount_RNA_log     = p_ncount_log,
-    nFeature_RNA_raw   = p_nfeature_raw,
-    nFeature_RNA_log   = p_nfeature_log,
-    percent_mt_raw     = p_pctmt_raw,
-    percent_mt_log     = p_pctmt_log,
-    # Overview panels (compact)
-    ov_ncount_raw      = ov_ncount_raw,
-    ov_ncount_log      = ov_ncount_log,
-    ov_nfeature_raw    = ov_nfeat_raw,
-    ov_nfeature_log    = ov_nfeat_log,
-    ov_pctmt_raw       = ov_pctmt_raw,
-    ov_pctmt_log       = ov_pctmt_log,
-    # Scatter
-    ncount_vs_nfeature = p_scatter,
-    # Metadata for JS
-    qc_samples         = as.character(samples)
+    nCount_RNA          = p_ncount,
+    nFeature_RNA        = p_nfeature,
+    percent_mt          = p_pctmt,
+    ov_ncount           = ov_ncount,
+    ov_nfeature         = ov_nfeature,
+    ov_pctmt            = ov_pctmt,
+    ncount_vs_nfeature  = p_scatter,
+    qc_samples          = as.character(samples)
   )
 }
