@@ -9,6 +9,11 @@ report_css <- function() {
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                "Helvetica Neue", Arial, sans-serif;
@@ -19,9 +24,10 @@ body {
 
 .container {
   max-width: 100vw;
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 /* --- View tabs (PCA / UMAP top-level switch) --- */
@@ -52,23 +58,24 @@ body {
 
 /* --- View containers (v0.2.0) --- */
 .sr-view-umap {
-  display: flex;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 .sr-view-pca {
-  display: flex;
   flex: 1;
   min-height: 0;
-  flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 /* --- PCA layout (v0.2.2) --- */
 .pca-layout {
-  display: flex;
-  flex: 1;
-  min-height: 0;
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  height: 100%;
+  overflow: hidden;
 }
 
 .pca-controls {
@@ -214,10 +221,12 @@ body {
 /* --- PCA plot area (pair scatter, single-PC, loading) --- */
 .pca-plot-area {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  min-width: 0;
   padding: 16px;
+  overflow-y: auto;
 }
 
 .pca-plot-area .section-title {
@@ -332,21 +341,23 @@ body {
 
 /* --- Plot view (v0.3.1 — three-column layout) --- */
 .sr-view-plot {
-  display: flex;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .plot-layout {
-  display: flex;
-  flex: 1;
-  min-height: 0;
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) 220px;
+  height: 100%;
+  overflow: hidden;
 }
 
 /* Left: navigator (switch between QC sub-views) */
 .plot-nav {
   width: 170px;
   min-width: 170px;
+  min-height: 0;
   flex-shrink: 0;
   background: #fff;
   border-right: 1px solid #dfe6e9;
@@ -405,6 +416,7 @@ body {
 .plot-main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -436,6 +448,7 @@ body {
   flex-direction: column;
   gap: 4px;
   min-height: 0;
+  overflow-y: auto;
 }
 .qc-overview-panel {
   flex: 1;
@@ -450,6 +463,7 @@ body {
 .plot-params {
   width: 220px;
   min-width: 220px;
+  min-height: 0;
   flex-shrink: 0;
   background: #fff;
   border-left: 1px solid #dfe6e9;
@@ -650,12 +664,14 @@ body {
   display: flex;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* --- Sidebar --- */
 .sidebar {
   width: 260px;
   min-width: 260px;
+  min-height: 0;
   background: #fff;
   border-right: 1px solid #dfe6e9;
   display: flex;
@@ -847,12 +863,13 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   overflow-y: auto;
 }
 
 /* --- UMAP plot --- */
 .umap-section {
-  height: 650px;
+  min-height: 500px;
   flex-shrink: 0;
   padding: 16px;
   background: #fff;
@@ -870,8 +887,8 @@ body {
   flex-shrink: 0;
 }
 .umap-container {
-  height: 600px;
-  flex-shrink: 0;
+  flex: 1;
+  min-height: 400px;
 }
 /* Force all htmlwidget / plotly child divs to fill container */
 .umap-container > *,
