@@ -330,7 +330,7 @@ body {
   background: #f8f9fc;
 }
 
-/* --- Plot view (v0.3.0) --- */
+/* --- Plot view (v0.3.1 — three-column layout) --- */
 .sr-view-plot {
   display: flex;
   flex: 1;
@@ -343,53 +343,53 @@ body {
   min-height: 0;
 }
 
-.plot-controls {
-  width: 220px;
-  min-width: 220px;
+/* Left: navigator (switch between QC sub-views) */
+.plot-nav {
+  width: 170px;
+  min-width: 170px;
   background: #fff;
   border-right: 1px solid #dfe6e9;
   overflow-y: auto;
-  padding: 12px;
+  padding: 12px 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 2px;
 }
 
-.plot-controls-section {
-  /* wrapper for each logical group in Plot controls */
-}
-
-.plot-controls-label {
-  font-size: 0.78em;
-  font-weight: 600;
+.plot-nav-label {
+  font-size: 0.72em;
+  font-weight: 700;
   color: #b2bec3;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
+  letter-spacing: 0.6px;
+  padding: 4px 8px;
+  margin-top: 8px;
+  margin-bottom: 2px;
 }
+.plot-nav-label:first-child { margin-top: 0; }
 
-.plot-qc-item {
+.plot-nav-item {
   display: flex;
   align-items: center;
-  padding: 6px 10px;
+  padding: 5px 8px;
   cursor: pointer;
   border-radius: 4px;
-  font-size: 0.82em;
+  font-size: 0.80em;
   color: #636e72;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
   user-select: none;
   border-left: 3px solid transparent;
   gap: 6px;
 }
-.plot-qc-item:hover { background: #f0f1f5; }
-.plot-qc-item.active {
+.plot-nav-item:hover { background: #f0f1f5; }
+.plot-nav-item.active {
   background: #e8ecf8;
   border-left-color: #00b894;
   font-weight: 600;
   color: #2d3436;
 }
 
-.plot-qc-dot {
+.plot-nav-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -398,28 +398,172 @@ body {
   opacity: 0;
   transition: opacity 0.15s;
 }
-.plot-qc-item.active .plot-qc-dot {
-  opacity: 1;
-}
+.plot-nav-item.active .plot-nav-dot { opacity: 1; }
 
-.plot-area {
+/* Center: plot area (flexible) */
+.plot-main {
   flex: 1;
   min-width: 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* QC container (shared by overview / single / scatter) */
+.qc-container {
+  flex: 1;
+  min-height: 0;
+  display: none;
+  flex-direction: column;
+}
+.qc-container.qc-visible {
+  display: flex;
+}
+.qc-container > *,
+.qc-container .html-widget,
+.qc-container .plotly,
+.qc-container .js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* QC Overview: three panels stacked vertically */
+.qc-overview-panels {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+}
+.qc-overview-panel {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.qc-overview-panel .metric-label {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  font-size: 0.75em;
+  font-weight: 600;
+  color: #636e72;
+  background: rgba(255,255,255,0.85);
+  padding: 1px 6px;
+  border-radius: 3px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Right: controls sidebar */
+.plot-params {
+  width: 220px;
+  min-width: 220px;
+  background: #fff;
+  border-left: 1px solid #dfe6e9;
+  overflow-y: auto;
   padding: 12px;
   display: flex;
   flex-direction: column;
+  gap: 12px;
 }
 
-.plot-area .qc-container {
-  flex: 1;
-  min-height: 0;
+.plot-params-label {
+  font-size: 0.72em;
+  font-weight: 700;
+  color: #b2bec3;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 2px;
 }
-.plot-area .qc-container > *,
-.plot-area .qc-container .html-widget,
-.plot-area .qc-container .plotly,
-.plot-area .qc-container .js-plotly-plot {
-  width: 100% !important;
-  height: 100% !important;
+
+.plot-params-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Toggle-button row (Scope, Focus, Scale) */
+.plot-toggle-row {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+}
+.plot-toggle-btn {
+  flex: 1;
+  padding: 5px 6px;
+  border: 1px solid #dfe6e9;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 0.76em;
+  color: #636e72;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  user-select: none;
+}
+.plot-toggle-btn:hover { background: #f0f1f5; }
+.plot-toggle-btn.active {
+  background: #6c5ce7;
+  color: #fff;
+  border-color: #6c5ce7;
+  font-weight: 600;
+}
+
+/* On/Off switch */
+.plot-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82em;
+  color: #2d3436;
+}
+.plot-switch-track {
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: #dfe6e9;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.plot-switch-track.on {
+  background: #6c5ce7;
+}
+.plot-switch-knob {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: left 0.15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.plot-switch-track.on .plot-switch-knob {
+  left: 20px;
+}
+
+/* Sample / Metric dropdown */
+.plot-param-select {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid #dfe6e9;
+  border-radius: 4px;
+  font-size: 0.82em;
+  color: #2d3436;
+  background: #fff;
+  outline: none;
+}
+.plot-param-select:focus {
+  border-color: #6c5ce7;
+}
+
+/* Hidden utility */
+.plot-params-hidden {
+  display: none;
 }
 
 /* --- Header --- */
@@ -909,15 +1053,10 @@ function switchView(view) {
   if (view === "plot" && plotView) {
     plotView.style.display = "";
     if (tabPlot) tabPlot.classList.add("active");
+    // Lazy-init Plot/QC state on first view (v0.3.1)
+    try { _PLOT_ensureInit(); } catch(e) {}
     setTimeout(function() {
-      var visible = null;
-      var qcContainers = plotView.querySelectorAll(".qc-container");
-      for (var i = 0; i < qcContainers.length; i++) {
-        if (qcContainers[i].style.display !== "none") {
-          visible = qcContainers[i];
-          break;
-        }
-      }
+      var visible = plotView.querySelector(".qc-container.qc-visible");
       if (!visible) visible = plotView.querySelector(".qc-container");
       if (visible) {
         var plots = visible.querySelectorAll(".js-plotly-plot, .plotly");
@@ -957,40 +1096,304 @@ function switchView(view) {
 }
 
 // =========================================================================
-// QC Plot switching within Plot view (v0.3.0)
+// Plot / QC state machine (v0.3.1 — three-column layout with right sidebar)
+// All state uses _PLOT_ namespace to avoid polluting PCA / UMAP.
 // =========================================================================
 
-var _ACTIVE_QC = "nCount_RNA";
+var _PLOT_QC_VIEW  = "overview";  // "overview" | "single" | "scatter"
+var _PLOT_QC_METRIC = "nCount_RNA";  // active metric in single-metric mode
+var _PLOT_SCOPE     = "all";      // "all" | "single"
+var _PLOT_SAMPLE    = null;       // selected sample (set on init)
+var _PLOT_FOCUS     = "violin";   // "violin" | "point" | "balanced"
+var _PLOT_POINTS_ON = true;
+var _PLOT_SCALE     = "raw";      // "raw" | "log"
+var _PLOT_INITIALIZED = false;
 
-function switchQcPlot(mode) {
-  _ACTIVE_QC = mode;
+// ---- Init: populate sample dropdown + set defaults ----
+function _PLOT_init() {
+  if (_PLOT_INITIALIZED) return;
+  _PLOT_INITIALIZED = true;
 
-  var plotView = document.getElementById("sr-view-plot");
-  if (!plotView) return;
-
-  // Hide all QC containers
-  var containers = plotView.querySelectorAll(".qc-container");
-  for (var i = 0; i < containers.length; i++) {
-    containers[i].style.display = "none";
-  }
-
-  // Show selected
-  var active = document.getElementById("plot-qc-" + String(mode).split(".").join("_"));
-  if (active) {
-    active.style.display = "";
-    // Resize plotly
-    var plots = active.querySelectorAll(".js-plotly-plot, .plotly");
-    for (var j = 0; j < plots.length; j++) {
-      if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(plots[j]);
+  // Populate sample dropdown from embedded data
+  var sel = document.getElementById("plot-select-sample");
+  if (sel && window._QC_SAMPLES && _QC_SAMPLES.length) {
+    for (var i = 0; i < _QC_SAMPLES.length; i++) {
+      var opt = document.createElement("option");
+      opt.value = _QC_SAMPLES[i];
+      opt.textContent = _QC_SAMPLES[i];
+      sel.appendChild(opt);
     }
-    window.dispatchEvent(new Event("resize"));
+    _PLOT_SAMPLE = _QC_SAMPLES[0];
+  }
+}
+
+// ---- Update active state on left nav items ----
+function _PLOT_updateNav(activeView) {
+  var nav = document.getElementById("sr-view-plot");
+  if (!nav) return;
+  var items = nav.querySelectorAll(".plot-nav-item");
+  for (var i = 0; i < items.length; i++) {
+    var data = items[i].getAttribute("data-plot-nav");
+    items[i].classList.toggle("active", data === activeView);
+  }
+}
+
+// ---- Apply scope to visible violin/point traces ----
+function _PLOT_applyScope() {
+  var containers = document.querySelectorAll(".qc-container.qc-visible");
+  containers.forEach(function(ctr) {
+    var plots = ctr.querySelectorAll(".js-plotly-plot, .plotly");
+    plots.forEach(function(plotEl) {
+      if (!plotEl || !plotEl._qcScopeApplied && _PLOT_SCOPE === "all") return;
+      try {
+        var gd = plotEl;
+        if (!gd.data) return;
+        var nTraces = gd.data.length;
+        var updates = [];
+        for (var t = 0; t < nTraces; t++) {
+          var tname = gd.data[t].name || "";
+          if (_PLOT_SCOPE === "all") {
+            updates.push({visible: true});
+          } else {
+            // Single sample: show only traces for _PLOT_SAMPLE
+            var isPt = tname.indexOf("qc_pts_") === 0 || tname.indexOf("qc_ov_pts_") === 0;
+            var isViolin = !isPt && tname !== "" && tname.indexOf("qc_") !== 0;
+            var show = (tname === _PLOT_SAMPLE) || (isPt && tname === "qc_pts_" + _PLOT_SAMPLE) ||
+                       (isPt && tname === "qc_ov_pts_" + _PLOT_SAMPLE);
+            updates.push({visible: show});
+          }
+        }
+        if (updates.length === nTraces) {
+          Plotly.restyle(gd, updates);
+        }
+      } catch(e) {}
+    });
+  });
+}
+
+// ---- Apply display focus to visible traces ----
+function _PLOT_applyFocus() {
+  var vOpac, pOpac;
+  if (_PLOT_FOCUS === "violin")   { vOpac = 0.90; pOpac = 0.00; }
+  else if (_PLOT_FOCUS === "point") { vOpac = 0.15; pOpac = 0.55; }
+  else                              { vOpac = 0.85; pOpac = 0.20; }
+
+  var containers = document.querySelectorAll(".qc-container.qc-visible");
+  containers.forEach(function(ctr) {
+    var plots = ctr.querySelectorAll(".js-plotly-plot, .plotly");
+    plots.forEach(function(plotEl) {
+      try {
+        var gd = plotEl;
+        if (!gd.data) return;
+        var nTraces = gd.data.length;
+        var opacUpdates = [];
+        for (var t = 0; t < nTraces; t++) {
+          var tname = gd.data[t].name || "";
+          var isPt = tname.indexOf("qc_pts_") === 0 || tname.indexOf("qc_ov_pts_") === 0;
+          opacUpdates.push({opacity: isPt ? pOpac : vOpac});
+        }
+        if (opacUpdates.length === nTraces) {
+          Plotly.restyle(gd, opacUpdates);
+        }
+      } catch(e) {}
+    });
+  });
+  // Also toggle point visibility sync
+  if (!_PLOT_POINTS_ON) _PLOT_applyPoints();
+}
+
+// ---- Toggle point trace visibility ----
+function _PLOT_applyPoints() {
+  var containers = document.querySelectorAll(".qc-container.qc-visible");
+  containers.forEach(function(ctr) {
+    var plots = ctr.querySelectorAll(".js-plotly-plot, .plotly");
+    plots.forEach(function(plotEl) {
+      try {
+        var gd = plotEl;
+        if (!gd.data) return;
+        var nTraces = gd.data.length;
+        var visUpdates = [];
+        for (var t = 0; t < nTraces; t++) {
+          var tname = gd.data[t].name || "";
+          var isPt = tname.indexOf("qc_pts_") === 0 || tname.indexOf("qc_ov_pts_") === 0;
+          if (isPt) {
+            visUpdates.push({visible: _PLOT_POINTS_ON});
+          } else {
+            visUpdates.push({});
+          }
+        }
+        if (visUpdates.length === nTraces) {
+          Plotly.restyle(gd, visUpdates);
+        }
+      } catch(e) {}
+    });
+  });
+}
+
+// ---- Switch QC sub-view (overview / single / scatter) ----
+function _PLOT_selectQcView(view) {
+  _PLOT_QC_VIEW = view;
+  _PLOT_updateNav(view);
+
+  var ov    = document.getElementById("plot-qc-overview");
+  var ovLog = document.getElementById("plot-qc-overview-log");
+  var sg    = document.getElementById("plot-qc-single");
+  var sc    = document.getElementById("plot-qc-scatter");
+  var metGrp = document.getElementById("plot-metric-selector");
+
+  // Hide both overview containers first
+  if (ov)    ov.classList.toggle("qc-visible", false);
+  if (ovLog) ovLog.classList.toggle("qc-visible", false);
+  if (sg)    sg.classList.toggle("qc-visible", false);
+  if (sc)    sc.classList.toggle("qc-visible", false);
+
+  if (view === "overview") {
+    // Show the overview matching current scale
+    var targetOv = (_PLOT_SCALE === "log") ? ovLog : ov;
+    if (targetOv) targetOv.classList.toggle("qc-visible", true);
+  } else if (view === "single") {
+    if (sg) sg.classList.toggle("qc-visible", true);
+    _PLOT_refreshSingle();
+  } else if (view === "scatter") {
+    if (sc) sc.classList.toggle("qc-visible", true);
   }
 
-  // Update active state on QC items
-  var items = plotView.querySelectorAll(".plot-qc-item");
-  for (var k = 0; k < items.length; k++) {
-    items[k].classList.toggle("active", items[k].getAttribute("data-qc") === mode);
+  if (metGrp) metGrp.classList.toggle("plot-params-hidden", view !== "single");
+
+  // Resize visible plotly
+  setTimeout(function() {
+    var visible = document.querySelector(".qc-container.qc-visible");
+    if (visible) {
+      var plots = visible.querySelectorAll(".js-plotly-plot, .plotly");
+      for (var i = 0; i < plots.length; i++) {
+        if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(plots[i]);
+      }
+      window.dispatchEvent(new Event("resize"));
+    }
+  }, 80);
+
+  // Re-apply all controls to new visible containers
+  setTimeout(function() {
+    _PLOT_applyFocus();
+    _PLOT_applyPoints();
+    _PLOT_applyScope();
+  }, 150);
+}
+
+// ---- Refresh single-metric view (show correct metric + scale) ----
+function _PLOT_refreshSingle() {
+  var metric = _PLOT_QC_METRIC;
+  var scale  = _PLOT_SCALE;
+  var m = (metric === "percent_mt") ? "pctmt" : (metric === "nFeature_RNA" ? "nfeature" : "ncount");
+  var targetId = "plot-qc-single-" + m + "-" + scale;
+
+  var parent = document.getElementById("plot-qc-single");
+  if (!parent) return;
+  var children = parent.children;
+  for (var i = 0; i < children.length; i++) {
+    children[i].style.display = (children[i].id === targetId) ? "" : "none";
   }
+
+  setTimeout(function() {
+    var el = document.getElementById(targetId);
+    if (el) {
+      var plots = el.querySelectorAll(".js-plotly-plot, .plotly");
+      for (var i = 0; i < plots.length; i++) {
+        if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(plots[i]);
+      }
+      window.dispatchEvent(new Event("resize"));
+    }
+  }, 80);
+}
+
+// ---- Public: set scale (toggles between full overview containers) ----
+function _PLOT_setScale(scale) {
+  _PLOT_SCALE = scale;
+  var btnR = document.getElementById("plot-scale-raw");
+  var btnL = document.getElementById("plot-scale-log");
+  if (btnR) btnR.classList.toggle("active", scale === "raw");
+  if (btnL) btnL.classList.toggle("active", scale === "log");
+
+  if (_PLOT_QC_VIEW === "overview") {
+    var ov    = document.getElementById("plot-qc-overview");
+    var ovLog = document.getElementById("plot-qc-overview-log");
+    if (ov)    ov.classList.toggle("qc-visible", scale === "raw");
+    if (ovLog) ovLog.classList.toggle("qc-visible", scale === "log");
+
+    setTimeout(function() {
+      var visible = document.querySelector("#plot-qc-overview.qc-visible, #plot-qc-overview-log.qc-visible");
+      if (visible) {
+        var plots = visible.querySelectorAll(".js-plotly-plot, .plotly");
+        for (var i = 0; i < plots.length; i++) {
+          if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(plots[i]);
+        }
+        window.dispatchEvent(new Event("resize"));
+      }
+      _PLOT_applyFocus();
+      _PLOT_applyPoints();
+      _PLOT_applyScope();
+    }, 150);
+  } else if (_PLOT_QC_VIEW === "single") {
+    _PLOT_refreshSingle();
+    setTimeout(function() {
+      _PLOT_applyFocus();
+      _PLOT_applyPoints();
+      _PLOT_applyScope();
+    }, 150);
+  }
+}
+
+// ---- Public: set scope ----
+function _PLOT_setScope(scope) {
+  _PLOT_SCOPE = scope;
+  var btnAll    = document.getElementById("plot-scope-all");
+  var btnSingle = document.getElementById("plot-scope-single");
+  var selGrp    = document.getElementById("plot-sample-selector");
+  if (btnAll)    btnAll.classList.toggle("active", scope === "all");
+  if (btnSingle) btnSingle.classList.toggle("active", scope === "single");
+  if (selGrp)    selGrp.classList.toggle("plot-params-hidden", scope !== "single");
+  _PLOT_applyScope();
+}
+
+// ---- Public: on sample dropdown change ----
+function _PLOT_onSampleChange() {
+  var sel = document.getElementById("plot-select-sample");
+  if (sel) _PLOT_SAMPLE = sel.value;
+  _PLOT_applyScope();
+}
+
+// ---- Public: on metric dropdown change (single mode) ----
+function _PLOT_onMetricChange() {
+  var sel = document.getElementById("plot-select-metric");
+  if (sel) _PLOT_QC_METRIC = sel.value;
+  if (_PLOT_QC_VIEW === "single") _PLOT_refreshSingle();
+}
+
+// ---- Public: set display focus ----
+function _PLOT_setFocus(focus) {
+  _PLOT_FOCUS = focus;
+  var btnV = document.getElementById("plot-focus-violin");
+  var btnP = document.getElementById("plot-focus-point");
+  var btnB = document.getElementById("plot-focus-balanced");
+  if (btnV) btnV.classList.toggle("active", focus === "violin");
+  if (btnP) btnP.classList.toggle("active", focus === "point");
+  if (btnB) btnB.classList.toggle("active", focus === "balanced");
+  _PLOT_applyFocus();
+}
+
+// ---- Public: toggle show points ----
+function _PLOT_togglePoints() {
+  _PLOT_POINTS_ON = !_PLOT_POINTS_ON;
+  var track = document.getElementById("plot-switch-points");
+  var label = document.getElementById("plot-switch-points-label");
+  if (track) track.classList.toggle("on", _PLOT_POINTS_ON);
+  if (label) label.textContent = _PLOT_POINTS_ON ? "On" : "Off";
+  _PLOT_applyPoints();
+}
+
+// ---- Lazy-init on first Plot view open ----
+function _PLOT_ensureInit() {
+  if (!_PLOT_INITIALIZED) _PLOT_init();
 }
 
 // =========================================================================
@@ -2445,61 +2848,159 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         # Main layout with view containers
         tags$div(class = "main-layout",
 
-          # ---- Plot view container (v0.3.0) ----
+          # ---- Plot view container (v0.3.1 — three-column layout) ----
           if (has_plot) tags$div(
             id    = "sr-view-plot",
             class = "sr-view-plot",
             tags$div(class = "plot-layout",
-              # Plot controls (left)
-              tags$div(class = "plot-controls",
-                tags$div(class = "plot-controls-section",
-                  tags$div(class = "plot-controls-label", "QC"),
-                  tags$div(
-                    class = "plot-qc-item active",
-                    `data-qc` = "nCount_RNA",
-                    onclick = "switchQcPlot('nCount_RNA')",
-                    tags$span(class = "plot-qc-dot"),
-                    "nCount_RNA"
-                  ),
-                  tags$div(
-                    class = "plot-qc-item",
-                    `data-qc` = "nFeature_RNA",
-                    onclick = "switchQcPlot('nFeature_RNA')",
-                    tags$span(class = "plot-qc-dot"),
-                    "nFeature_RNA"
-                  ),
-                  tags$div(
-                    class = "plot-qc-item",
-                    `data-qc` = "percent_mt",
-                    onclick = "switchQcPlot('percent_mt')",
-                    tags$span(class = "plot-qc-dot"),
-                    "percent.mt"
-                  ),
-                  tags$div(
-                    class = "plot-qc-item",
-                    `data-qc` = "ncount_vs_nfeature",
-                    onclick = "switchQcPlot('ncount_vs_nfeature')",
-                    tags$span(class = "plot-qc-dot"),
-                    "nCount vs nFeature"
-                  )
+              # Left: navigator (switch sub-views only)
+              tags$div(class = "plot-nav",
+                tags$div(class = "plot-nav-label", "QC"),
+                tags$div(
+                  class = "plot-nav-item active",
+                  `data-plot-nav` = "overview",
+                  onclick = "_PLOT_selectQcView('overview')",
+                  tags$span(class = "plot-nav-dot"),
+                  "Overview"
+                ),
+                tags$div(
+                  class = "plot-nav-item",
+                  `data-plot-nav` = "single",
+                  onclick = "_PLOT_selectQcView('single')",
+                  tags$span(class = "plot-nav-dot"),
+                  "Single metric"
+                ),
+                tags$div(
+                  class = "plot-nav-item",
+                  `data-plot-nav` = "scatter",
+                  onclick = "_PLOT_selectQcView('scatter')",
+                  tags$span(class = "plot-nav-dot"),
+                  "nCount vs nFeature"
                 )
               ),
-              # Plot area (right)
-              tags$div(class = "plot-area",
-                tags$div(class = "qc-container", id = "plot-qc-nCount_RNA",
-                  htmltools::as.tags(qc_plots[["nCount_RNA"]])
+              # Center: plot area
+              tags$div(class = "plot-main", id = "plot-main",
+                # Overview — raw scale (default visible)
+                tags$div(class = "qc-container qc-visible", id = "plot-qc-overview",
+                  tags$div(class = "qc-overview-panels",
+                    tags$div(class = "qc-overview-panel",
+                      tags$span(class = "metric-label", "nCount_RNA"),
+                      htmltools::as.tags(qc_plots[["ov_ncount_raw"]])
+                    ),
+                    tags$div(class = "qc-overview-panel",
+                      tags$span(class = "metric-label", "nFeature_RNA"),
+                      htmltools::as.tags(qc_plots[["ov_nfeature_raw"]])
+                    ),
+                    tags$div(class = "qc-overview-panel",
+                      tags$span(class = "metric-label", "percent.mt"),
+                      htmltools::as.tags(qc_plots[["ov_pctmt_raw"]])
+                    )
+                  )
                 ),
-                tags$div(class = "qc-container", id = "plot-qc-nFeature_RNA",
-                  style = "display:none;",
-                  htmltools::as.tags(qc_plots[["nFeature_RNA"]])
+                # Overview — log1p scale (hidden by default)
+                tags$div(class = "qc-container", id = "plot-qc-overview-log",
+                  tags$div(class = "qc-overview-panels",
+                    tags$div(class = "qc-overview-panel",
+                      tags$span(class = "metric-label", "nCount_RNA"),
+                      htmltools::as.tags(qc_plots[["ov_ncount_log"]])
+                    ),
+                    tags$div(class = "qc-overview-panel",
+                      tags$span(class = "metric-label", "nFeature_RNA"),
+                      htmltools::as.tags(qc_plots[["ov_nfeature_log"]])
+                    ),
+                    tags$div(class = "qc-overview-panel",
+                      tags$span(class = "metric-label", "percent.mt"),
+                      htmltools::as.tags(qc_plots[["ov_pctmt_log"]])
+                    )
+                  )
                 ),
-                tags$div(class = "qc-container", id = "plot-qc-percent_mt",
-                  style = "display:none;",
-                  htmltools::as.tags(qc_plots[["percent_mt"]])
+                # Single metric (one violin, raw + log)
+                tags$div(class = "qc-container", id = "plot-qc-single",
+                  tags$div(id = "plot-qc-single-ncount-raw", style = "flex:1;min-height:0;",
+                    htmltools::as.tags(qc_plots[["nCount_RNA_raw"]])
+                  ),
+                  tags$div(id = "plot-qc-single-ncount-log", style = "display:none;flex:1;min-height:0;",
+                    htmltools::as.tags(qc_plots[["nCount_RNA_log"]])
+                  ),
+                  tags$div(id = "plot-qc-single-nfeature-raw", style = "display:none;flex:1;min-height:0;",
+                    htmltools::as.tags(qc_plots[["nFeature_RNA_raw"]])
+                  ),
+                  tags$div(id = "plot-qc-single-nfeature-log", style = "display:none;flex:1;min-height:0;",
+                    htmltools::as.tags(qc_plots[["nFeature_RNA_log"]])
+                  ),
+                  tags$div(id = "plot-qc-single-pctmt-raw", style = "display:none;flex:1;min-height:0;",
+                    htmltools::as.tags(qc_plots[["percent_mt_raw"]])
+                  ),
+                  tags$div(id = "plot-qc-single-pctmt-log", style = "display:none;flex:1;min-height:0;",
+                    htmltools::as.tags(qc_plots[["percent_mt_log"]])
+                  )
                 ),
-                tags$div(class = "qc-container", id = "plot-qc-ncount_vs_nfeature",
-                  style = "display:none;",
+                # nCount vs nFeature scatter
+                tags$div(class = "qc-container", id = "plot-qc-scatter",
                   htmltools::as.tags(qc_plots[["ncount_vs_nfeature"]])
+                )
+              ),
+              # Right: controls sidebar
+              tags$div(class = "plot-params", id = "plot-params",
+                # Scope
+                tags$div(class = "plot-params-group",
+                  tags$div(class = "plot-params-label", "Scope"),
+                  tags$div(class = "plot-toggle-row",
+                    tags$button(class = "plot-toggle-btn active", id = "plot-scope-all",
+                      onclick = "_PLOT_setScope('all')", "All samples"),
+                    tags$button(class = "plot-toggle-btn", id = "plot-scope-single",
+                      onclick = "_PLOT_setScope('single')", "Single sample")
+                  )
+                ),
+                # Sample selector (visible when scope=single)
+                tags$div(class = "plot-params-group plot-params-hidden", id = "plot-sample-selector",
+                  tags$div(class = "plot-params-label", "Sample"),
+                  tags$select(class = "plot-param-select", id = "plot-select-sample",
+                    onchange = "_PLOT_onSampleChange()"
+                  )
+                ),
+                # Metric selector (visible in single-metric mode)
+                tags$div(class = "plot-params-group plot-params-hidden", id = "plot-metric-selector",
+                  tags$div(class = "plot-params-label", "Metric"),
+                  tags$select(class = "plot-param-select", id = "plot-select-metric",
+                    onchange = "_PLOT_onMetricChange()",
+                    tags$option(value = "nCount_RNA", "nCount_RNA"),
+                    tags$option(value = "nFeature_RNA", "nFeature_RNA"),
+                    tags$option(value = "percent_mt", "percent.mt")
+                  )
+                ),
+                # Display focus
+                tags$div(class = "plot-params-group",
+                  tags$div(class = "plot-params-label", "Display focus"),
+                  tags$div(class = "plot-toggle-row",
+                    tags$button(class = "plot-toggle-btn active", id = "plot-focus-violin",
+                      onclick = "_PLOT_setFocus('violin')", "Violin"),
+                    tags$button(class = "plot-toggle-btn", id = "plot-focus-point",
+                      onclick = "_PLOT_setFocus('point')", "Point"),
+                    tags$button(class = "plot-toggle-btn", id = "plot-focus-balanced",
+                      onclick = "_PLOT_setFocus('balanced')", "Balanced")
+                  )
+                ),
+                # Show points
+                tags$div(class = "plot-params-group",
+                  tags$div(class = "plot-params-label", "Show points"),
+                  tags$div(class = "plot-switch-row",
+                    tags$div(class = "plot-switch-track on", id = "plot-switch-points",
+                      onclick = "_PLOT_togglePoints()",
+                      tags$div(class = "plot-switch-knob")
+                    ),
+                    tags$span(id = "plot-switch-points-label", "On")
+                  )
+                ),
+                # Scale
+                tags$div(class = "plot-params-group",
+                  tags$div(class = "plot-params-label", "Scale"),
+                  tags$div(class = "plot-toggle-row",
+                    tags$button(class = "plot-toggle-btn active", id = "plot-scale-raw",
+                      onclick = "_PLOT_setScale('raw')", "Raw"),
+                    tags$button(class = "plot-toggle-btn", id = "plot-scale-log",
+                      onclick = "_PLOT_setScale('log')", "Log1p")
+                  )
                 )
               )
             )
@@ -2631,6 +3132,9 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
       tags$script(htmltools::HTML(sprintf(
         "window._GENE_EXPR_DATA = %s;",
         gene_expr_json
+      ))),
+      if (has_plot) tags$script(htmltools::HTML(paste0(
+        "window._QC_SAMPLES = ", jsonlite::toJSON(qc_plots[["qc_samples"]], auto_unbox = TRUE), ";"
       ))),
       if (has_pca) list(
         tags$script(htmltools::HTML(paste0("window._PCA_DATA = ", pca_data_json, ";"))),
