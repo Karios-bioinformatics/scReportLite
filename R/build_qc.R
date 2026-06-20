@@ -71,9 +71,12 @@ build_qc_plotly <- function(qc_df,
     h
   }
 
-  # ---- Helper: build a distribution jitter plot for one metric ----
+  # ---- Helper: build a distribution violin plot for one metric ----
+  # Two-layer architecture per sample:
+  #   Layer 1 — violin (primary visual, summary hover)
+  #   Layer 2 — faint jitter scatter (per-cell hover, deliberately weak)
   build_dist_plot <- function(metric, y_title) {
-    p <- plotly::plot_ly(type = trace_type)
+    p <- plotly::plot_ly()
 
     for (si in seq_along(samples)) {
       s   <- samples[si]
@@ -82,8 +85,23 @@ build_qc_plotly <- function(qc_df,
       n   <- nrow(sub)
       if (n == 0) next
 
-      # Horizontal jitter within [si - 0.3, si + 0.3]
-      jitter_x <- rep(si, n) + runif(n, -0.30, 0.30)
+      # ---- Layer 1: Violin (the main visual) ----
+      p <- plotly::add_trace(
+        p,
+        x          = rep(si, n),
+        y          = sub[[metric]],
+        type       = "violin",
+        points     = FALSE,
+        name       = s,
+        showlegend = FALSE,
+        fillcolor  = unname(sample_cols[s]),
+        line       = list(color = unname(sample_cols[s]), width = 1.5),
+        opacity    = 0.85,
+        hoverinfo  = "y"
+      )
+
+      # ---- Layer 2: Faint jitter scatter (per-cell hover only) ----
+      jitter_x <- rep(si, n) + runif(n, -0.25, 0.25)
 
       hover_texts <- vapply(seq_len(n), function(i) build_qc_hover(sub, i),
                             character(1), USE.NAMES = FALSE)
@@ -98,10 +116,11 @@ build_qc_plotly <- function(qc_df,
         mode       = "markers",
         marker     = list(
           color   = unname(sample_cols[s]),
-          size    = 3,
-          opacity = 0.7
+          size    = 2,
+          opacity = 0.20,
+          line    = list(width = 0)
         ),
-        name       = paste0("qc_", s),
+        name       = paste0("qc_pts_", s),
         showlegend = FALSE
       )
     }
