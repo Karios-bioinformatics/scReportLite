@@ -1578,6 +1578,9 @@ function buildPcaGroupIndices() {
 // ---- Main PCA render dispatcher ----
 function renderPcaPlot() {
   if (_PCA_SELECTED_PCS.length === 1) {
+    // Hide pair scatter (no residual pair plot in single-PC mode)
+    var pair = document.getElementById("pca-pair-area");
+    if (pair) pair.style.display = "none";
     renderSinglePcPlot();
     renderPcLoading();
   } else {
