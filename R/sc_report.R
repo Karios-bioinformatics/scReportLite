@@ -1214,7 +1214,8 @@ var _PLOT_STATE = {
 
   renderToken: 0,
   renderTimer:  null,
-  isRendering:  false
+  isRendering:  false,
+  _activeCanvasIds: []   // set by each render fn for focus restyle
 };
 
 // ---- Focus → opacities ----
@@ -1222,6 +1223,77 @@ function _PLOT_focusOpacities(focus) {
   if (focus === "violin")   return {v:0.90, p:0.00};
   if (focus === "point")    return {v:0.15, p:0.55};
   return                     {v:0.85, p:0.20};
+}
+
+// ---- Sample colour helper ----
+var _PLOT_PALETTE = [
+  "#E6194B","#3CB44B","#FFE119","#0082C8","#F58231","#911EB4",
+  "#46F0F0","#F032E6","#BCF60C","#E6BEFF","#008080","#A52A2A"
+];
+function _PLOT_getSampleColor(sample) {
+  var d = window._QC_DATA || {};
+  var colors = d.sample_colors || {};
+  if (colors[sample]) return colors[sample];
+  var samples = d.samples || [];
+  var idx = samples.indexOf(sample);
+  return _PLOT_PALETTE[(idx >= 0 ? idx : 0) % _PLOT_PALETTE.length];
+}
+
+// ---- Focus helpers ----
+function _PLOT_getCurrentFocus() {
+  var m = _PLOT_STATE.activeModule;
+  if (m === "overview") return _PLOT_STATE.overview.focus;
+  if (m === "single")   return _PLOT_STATE.single.focus;
+  return "balanced";
+}
+
+// ---- Focus apply (no full render — only restyles violin/point opacity) ----
+function _PLOT_applyFocusOnly() {
+  var canvas = document.getElementById("plot-active-canvas");
+  if (!canvas || !window.Plotly) return;
+
+  var focus = _PLOT_getCurrentFocus();
+  var op = _PLOT_focusOpacities(focus);
+
+  var plots = canvas.querySelectorAll(".js-plotly-plot");
+  plots.forEach(function(gd) {
+    if (!gd || !gd.data) return;
+
+    // Violin trace opacity
+    var vi = [];
+    for (var i = 0; i < gd.data.length; i++) {
+      if (gd.data[i].type === "violin") vi.push(i);
+    }
+    if (vi.length > 0) {
+      try { Plotly.restyle(gd, {"opacity": op.v}, vi); } catch(e) {
+        console.warn("Plot focus violin restyle failed:", e);
+      }
+    }
+
+    // Point (scatter+markers) trace opacity
+    var pi = [];
+    for (var j = 0; j < gd.data.length; j++) {
+      var tr = gd.data[j];
+      if (tr.type === "scatter" && tr.mode === "markers") pi.push(j);
+    }
+    if (pi.length > 0) {
+      try { Plotly.restyle(gd, {"marker.opacity": op.p}, pi); } catch(e) {
+        console.warn("Plot focus point restyle failed:", e);
+      }
+    }
+  });
+}
+
+// ---- Stable jitter (deterministic — same cell+metric+sample always same offset) ----
+function _PLOT_stableJitter(key, width) {
+  var h = 0;
+  key = String(key || "");
+  for (var i = 0; i < key.length; i++) {
+    h = ((h << 5) - h) + key.charCodeAt(i);
+    h |= 0;
+  }
+  var u = (Math.abs(h) % 10000) / 10000;
+  return (u - 0.5) * width;
 }
 
 // ---- Debounced render scheduler ----
@@ -1243,6 +1315,7 @@ function _PLOT_renderCurrentState() {
   var d = window._QC_DATA;
   if (!d || !d.cells || !d.cells.length) return;
 
+  _PLOT_updateRightPane();
   _PLOT_STATE.isRendering = true;
   try {
     var m = _PLOT_STATE.activeModule;
@@ -1267,17 +1340,16 @@ function _PLOT_selectQcView(view) {
   if (!_SR_isActiveView("plot")) return;
   _PLOT_STATE.activeModule = view;
   _PLOT_updateNav(view);
-
-  // Show/hide right panes
-  ["plot-params-overview","plot-params-single","plot-params-scatter"].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.classList.add("plot-params-hidden");
-  });
-  var paneId = "plot-params-" + (view === "single" ? "single" : view === "scatter" ? "scatter" : "overview");
-  var pane = document.getElementById(paneId);
-  if (pane) pane.classList.remove("plot-params-hidden");
-
+  _PLOT_updateRightPane();
   _PLOT_scheduleRender();
+}
+
+function _PLOT_updateRightPane() {
+  var module = _PLOT_STATE.activeModule;
+  ["overview","single","scatter"].forEach(function(name) {
+    var el = document.getElementById("plot-params-" + name);
+    if (el) el.classList.toggle("plot-params-hidden", name !== module);
+  });
 }
 
 function _PLOT_updateNav(activeView) {
@@ -1300,6 +1372,7 @@ function _PLOT_renderOvMetric(d) {
   canvas.style.overflowX = "hidden";
 
   var op = _PLOT_focusOpacities(_PLOT_STATE.overview.focus);
+  _PLOT_STATE._activeCanvasIds = ["plot-ov-metric-0","plot-ov-metric-1","plot-ov-metric-2"];
   var samples = d.samples;
   var metrics = ["nCount_RNA","nFeature_RNA","percent_mt"];
   var yLabels = ["nCount_RNA","nFeature_RNA","percent_mt"];
@@ -1330,9 +1403,11 @@ function _PLOT_renderOvMetric(d) {
       // Gather cells for this sample
       var yVals = [];
       var hoverTexts = [];
+      var cellIds = [];
       for (var ci = 0; ci < d.cells.length; ci++) {
         if (d.cells[ci].sample !== s) continue;
         yVals.push(d.cells[ci][metric]);
+        cellIds.push(d.cells[ci].cell);
         hoverTexts.push("Cell: " + d.cells[ci].cell +
           "<br>Sample: " + s +
           "<br>nCount: " + d.cells[ci].nCount_RNA +
@@ -1341,14 +1416,14 @@ function _PLOT_renderOvMetric(d) {
       }
       if (!yVals.length) continue;
 
-      var fillCol = (d.sample_colors && d.sample_colors[s]) || "#888";
-      // Violin trace
+      var fillCol = _PLOT_getSampleColor(s);
+      // Violin trace (OvMetric)
       traces.push({
         x: new Array(yVals.length).fill(si),
         y: yVals,
         type: "violin", points: false, name: s, showlegend: false,
         fillcolor: fillCol, line: {color: fillCol, width: 1.2},
-        opacity: op.v, hoverinfo: "y"
+        opacity: op.v, hoverinfo: "y", width: 0.6, spanmode: "hard", span: [0, null]
       });
       // Point trace (sampled overlay)
       if (op.p > 0.001) {
@@ -1356,7 +1431,7 @@ function _PLOT_renderOvMetric(d) {
         var total = yVals.length > 1000 ? 1000 : yVals.length;
         var step = Math.max(1, Math.floor(yVals.length / total));
         for (var k = 0; k < yVals.length; k += step) {
-          px.push(si + (Math.random() - 0.5) * 0.4);
+          px.push(si + _PLOT_stableJitter(cellIds[k] + "_" + metric + "_" + s, 0.4));
           py.push(yVals[k]);
           pt.push(hoverTexts[k] || "");
         }
@@ -1373,7 +1448,7 @@ function _PLOT_renderOvMetric(d) {
       title: "", margin: {l:70,r:15,b:50,t:10},
       xaxis: {title:"", ticktext:samples, tickvals:samples.map(function(_,i){return i;}),
               showgrid:false, zeroline:false},
-      yaxis: {title:yLabels[mi], showgrid:true, zeroline:false},
+      yaxis: {title:yLabels[mi], showgrid:true, zeroline:false, rangemode:"nonnegative"},
       hovermode: "closest", dragmode: "pan"
     }, {
       displayModeBar: true,
@@ -1394,6 +1469,7 @@ function _PLOT_renderOvSample(d) {
 
   var op = _PLOT_focusOpacities(_PLOT_STATE.overview.focus);
   var samples = d.samples;
+  _PLOT_STATE._activeCanvasIds = samples.map(function(_,i){return "plot-ov-sample-"+i;});
   var metrics = ["nCount_RNA","nFeature_RNA","percent_mt"];
   var mLabels = ["nCount","nFeature","%MT"];
 
@@ -1419,21 +1495,38 @@ function _PLOT_renderOvSample(d) {
   }
   canvas.appendChild(wrapper);
 
+  // Compute global y-max for unified scale across sample panels
+  var ovSampleGlobalMax = 0;
+  for (var gi = 0; gi < samples.length; gi++) {
+    var gs = samples[gi];
+    for (var gm = 0; gm < metrics.length; gm++) {
+      var gmetric = metrics[gm];
+      for (var gc = 0; gc < d.cells.length; gc++) {
+        if (d.cells[gc].sample !== gs) continue;
+        var gv = d.cells[gc][gmetric];
+        if (gv > ovSampleGlobalMax) ovSampleGlobalMax = gv;
+      }
+    }
+  }
+  var ovSampleYrange = [0, ovSampleGlobalMax * 1.05];
+
   // Render per-sample triple-violin
   for (var si = 0; si < samples.length; si++) {
     var s = samples[si];
     var panel = document.getElementById("plot-ov-sample-" + si);
     if (!panel) continue;
-    var fillCol = (d.sample_colors && d.sample_colors[s]) || "#888";
+    var fillCol = _PLOT_getSampleColor(s);
 
     var traces = [];
     for (var mi = 0; mi < metrics.length; mi++) {
       var metric = metrics[mi];
       var yVals = [];
       var hovers = [];
+      var cellIds = [];
       for (var ci = 0; ci < d.cells.length; ci++) {
         if (d.cells[ci].sample !== s) continue;
         yVals.push(d.cells[ci][metric]);
+        cellIds.push(d.cells[ci].cell);
         hovers.push("Cell: " + d.cells[ci].cell + "<br>" + metric + ": " + d.cells[ci][metric]);
       }
       if (!yVals.length) continue;
@@ -1442,14 +1535,14 @@ function _PLOT_renderOvSample(d) {
         x: new Array(yVals.length).fill(mi),
         y: yVals, type: "violin", points: false, name: mLabels[mi], showlegend: false,
         fillcolor: fillCol, line: {color: fillCol, width: 1.2},
-        opacity: op.v, hoverinfo: "y"
+        opacity: op.v, hoverinfo: "y", width: 0.6, spanmode: "hard", span: [0, null]
       });
       if (op.p > 0.001) {
         var px=[]; var py=[]; var pt=[];
         var total = yVals.length > 500 ? 500 : yVals.length;
         var step = Math.max(1, Math.floor(yVals.length/total));
         for (var k=0; k<yVals.length; k+=step) {
-          px.push(mi + (Math.random()-0.5)*0.3);
+          px.push(mi + _PLOT_stableJitter(cellIds[k] + "_" + metric + "_" + s, 0.3));
           py.push(yVals[k]); pt.push(hovers[k]||"");
         }
         traces.push({
@@ -1463,7 +1556,7 @@ function _PLOT_renderOvSample(d) {
     Plotly.newPlot(panel, traces, {
       title:"", margin:{l:55,r:10,b:40,t:10},
       xaxis:{title:"", ticktext:mLabels, tickvals:[0,1,2], showgrid:false, zeroline:false},
-      yaxis:{title:"", showgrid:true, zeroline:false},
+      yaxis:{title:"", showgrid:true, zeroline:false, range:ovSampleYrange},
       hovermode:"closest", dragmode:"pan"
     }, {
       displayModeBar: true,
@@ -1483,6 +1576,7 @@ function _PLOT_renderSmMetric(d) {
   canvas.style.overflowX = "hidden";
 
   var op = _PLOT_focusOpacities(_PLOT_STATE.single.focus);
+  _PLOT_STATE._activeCanvasIds = ["plot-sm-panel"];
   var metric = _PLOT_STATE.single.metric;
   var samples = d.samples;
 
@@ -1495,27 +1589,28 @@ function _PLOT_renderSmMetric(d) {
   var traces = [];
   for (var si = 0; si < samples.length; si++) {
     var s = samples[si];
-    var yVals = []; var hovers = [];
+    var yVals = []; var hovers = []; var cellIds = [];
     for (var ci = 0; ci < d.cells.length; ci++) {
       if (d.cells[ci].sample !== s) continue;
       yVals.push(d.cells[ci][metric]);
+      cellIds.push(d.cells[ci].cell);
       hovers.push("Cell: "+d.cells[ci].cell+"<br>Sample: "+s+"<br>"+metric+": "+d.cells[ci][metric]);
     }
     if (!yVals.length) continue;
-    var fillCol = (d.sample_colors && d.sample_colors[s]) || "#888";
+    var fillCol = _PLOT_getSampleColor(s);
 
     traces.push({
       x: new Array(yVals.length).fill(si), y: yVals,
       type:"violin", points:false, name:s, showlegend:false,
       fillcolor:fillCol, line:{color:fillCol, width:1.5},
-      opacity:op.v, hoverinfo:"y"
+      opacity:op.v, hoverinfo:"y", width:0.6, spanmode:"hard", span:[0,null]
     });
     if (op.p > 0.001) {
       var px=[]; var py=[]; var pt=[];
       var total = yVals.length > 1000 ? 1000 : yVals.length;
       var step = Math.max(1, Math.floor(yVals.length/total));
       for (var k=0; k<yVals.length; k+=step) {
-        px.push(si + (Math.random()-0.5)*0.4);
+        px.push(si + _PLOT_stableJitter(cellIds[k] + "_" + metric + "_" + s, 0.4));
         py.push(yVals[k]); pt.push(hovers[k]||"");
       }
       traces.push({
@@ -1529,7 +1624,7 @@ function _PLOT_renderSmMetric(d) {
   Plotly.newPlot(panel, traces, {
     title:"QC — "+metric, margin:{l:80,r:30,b:80,t:50},
     xaxis:{title:"", ticktext:samples, tickvals:samples.map(function(_,i){return i;}), showgrid:false},
-    yaxis:{title:metric, showgrid:true},
+    yaxis:{title:metric, showgrid:true, rangemode:"nonnegative"},
     hovermode:"closest", dragmode:"pan"
   }, {
     displayModeBar: true,
@@ -1548,6 +1643,7 @@ function _PLOT_renderSmSample(d) {
   canvas.style.overflowX = "hidden";
 
   var op = _PLOT_focusOpacities(_PLOT_STATE.single.focus);
+  _PLOT_STATE._activeCanvasIds = ["plot-sm-panel"];
   var sample = _PLOT_STATE.single.sample;
   if (!sample) return;
 
@@ -1559,15 +1655,16 @@ function _PLOT_renderSmSample(d) {
 
   var metrics = ["nCount_RNA","nFeature_RNA","percent_mt"];
   var mLabels = ["nCount_RNA","nFeature_RNA","percent.mt"];
-  var fillCol = (d.sample_colors && d.sample_colors[sample]) || "#888";
+  var fillCol = _PLOT_getSampleColor(sample);
   var traces = [];
 
   for (var mi = 0; mi < metrics.length; mi++) {
     var metric = metrics[mi];
-    var yVals = []; var hovers = [];
+    var yVals = []; var hovers = []; var cellIds = [];
     for (var ci = 0; ci < d.cells.length; ci++) {
       if (d.cells[ci].sample !== sample) continue;
       yVals.push(d.cells[ci][metric]);
+      cellIds.push(d.cells[ci].cell);
       hovers.push("Cell: "+d.cells[ci].cell+"<br>"+metric+": "+d.cells[ci][metric]);
     }
     if (!yVals.length) continue;
@@ -1576,14 +1673,14 @@ function _PLOT_renderSmSample(d) {
       x: new Array(yVals.length).fill(mi), y: yVals,
       type:"violin", points:false, name:mLabels[mi], showlegend:false,
       fillcolor:fillCol, line:{color:fillCol, width:1.5},
-      opacity:op.v, hoverinfo:"y"
+      opacity:op.v, hoverinfo:"y", width:0.6, spanmode:"hard", span:[0,null]
     });
     if (op.p > 0.001) {
       var px=[]; var py=[]; var pt=[];
       var total = yVals.length > 500 ? 500 : yVals.length;
       var step = Math.max(1, Math.floor(yVals.length/total));
       for (var k=0; k<yVals.length; k+=step) {
-        px.push(mi + (Math.random()-0.5)*0.3);
+        px.push(mi + _PLOT_stableJitter(cellIds[k] + "_" + metric + "_" + sample, 0.3));
         py.push(yVals[k]); pt.push(hovers[k]||"");
       }
       traces.push({
@@ -1597,7 +1694,7 @@ function _PLOT_renderSmSample(d) {
   Plotly.newPlot(panel, traces, {
     title: "QC — " + sample, margin:{l:80,r:30,b:60,t:50},
     xaxis:{title:"", ticktext:mLabels, tickvals:[0,1,2], showgrid:false},
-    yaxis:{title:"value", showgrid:true},
+    yaxis:{title:"value", showgrid:true, rangemode:"nonnegative"},
     hovermode:"closest", dragmode:"pan"
   }, {
     displayModeBar: true,
@@ -1616,6 +1713,7 @@ function _PLOT_renderScatter(d) {
   canvas.style.overflowX = "hidden";
 
   var hl = _PLOT_STATE.scatter.highlightedSample;
+  _PLOT_STATE._activeCanvasIds = ["plot-sc-panel"];
   var samples = d.samples;
 
   canvas.innerHTML = "";
@@ -1637,7 +1735,7 @@ function _PLOT_renderScatter(d) {
     }
     if (!xVals.length) continue;
 
-    var fillCol = (d.sample_colors && d.sample_colors[s]) || "#888";
+    var fillCol = _PLOT_getSampleColor(s);
     var opac = 0.7;
     if (hl) { opac = (s === hl) ? 0.85 : 0.06; }
 
@@ -1691,7 +1789,7 @@ function _PLOT_setOvFocus(focus) {
     var b = document.getElementById("plot-ov-focus-"+f);
     if (b) b.classList.toggle("active", f === focus);
   });
-  _PLOT_scheduleRender();
+  _PLOT_applyFocusOnly();
 }
 
 // ---- SINGLE METRIC ----
@@ -1725,7 +1823,7 @@ function _PLOT_setSmFocus(focus) {
     var b = document.getElementById("plot-sm-focus-"+f);
     if (b) b.classList.toggle("active", f === focus);
   });
-  _PLOT_scheduleRender();
+  _PLOT_applyFocusOnly();
 }
 
 // ---- SCATTER ----
