@@ -1418,7 +1418,7 @@ function _PLOT_renderOvSample(d) {
   }
   canvas.appendChild(wrapper);
 
-  // Render each sample's triple-violin
+  // Render per-sample triple-violin
   for (var si = 0; si < samples.length; si++) {
     var s = samples[si];
     var panel = document.getElementById("plot-ov-sample-" + si);
