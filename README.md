@@ -1,35 +1,123 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20697746.svg)](https://doi.org/10.5281/zenodo.20697746)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20785010.svg)](https://doi.org/10.5281/zenodo.20785010)
+
 # scReportLite
 
-Generate interactive HTML reports from single-cell RNA-seq clustering results.
+**scReportLite** is a lightweight R package for generating interactive HTML reports from single-cell RNA-seq analysis results.
 
-scReportLite converts UMAP coordinates and marker gene tables into a lightweight interactive report that can be shared through a web browser without requiring R or Seurat.
+It converts pre-computed single-cell analysis outputs — including QC metrics, PCA coordinates, UMAP embeddings, marker gene tables, sample information, and gene expression matrices — into a standalone browser-based report.
+
+scReportLite is designed as a **reporting and visualization layer** for Seurat-style workflows: analysis is performed upstream, while scReportLite focuses on interactive exploration, sharing, and result presentation.
+
+---
+
+## Overview
+
+Single-cell analysis often produces multiple result layers:
+
+```text
+QC metrics
+PCA embeddings
+UMAP embeddings
+Cluster assignments
+Marker gene tables
+Sample / condition metadata
+Gene expression matrices
+```
+
+scReportLite brings these outputs together into one interactive HTML report.
+
+The current report structure is organized around three top-level views:
+
+```text
+Plot | PCA | UMAP
+```
+
+Each view has a clear role:
+
+```text
+Plot: QC diagnostics and preprocessing-level visualization
+PCA: linear structure and principal component exploration
+UMAP: cell embedding, cluster selection, marker table, and gene expression exploration
+```
+
+The generated report can be opened directly in a web browser and shared without requiring R, Seurat, or a running analysis environment.
 
 ---
 
 ## Features
 
+### Plot / QC diagnostics
+
+- Dedicated **Plot** view for QC diagnostics
+    
+- Interactive violin plots for:
+    
+    - `nCount_RNA`
+        
+    - `nFeature_RNA`
+        
+    - `percent.mt` / `percent_mt`
+        
+- `nCount_RNA` vs `nFeature_RNA` scatter view
+    
+- Sample-aware QC comparison
+    
+- Metric-aware QC comparison
+    
+- Fixed readable panel sizes with scroll-based layout
+    
+- Independent y-axes for QC metrics on different scales
+    
+- Plotly hover controls for closest-point and compare-hover inspection
+    
+
+### PCA exploration
+
+- Interactive PCA view
+    
+- PC selector for one-PC or two-PC exploration
+    
+- Pairwise PC scatter plot
+    
+- Single-PC score distribution
+    
+- PC loading table
+    
+- Cluster or sample-based colouring
+    
+- Group highlighting and reset controls
+    
+
+### UMAP exploration
+
 - Interactive UMAP visualization
     
-- **Interactive PCA visualization** — built-in PC_1 vs PC_2 plot with the same cluster colouring as UMAP; top-level PCA / UMAP switch (v0.2.0)
+- Multi-cluster highlighting
     
-- **Multi-cluster highlight** — select multiple clusters simultaneously to compare spatial relationships
+- Sample / condition highlighting
     
-- **Sample / condition highlight** — click a sample to isolate cells from that condition; composes with cluster filter for intersection queries
+- Cell information panel
     
-- **Cell Information Panel** — click any cell on the UMAP to inspect its metadata (Cell ID, Cluster, Sample, UMAP coordinates); Copy Cell ID button for downstream use
+- Copy Cell ID button
     
-- **Gene expression mode** — colour UMAP by gene expression (grey-to-red scale)
+- Marker gene table linked to cluster selection
     
-- Marker gene exploration
-    
-- Automatic cluster statistics
+- Gene expression mode for colouring UMAP by selected gene expression
     
 - WebGL support for large datasets
     
-- Standalone HTML report generation
+
+### Report system
+
+- Standalone HTML output
+    
+- Panel-based report architecture
     
 - Compatible with Seurat workflows
+    
+- Works with pre-computed analysis results
+    
+- Does not require Seurat when viewing the generated report
     
 
 ---
@@ -48,10 +136,9 @@ remotes::install_github(
 
 ## Quick Start
 
-### Prepare UMAP coordinates
+### 1. Prepare UMAP coordinates
 
 ```r
-# With sample / condition column (recommended)
 umap_df <- FetchData(
   seurat_obj,
   vars = c(
@@ -67,7 +154,81 @@ colnames(umap_df)[3:4] <- c("cluster", "sample")
 umap_df$cell <- colnames(seurat_obj)
 ```
 
-### Prepare marker genes
+Required columns:
+
+|Column|Description|
+|---|---|
+|`cell`|Cell barcode|
+|`UMAP_1`|UMAP dimension 1|
+|`UMAP_2`|UMAP dimension 2|
+|`cluster`|Cluster label|
+|`sample`|Sample or condition label|
+
+---
+
+### 2. Prepare QC metrics
+
+```r
+qc_df <- data.frame(
+  cell = colnames(seurat_obj),
+  sample = seurat_obj$orig.ident,
+  cluster = as.character(Idents(seurat_obj)),
+  nCount_RNA = seurat_obj$nCount_RNA,
+  nFeature_RNA = seurat_obj$nFeature_RNA,
+  percent.mt = seurat_obj$percent.mt,
+  stringsAsFactors = FALSE
+)
+```
+
+Required columns:
+
+|Column|Description|
+|---|---|
+|`cell`|Cell barcode|
+|`sample`|Sample or condition label|
+|`nCount_RNA`|Total RNA counts per cell|
+|`nFeature_RNA`|Number of detected genes per cell|
+|`percent.mt`|Mitochondrial percentage|
+|`cluster`|Cluster label, optional but recommended|
+
+---
+
+### 3. Prepare PCA coordinates
+
+```r
+pca_embed <- Embeddings(seurat_obj, reduction = "pca")
+
+pca_df <- data.frame(
+  cell = rownames(pca_embed),
+  PC_1 = pca_embed[, 1],
+  PC_2 = pca_embed[, 2],
+  cluster = as.character(Idents(seurat_obj)),
+  sample = seurat_obj$orig.ident,
+  stringsAsFactors = FALSE
+)
+```
+
+You may include additional `PC_*` columns. scReportLite will detect available PCs automatically.
+
+---
+
+### 4. Prepare PCA loadings
+
+```r
+pca_loadings <- Loadings(seurat_obj, reduction = "pca")
+
+pca_loading_df <- data.frame(
+  gene = rownames(pca_loadings),
+  pca_loadings,
+  check.names = FALSE
+)
+```
+
+The loading table is used in the PCA view when a single PC is selected.
+
+---
+
+### 5. Prepare marker genes
 
 ```r
 markers <- FindAllMarkers(
@@ -84,80 +245,107 @@ marker_df <- markers[
     "p_val_adj"
   )
 ]
+
+marker_df$cluster <- as.character(marker_df$cluster)
 ```
 
-### Generate report
+Required columns:
+
+|Column|Description|
+|---|---|
+|`cluster`|Cluster ID|
+|`gene`|Gene symbol|
+|`avg_log2FC`|Average log2 fold change|
+|`p_val_adj`|Adjusted p-value|
+
+---
+
+### 6. Prepare gene expression data
+
+`gene_expr_df` is used for UMAP gene expression mode.
+
+For browser performance, it is recommended to provide a focused gene set, such as marker genes, rather than the full expression matrix.
+
+```r
+genes_use <- unique(marker_df$gene)
+genes_use <- genes_use[genes_use %in% rownames(seurat_obj)]
+
+expr_mat <- as.matrix(
+  GetAssayData(seurat_obj, assay = "RNA", slot = "data")[genes_use, , drop = FALSE]
+)
+
+gene_expr_df <- data.frame(
+  cell = colnames(seurat_obj),
+  t(expr_mat),
+  check.names = FALSE
+)
+```
+
+Required structure:
+
+|Column|Description|
+|---|---|
+|`cell`|Cell barcode|
+|gene columns|Expression values for selected genes|
+
+---
+
+## Generate a Full Report
 
 ```r
 library(scReportLite)
 
-# Basic usage
 sc_report(
-  umap_df,
+  qc_df = qc_df,
+  umap_df = umap_df,
+  pca_df = pca_df,
+  pca_loading_df = pca_loading_df,
   marker_df = marker_df,
-  sample_col = "sample",   # optional — enables sample highlight
-  output = "report.html",
-  title = "My scRNA-seq Report"
-)
-
-# With PCA module (v0.2.0)
-# Prepare PCA data:
-#   pca_embed <- Embeddings(seurat_obj, reduction = "pca")
-#   pca_df <- data.frame(cell = rownames(pca_embed),
-#                         PC_1 = pca_embed[,1], PC_2 = pca_embed[,2],
-#                         cluster = as.character(Idents(seurat_obj)),
-#                         sample = seurat_obj$sample)
-
-sc_report(
-  umap_df,
-  pca_df       = pca_df,
-  marker_df    = marker_df,
-  sample_col   = "sample",
-  panels       = c("pca", "umap", "marker_table"),
-  output       = "report_pca.html",
-  title        = "scRNA-seq Report with PCA"
+  gene_expr_df = gene_expr_df,
+  sample_col = "sample",
+  output = "sc_report_v030.html",
+  title = "scReportLite v0.3.0 report",
+  panels = c(
+    "plot",
+    "pca",
+    "umap",
+    "marker_table",
+    "sample_composition",
+    "gene_expression"
+  ),
+  pca_color_by = "cluster",
+  pca_loading_top_n = 10,
+  use_webgl = TRUE
 )
 ```
 
 ---
 
-## Input Requirements
+## Recommended Panels
 
-### UMAP Data
-
-Required columns:
-
-|Column|Description|
-|---|---|
-|cell|Cell barcode|
-|UMAP_1|UMAP dimension 1|
-|UMAP_2|UMAP dimension 2|
-|cluster|Cluster label|
-|sample|Sample / condition label (optional)|
-
-Example:
+For a complete v0.3.0 report, use:
 
 ```r
-head(umap_df)
+panels = c(
+  "plot",
+  "pca",
+  "umap",
+  "marker_table",
+  "sample_composition",
+  "gene_expression"
+)
 ```
 
-|cell|UMAP_1|UMAP_2|cluster|
-|---|---|---|---|
-|Cell1|1.24|-3.55|0|
-|Cell2|2.01|-2.83|1|
+Panel roles:
 
----
-
-### Marker Data
-
-Required columns:
-
-|Column|Description|
+|Panel|Purpose|
 |---|---|
-|cluster|Cluster ID|
-|gene|Gene symbol|
-|avg_log2FC|Average log2 fold change|
-|p_val_adj|Adjusted p-value|
+|`plot`|QC diagnostics|
+|`pca`|PCA exploration|
+|`umap`|UMAP visualization|
+|`marker_table`|Marker genes linked to cluster selection|
+|`sample_composition`|Sample composition panel|
+|`gene_expression`|Gene expression summary panel|
 
 ---
 
@@ -165,40 +353,24 @@ Required columns:
 
 The generated report includes:
 
-- Interactive UMAP with multi-cluster highlight
+- Plot / PCA / UMAP top-level navigation
     
-- Interactive PCA plot (PC_1 vs PC_2) with top-level PCA / UMAP switch (when `pca_df` is provided)
+- QC violin plots and QC scatter diagnostics
     
-- Multi-select cluster sidebar with checkboxes
+- PCA pair scatter and single-PC loading views
     
-- Sample / condition sidebar (when `sample_col` is provided)
+- Interactive UMAP with cluster and sample highlighting
     
-- Cell Information Panel (click a cell to inspect metadata, copy Cell ID)
+- Marker table linked to single-cluster selection
     
-- Cluster statistics
+- Gene expression mode on UMAP
     
-- Marker gene table
+- Cell information panel
     
-- Hover information for individual cells
+- Browser-based interactive exploration
     
-
-**PCA / UMAP switch:** When `pca_df` is provided and `"pca"` is in the `panels`
-vector, the sidebar displays PCA | UMAP view tabs above the existing Clusters /
-Samples / Genes tabs. Click PCA to view the PC_1 vs PC_2 plot coloured by
-cluster; click UMAP to return to the interactive UMAP with all highlighting
-and cell-click features restored.
-
-**Multi-cluster highlight:** Click multiple clusters to compare their spatial
-relationships. Toggle clusters on/off — selected clusters stay highlighted
-while others dim.
-
-**Sample highlight:** Click a sample in the sidebar to isolate cells from
-that condition. Compose with cluster selection to see, for example,
-"Cluster 4 cells in Treatment_A" (intersection query).
-
-**Cell Information Panel:** Click any cell on the UMAP to pin its metadata.
-Displays Cell ID, Cluster, Sample, and UMAP coordinates. Use the Copy Cell ID
-button to grab the barcode for downstream analysis in R.
+- Standalone HTML output
+    
 
 ---
 
@@ -220,19 +392,28 @@ button to grab the barcode for downstream analysis in R.
 
 ---
 
-## Performance
+## Performance Notes
 
 WebGL rendering can be enabled for large datasets:
 
 ```r
 sc_report(
-  umap_df,
-  marker_df,
+  umap_df = umap_df,
+  marker_df = marker_df,
   use_webgl = TRUE
 )
 ```
 
 Recommended for datasets containing more than 10,000 cells.
+
+For `gene_expr_df`, avoid embedding too many genes into a standalone HTML report. A focused marker-gene subset is usually more practical for sharing and browser-side interaction.
+
+Recommended strategy:
+
+```text
+marker_df: can contain a larger marker table
+gene_expr_df: should contain a focused gene subset for expression colouring
+```
 
 ---
 
@@ -242,67 +423,127 @@ Recommended for datasets containing more than 10,000 cells.
     
 - No 3D visualization
     
-- Marker table requires pre-computed marker genes
+- Marker genes must be pre-computed
+    
+- QC module currently expects common Seurat-style QC columns
+    
+- Very large gene expression matrices can produce heavy HTML files
     
 
 ---
 
 ## Roadmap
 
-Planned features:
+Planned directions:
 
-- Cell Focus (neighbour search, local clustering — downstream workflow)
+- Additional QC diagnostics
     
-- Custom colour palettes
-    
-- Additional embeddings (t-SNE)
+- Additional embeddings such as t-SNE
     
 - Cell-type annotation panel
     
-- Enhanced report customization
+- More customizable report themes
+    
+- Better support for progressive / partial reports
+    
+- Lightweight export workflows for upstream single-cell pipelines
+    
+- Improved integration with analysis agents and automated reporting workflows
     
 
-### Changelog
+---
 
-**v0.2.2** — PC Selector with pair/score/loading views
-- PC selector list in PCA controls: choose 1 or 2 PCs to inspect
-- 1 PC selected: single-PC score distribution plot + loading/composition table
-- 2 PCs selected: pair scatter (generalized from v0.2.1, now works with any PC pair, default PC_1 vs PC_2)
-- PC loading table shows top N genes by absolute loading, coloured by direction
-- New parameters: `pca_loading_df` (gene loading data) and `pca_loading_top_n` (default 10)
-- Dynamic PC column detection: any `PC_*` columns in `pca_df` are auto-detected
-- Default visual matches v0.2.1 (PC_1 vs PC_2 scatter on load)
-- Group highlight, colour mode, and reset all work seamlessly across pair and single-PC views
+## Changelog
 
-**v0.2.1** — Interactive PCA controls
-- PCA view now includes interactive colour-mode and group-highlight controls
-- Colour by Cluster or Sample (when sample column available) with toggle buttons
-- Click any group in the PCA controls sidebar to highlight that group (dim others)
-- Reset highlight button restores full-colour view
-- Client-side Plotly.react rendering — fast switching without page reload
-- New `pca_color_by` parameter sets initial colour mode (default `"cluster"`)
-- Fallback: missing colour column → warning + fallback to `"cluster"`
-- Hover text always shows Cell/Cluster/PC_1/PC_2/Sample regardless of colour mode
+### v0.3.0 — Plot/QC diagnostics and multi-view report foundation
 
-**v0.2.0** — PCA module
-- New `pca_df` parameter: provide PCA coordinates to enable the PCA view
-- New `"pca"` panel in `panels`: includes PCA in the report
-- Top-level PCA | UMAP switch above the main content area
-- PCA plot: PC_1 vs PC_2, cluster-coloured, with Cell/Cluster/PC_1/PC_2/Sample hover
-- When `pca_df = NULL` or `"pca"` not in panels: behaviour identical to v0.1.5
-- No changes to UMAP, gene expression mode, sample composition, or marker table
+- Added top-level `Plot | PCA | UMAP` report structure
+    
+- Added Plot view for QC diagnostics
+    
+- Added data-driven QC rendering through `build_qc_payload()`
+    
+- Added QC violin plots for `nCount_RNA`, `nFeature_RNA`, and `percent.mt`
+    
+- Added `nCount_RNA` vs `nFeature_RNA` QC scatter view
+    
+- Added sample-aware and metric-aware QC comparison modes
+    
+- Improved fixed-size QC panel layout with scroll-based behavior
+    
+- Preserved independent y-axes for QC metrics with different scales
+    
+- Restored Plotly hover mode controls for QC plots
+    
+- Verified marker table behavior under single-cluster and multi-cluster selection
+    
+- Verified UMAP gene expression mode with selected gene-expression payloads
+    
+- Stabilized the multi-view report foundation for future diagnostic panels
+    
 
-**v0.1.5** — Gene Expression Mode
-- New `gene_expr_df` parameter: colour UMAP by gene expression (grey-to-red)
-- Gene sidebar tab with search/filter
-- Gene expression summary panel
-- Full mode isolation between cluster/sample/gene tabs
+### v0.2.2 — PC Selector with pair / score / loading views
 
-**v0.1.4** — Panel system + sample composition
-- JS-driven sample composition barplot (syncs with cluster colour map)
-- Panel registry system for extensible report sections
-- Natural sort for sample/cluster labels
-- Responsive resize across all plotly charts
+- PC selector list in PCA controls
+    
+- One PC selected: single-PC score distribution plot and loading table
+    
+- Two PCs selected: pair scatter plot
+    
+- PC loading table shows top genes by absolute loading
+    
+- Added `pca_loading_df`
+    
+- Added `pca_loading_top_n`
+    
+- Dynamic PC column detection
+    
+
+### v0.2.1 — Interactive PCA controls
+
+- PCA colour mode controls
+    
+- Colour by cluster or sample
+    
+- Group highlight controls
+    
+- Reset highlight button
+    
+- Added `pca_color_by`
+    
+
+### v0.2.0 — PCA module
+
+- Added `pca_df`
+    
+- Added `"pca"` panel
+    
+- Added PCA / UMAP top-level switch
+    
+- Added PC_1 vs PC_2 plot
+    
+
+### v0.1.5 — Gene Expression Mode
+
+- Added `gene_expr_df`
+    
+- Added gene sidebar tab
+    
+- Added gene expression summary panel
+    
+- Added gene-based UMAP colouring
+    
+
+### v0.1.4 — Panel system and sample composition
+
+- Added panel registry system
+    
+- Added sample composition panel
+    
+- Added natural sort for sample and cluster labels
+    
+- Improved responsive resizing across Plotly charts
+    
 
 ---
 
@@ -310,10 +551,23 @@ Planned features:
 
 If you use scReportLite in research projects, please cite:
 
-> Park, K. K. (2026).
-> scReportLite v0.2.0.
-> Zenodo.
-> https://doi.org/10.5281/zenodo.20697746
+> Park, K. K. (2026).  
+> scReportLite v0.3.0.  
+> Zenodo.  
+> [https://doi.org/10.5281/zenodo.20785010](https://doi.org/10.5281/zenodo.20785010)
+
+BibTeX:
+
+```bibtex
+@software{park_2026_screportlite,
+  author       = {Park, Kee-gong Karios},
+  title        = {scReportLite v0.3.0},
+  year         = {2026},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.20785010},
+  url          = {https://doi.org/10.5281/zenodo.20785010}
+}
+```
 
 ---
 
