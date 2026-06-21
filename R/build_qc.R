@@ -39,7 +39,7 @@ build_qc_payload <- function(qc_df,
          call. = FALSE)
 
   has_cluster <- cluster_col %in% colnames(qc_df)
-  samples     <- sort(unique(qc_df[[sample_col]]))
+  samples     <- natural_sort(unique(qc_df[[sample_col]]))
   sample_cols <- cluster_color_map(samples)
   # force plain character keys / values
   sample_cols <- setNames(unname(sample_cols), names(sample_cols))
