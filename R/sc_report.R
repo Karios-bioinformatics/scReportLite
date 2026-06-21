@@ -1296,6 +1296,24 @@ function _PLOT_stableJitter(key, width) {
   return (u - 0.5) * width;
 }
 
+// ---- Cartesian modebar config (explicit button list, v0.3.0) ----
+function _SR_cartesianModebarConfig() {
+  return {
+    displayModeBar: true,
+    displaylogo: false,
+    modeBarButtons: [[
+      "toImage",
+      "zoom2d",
+      "pan2d",
+      "zoomIn2d",
+      "zoomOut2d",
+      "resetScale2d",
+      "hoverClosestCartesian",
+      "hoverCompareCartesian"
+    ]]
+  };
+}
+
 // ---- Debounced render scheduler ----
 function _PLOT_scheduleRender() {
   var token = ++_PLOT_STATE.renderToken;
@@ -1615,12 +1633,7 @@ function _PLOT_renderOvMetric(d) {
               showgrid:false, zeroline:false},
       yaxis: {title:yLabels[mi], showgrid:true, zeroline:false, rangemode:"nonnegative"},
       hovermode: "closest", dragmode: "pan"
-    }, {
-      displayModeBar: true,
-      modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
-      modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
-      displaylogo: false
-    });
+    }, _SR_cartesianModebarConfig());
   }
 }
 
@@ -1735,12 +1748,7 @@ function _PLOT_renderOvSample(d) {
         xaxis:{title:"", showgrid:false, zeroline:false, showticklabels:false, range:[-0.5, 0.5]},
         yaxis:{title:"", showgrid:true, zeroline:false, range:metricRanges[metric]},
         hovermode:"closest", dragmode:"pan"
-      }, {
-        displayModeBar: true,
-        modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
-        modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
-        displaylogo: false
-      });
+      }, _SR_cartesianModebarConfig());
     }
   }
 }
@@ -1806,12 +1814,7 @@ function _PLOT_renderSmMetric(d) {
     xaxis:{title:"", ticktext:samples, tickvals:samples.map(function(_,i){return i;}), showgrid:false},
     yaxis:{title:metric, showgrid:true, rangemode:"nonnegative"},
     hovermode:"closest", dragmode:"pan"
-  }, {
-    displayModeBar: true,
-    modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
-    modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
-    displaylogo: false
-  });
+  }, _SR_cartesianModebarConfig());
 }
 
 // =========================================================================
@@ -1904,12 +1907,7 @@ function _PLOT_renderSmSample(d) {
       xaxis:{title:"", showgrid:false, zeroline:false, showticklabels:false, range:[-0.5,0.5]},
       yaxis:{title:mLabels[mi], showgrid:true, zeroline:false, range:metricRanges[metric]},
       hovermode:"closest", dragmode:"pan"
-    }, {
-      displayModeBar: true,
-      modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
-      modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
-      displaylogo: false
-    });
+    }, _SR_cartesianModebarConfig());
   }
 }
 
@@ -1972,12 +1970,7 @@ function _PLOT_renderScatter(d) {
     xaxis:{title:"nCount_RNA", showgrid:false},
     yaxis:{title:"nFeature_RNA", showgrid:false},
     hovermode:"closest", dragmode:"pan"
-  }, {
-    displayModeBar: true,
-    modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
-    modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
-    displaylogo: false
-  });
+  }, _SR_cartesianModebarConfig());
 }
 
 // =========================================================================
