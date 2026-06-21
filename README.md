@@ -556,18 +556,7 @@ If you use scReportLite in research projects, please cite:
 > Zenodo.  
 > [https://doi.org/10.5281/zenodo.20785010](https://doi.org/10.5281/zenodo.20785010)
 
-BibTeX:
-
-```bibtex
-@software{park_2026_screportlite,
-  author       = {Park, Kee-gong Karios},
-  title        = {scReportLite v0.3.0},
-  year         = {2026},
-  publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.20785010},
-  url          = {https://doi.org/10.5281/zenodo.20785010}
-}
-```
+A formal BibTeX entry will be added after the stable v0.3.0 release.
 
 ---
 
