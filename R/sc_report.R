@@ -1188,84 +1188,97 @@ function switchView(view) {
 }
 
 // =========================================================================
-// Plot / QC state machine (v0.3.0)
-// All state uses _PLOT_ namespace. No pollution of PCA (_PCA_) or UMAP globals.
+// Plot / QC state machine (v0.3.0 — data-driven, single active canvas)
+// All rendering reads _PLOT_STATE + window._QC_DATA.  No pre-built widgets.
 // =========================================================================
 
-var _PLOT_QC_VIEW  = "overview";   // "overview" | "single" | "scatter"
-var _PLOT_INITIALIZED = false;
+var _PLOT_STATE = {
+  activeModule: "overview",       // "overview" | "single" | "scatter"
 
-// Overview state
-var _PLOT_OV_MODE   = "metric";    // "metric" | "sample"
-var _PLOT_OV_FOCUS  = "violin";    // "violin" | "point" | "balanced"
+  overview: {
+    mode:  "metric",              // "metric" | "sample"
+    focus: "balanced"             // "violin" | "point" | "balanced"
+  },
 
-// Single metric state
-var _PLOT_SM_MODE   = "metric";    // "metric" | "sample"
-var _PLOT_SM_FOCUS  = "violin";
-var _PLOT_SM_METRIC = "nCount_RNA";
-var _PLOT_SM_SAMPLE = null;
+  single: {
+    mode:   "metric",             // "metric" | "sample"
+    metric: "nCount_RNA",
+    sample: null,
+    focus:  "balanced"
+  },
 
-// Scatter state
-var _PLOT_SC_SAMPLE = null;        // null = None/All, string = highlighted sample
+  scatter: {
+    highlightedSample: null       // null = none, string = highlight
+  },
 
-// =========================================================================
-// Generic: apply display focus (Violin / Point / Balanced) to a container
-// =========================================================================
-function _PLOT_applyFocusToContainer(containerId) {
-  var ctr = document.getElementById(containerId);
-  if (!ctr) return;
+  renderToken: 0,
+  renderTimer:  null,
+  isRendering:  false
+};
 
-  // Determine active focus mode
-  var focus = "balanced";
-  if (_PLOT_QC_VIEW === "overview") focus = _PLOT_OV_FOCUS;
-  else if (_PLOT_QC_VIEW === "single") focus = _PLOT_SM_FOCUS;
-
-  var vOpac, pOpac;
-  if (focus === "violin")      { vOpac = 0.90; pOpac = 0.00; }
-  else if (focus === "point")  { vOpac = 0.15; pOpac = 0.55; }
-  else                         { vOpac = 0.85; pOpac = 0.20; }
-
-  _PLOT_restyleOpacity(ctr, vOpac, pOpac);
+// ---- Focus → opacities ----
+function _PLOT_focusOpacities(focus) {
+  if (focus === "violin")   return {v:0.90, p:0.00};
+  if (focus === "point")    return {v:0.15, p:0.55};
+  return                     {v:0.85, p:0.20};
 }
 
-// Apply focus to ALL plotly figures inside a container (recursive for by-sample)
-function _PLOT_restyleOpacity(ctr, vOpac, pOpac) {
-  var plots = ctr.querySelectorAll(".js-plotly-plot, .plotly");
-  plots.forEach(function(gd) {
-    if (!gd || !gd.data) return;
-    try {
-      var n = gd.data.length;
-      var up = [];
-      for (var t = 0; t < n; t++) {
-        var nm = gd.data[t].name || "";
-        var isPt = nm.indexOf("qc_pts_") === 0 || nm.indexOf("qc_ov_pts_") === 0 ||
-                   nm.indexOf("qc_sp_pts_") === 0;
-        up.push({opacity: isPt ? pOpac : vOpac});
-      }
-      if (up.length === n) Plotly.restyle(gd, up);
-    } catch(e) {}
+// ---- Debounced render scheduler ----
+function _PLOT_scheduleRender() {
+  var token = ++_PLOT_STATE.renderToken;
+  if (_PLOT_STATE.renderTimer) clearTimeout(_PLOT_STATE.renderTimer);
+  _PLOT_STATE.renderTimer = setTimeout(function() {
+    if (token === _PLOT_STATE.renderToken && !_PLOT_STATE.isRendering) {
+      _PLOT_renderCurrentState();
+    }
+  }, 60);
+}
+
+// =========================================================================
+// Unified render entry — reads _PLOT_STATE + _QC_DATA, renders on canvas
+// =========================================================================
+function _PLOT_renderCurrentState() {
+  if (!_SR_isActiveView("plot")) return;
+  var d = window._QC_DATA;
+  if (!d || !d.cells || !d.cells.length) return;
+
+  _PLOT_STATE.isRendering = true;
+  try {
+    var m = _PLOT_STATE.activeModule;
+    if (m === "overview") {
+      if (_PLOT_STATE.overview.mode === "metric") _PLOT_renderOvMetric(d);
+      else _PLOT_renderOvSample(d);
+    } else if (m === "single") {
+      if (_PLOT_STATE.single.mode === "metric") _PLOT_renderSmMetric(d);
+      else _PLOT_renderSmSample(d);
+    } else if (m === "scatter") {
+      _PLOT_renderScatter(d);
+    }
+  } finally {
+    _PLOT_STATE.isRendering = false;
+  }
+}
+
+// =========================================================================
+// View switching — update state + schedule render
+// =========================================================================
+function _PLOT_selectQcView(view) {
+  if (!_SR_isActiveView("plot")) return;
+  _PLOT_STATE.activeModule = view;
+  _PLOT_updateNav(view);
+
+  // Show/hide right panes
+  ["plot-params-overview","plot-params-single","plot-params-scatter"].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.add("plot-params-hidden");
   });
+  var paneId = "plot-params-" + (view === "single" ? "single" : view === "scatter" ? "scatter" : "overview");
+  var pane = document.getElementById(paneId);
+  if (pane) pane.classList.remove("plot-params-hidden");
+
+  _PLOT_scheduleRender();
 }
 
-// =========================================================================
-// Resize helper
-// =========================================================================
-function _PLOT_resizeVisible() {
-  setTimeout(function() {
-    var ctrs = document.querySelectorAll(".qc-container.qc-visible");
-    ctrs.forEach(function(ctr) {
-      var plots = ctr.querySelectorAll(".js-plotly-plot, .plotly");
-      for (var i = 0; i < plots.length; i++) {
-        if (window.Plotly && Plotly.Plots) Plotly.Plots.resize(plots[i]);
-      }
-    });
-    window.dispatchEvent(new Event("resize"));
-  }, 80);
-}
-
-// =========================================================================
-// Left nav update
-// =========================================================================
 function _PLOT_updateNav(activeView) {
   var nav = document.getElementById("sr-view-plot");
   if (!nav) return;
@@ -1277,258 +1290,484 @@ function _PLOT_updateNav(activeView) {
 }
 
 // =========================================================================
-// Switch QC sub-view + show correct right pane
+// RENDER: Overview / By metric — 3 violins stacked vertically
 // =========================================================================
-function _PLOT_selectQcView(view) {
-  if (!_SR_isActiveView("plot")) return;
-  _PLOT_QC_VIEW = view;
-  _PLOT_updateNav(view);
+function _PLOT_renderOvMetric(d) {
+  var canvas = document.getElementById("plot-active-canvas");
+  if (!canvas) return;
+  canvas.style.overflowY = "auto";
+  canvas.style.overflowX = "hidden";
 
-  // Hide all center containers
-  var allCtrs = ["plot-qc-overview-metric", "plot-qc-overview-sample",
-                 "plot-qc-single-metric", "plot-qc-single-sample",
-                 "plot-qc-scatter"];
-  allCtrs.forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.classList.remove("qc-visible");
-  });
+  var op = _PLOT_focusOpacities(_PLOT_STATE.overview.focus);
+  var samples = d.samples;
+  var metrics = ["nCount_RNA","nFeature_RNA","percent_mt"];
+  var yLabels = ["nCount_RNA","nFeature_RNA","percent_mt"];
 
-  // Hide all right panes
-  ["plot-params-overview", "plot-params-single", "plot-params-scatter"].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.classList.add("plot-params-hidden");
-  });
+  // Build 3 stacked containers
+  canvas.innerHTML = "";
+  var wrapper = document.createElement("div");
+  wrapper.style.cssText = "display:flex;flex-direction:column;gap:4px;min-height:min-content;";
 
-  if (view === "overview") {
-    var el = document.getElementById("plot-params-overview");
-    if (el) el.classList.remove("plot-params-hidden");
-    _PLOT_applyOvView();
-  } else if (view === "single") {
-    var el = document.getElementById("plot-params-single");
-    if (el) el.classList.remove("plot-params-hidden");
-    _PLOT_applySmView();
-  } else if (view === "scatter") {
-    var el = document.getElementById("plot-params-scatter");
-    if (el) el.classList.remove("plot-params-hidden");
-    // Show scatter container
-    var sc = document.getElementById("plot-qc-scatter");
-    if (sc) sc.classList.add("qc-visible");
-    _PLOT_applyScView();
+  for (var mi = 0; mi < metrics.length; mi++) {
+    var metric = metrics[mi];
+    var panel = document.createElement("div");
+    panel.style.cssText = "height:33%;min-height:200px;flex-shrink:0;";
+    panel.id = "plot-ov-metric-" + mi;
+    wrapper.appendChild(panel);
+  }
+  canvas.appendChild(wrapper);
+
+  // Render each panel
+  for (var mi = 0; mi < metrics.length; mi++) {
+    var metric = metrics[mi];
+    var panel = document.getElementById("plot-ov-metric-" + mi);
+    if (!panel) continue;
+
+    var traces = [];
+    for (var si = 0; si < samples.length; si++) {
+      var s = samples[si];
+      // Gather cells for this sample
+      var yVals = [];
+      var hoverTexts = [];
+      for (var ci = 0; ci < d.cells.length; ci++) {
+        if (d.cells[ci].sample !== s) continue;
+        yVals.push(d.cells[ci][metric]);
+        hoverTexts.push("Cell: " + d.cells[ci].cell +
+          "<br>Sample: " + s +
+          "<br>nCount: " + d.cells[ci].nCount_RNA +
+          "<br>nFeature: " + d.cells[ci].nFeature_RNA +
+          "<br>%MT: " + d.cells[ci].percent_mt.toFixed(2));
+      }
+      if (!yVals.length) continue;
+
+      var fillCol = (d.sample_colors && d.sample_colors[s]) || "#888";
+      // Violin trace
+      traces.push({
+        x: new Array(yVals.length).fill(si),
+        y: yVals,
+        type: "violin", points: false, name: s, showlegend: false,
+        fillcolor: fillCol, line: {color: fillCol, width: 1.2},
+        opacity: op.v, hoverinfo: "y"
+      });
+      // Point trace (sampled overlay)
+      if (op.p > 0.001) {
+        var px = []; var py = []; var pt = [];
+        var total = yVals.length > 1000 ? 1000 : yVals.length;
+        var step = Math.max(1, Math.floor(yVals.length / total));
+        for (var k = 0; k < yVals.length; k += step) {
+          px.push(si + (Math.random() - 0.5) * 0.4);
+          py.push(yVals[k]);
+          pt.push(hoverTexts[k] || "");
+        }
+        traces.push({
+          x: px, y: py, text: pt,
+          type: "scatter", mode: "markers", hoverinfo: "text",
+          marker: {color: fillCol, size: 1.5, opacity: op.p, line: {width: 0}},
+          name: "pts_" + s, showlegend: false
+        });
+      }
+    }
+
+    Plotly.newPlot(panel, traces, {
+      title: "", margin: {l:70,r:15,b:50,t:10},
+      xaxis: {title:"", ticktext:samples, tickvals:samples.map(function(_,i){return i;}),
+              showgrid:false, zeroline:false},
+      yaxis: {title:yLabels[mi], showgrid:true, zeroline:false},
+      hovermode: "closest", dragmode: "pan"
+    }, {
+      displayModeBar: true,
+      modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
+      displaylogo: false
+    });
+  }
+}
+
+// =========================================================================
+// RENDER: Overview / By sample — horizontal scroll, per-sample triples
+// =========================================================================
+function _PLOT_renderOvSample(d) {
+  var canvas = document.getElementById("plot-active-canvas");
+  if (!canvas) return;
+  canvas.style.overflowX = "auto";
+  canvas.style.overflowY = "hidden";
+
+  var op = _PLOT_focusOpacities(_PLOT_STATE.overview.focus);
+  var samples = d.samples;
+  var metrics = ["nCount_RNA","nFeature_RNA","percent_mt"];
+  var mLabels = ["nCount","nFeature","%MT"];
+
+  canvas.innerHTML = "";
+  var wrapper = document.createElement("div");
+  wrapper.style.cssText = "display:flex;flex-direction:row;gap:8px;height:100%;min-width:max-content;";
+
+  for (var si = 0; si < samples.length; si++) {
+    var s = samples[si];
+    var group = document.createElement("div");
+    group.style.cssText = "flex:0 0 280px;display:flex;flex-direction:column;min-height:0;";
+
+    var label = document.createElement("div");
+    label.textContent = s;
+    label.style.cssText = "font-size:0.78em;font-weight:600;color:#636e72;text-align:center;padding:2px 0 4px;flex-shrink:0;";
+    group.appendChild(label);
+
+    var panel = document.createElement("div");
+    panel.style.cssText = "flex:1;min-height:0;";
+    panel.id = "plot-ov-sample-" + si;
+    group.appendChild(panel);
+    wrapper.appendChild(group);
+  }
+  canvas.appendChild(wrapper);
+
+  // Render each sample's triple-violin
+  for (var si = 0; si < samples.length; si++) {
+    var s = samples[si];
+    var panel = document.getElementById("plot-ov-sample-" + si);
+    if (!panel) continue;
+    var fillCol = (d.sample_colors && d.sample_colors[s]) || "#888";
+
+    var traces = [];
+    for (var mi = 0; mi < metrics.length; mi++) {
+      var metric = metrics[mi];
+      var yVals = [];
+      var hovers = [];
+      for (var ci = 0; ci < d.cells.length; ci++) {
+        if (d.cells[ci].sample !== s) continue;
+        yVals.push(d.cells[ci][metric]);
+        hovers.push("Cell: " + d.cells[ci].cell + "<br>" + metric + ": " + d.cells[ci][metric]);
+      }
+      if (!yVals.length) continue;
+
+      traces.push({
+        x: new Array(yVals.length).fill(mi),
+        y: yVals, type: "violin", points: false, name: mLabels[mi], showlegend: false,
+        fillcolor: fillCol, line: {color: fillCol, width: 1.2},
+        opacity: op.v, hoverinfo: "y"
+      });
+      if (op.p > 0.001) {
+        var px=[]; var py=[]; var pt=[];
+        var total = yVals.length > 500 ? 500 : yVals.length;
+        var step = Math.max(1, Math.floor(yVals.length/total));
+        for (var k=0; k<yVals.length; k+=step) {
+          px.push(mi + (Math.random()-0.5)*0.3);
+          py.push(yVals[k]); pt.push(hovers[k]||"");
+        }
+        traces.push({
+          x:px, y:py, text:pt, type:"scatter", mode:"markers", hoverinfo:"text",
+          marker:{color:fillCol, size:1.5, opacity:op.p, line:{width:0}},
+          name:"pts_"+mi, showlegend:false
+        });
+      }
+    }
+
+    Plotly.newPlot(panel, traces, {
+      title:"", margin:{l:55,r:10,b:40,t:10},
+      xaxis:{title:"", ticktext:mLabels, tickvals:[0,1,2], showgrid:false, zeroline:false},
+      yaxis:{title:"", showgrid:true, zeroline:false},
+      hovermode:"closest", dragmode:"pan"
+    }, {
+      displayModeBar: true,
+      modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
+      displaylogo: false
+    });
+  }
+}
+
+// =========================================================================
+// RENDER: Single metric / By metric — one violin, x = samples
+// =========================================================================
+function _PLOT_renderSmMetric(d) {
+  var canvas = document.getElementById("plot-active-canvas");
+  if (!canvas) return;
+  canvas.style.overflowY = "hidden";
+  canvas.style.overflowX = "hidden";
+
+  var op = _PLOT_focusOpacities(_PLOT_STATE.single.focus);
+  var metric = _PLOT_STATE.single.metric;
+  var samples = d.samples;
+
+  canvas.innerHTML = "";
+  var panel = document.createElement("div");
+  panel.style.cssText = "width:100%;height:100%;";
+  panel.id = "plot-sm-panel";
+  canvas.appendChild(panel);
+
+  var traces = [];
+  for (var si = 0; si < samples.length; si++) {
+    var s = samples[si];
+    var yVals = []; var hovers = [];
+    for (var ci = 0; ci < d.cells.length; ci++) {
+      if (d.cells[ci].sample !== s) continue;
+      yVals.push(d.cells[ci][metric]);
+      hovers.push("Cell: "+d.cells[ci].cell+"<br>Sample: "+s+"<br>"+metric+": "+d.cells[ci][metric]);
+    }
+    if (!yVals.length) continue;
+    var fillCol = (d.sample_colors && d.sample_colors[s]) || "#888";
+
+    traces.push({
+      x: new Array(yVals.length).fill(si), y: yVals,
+      type:"violin", points:false, name:s, showlegend:false,
+      fillcolor:fillCol, line:{color:fillCol, width:1.5},
+      opacity:op.v, hoverinfo:"y"
+    });
+    if (op.p > 0.001) {
+      var px=[]; var py=[]; var pt=[];
+      var total = yVals.length > 1000 ? 1000 : yVals.length;
+      var step = Math.max(1, Math.floor(yVals.length/total));
+      for (var k=0; k<yVals.length; k+=step) {
+        px.push(si + (Math.random()-0.5)*0.4);
+        py.push(yVals[k]); pt.push(hovers[k]||"");
+      }
+      traces.push({
+        x:px, y:py, text:pt, type:"scatter", mode:"markers", hoverinfo:"text",
+        marker:{color:fillCol, size:2, opacity:op.p, line:{width:0}},
+        name:"pts_"+s, showlegend:false
+      });
+    }
   }
 
-  _PLOT_resizeVisible();
+  Plotly.newPlot(panel, traces, {
+    title:"QC — "+metric, margin:{l:80,r:30,b:80,t:50},
+    xaxis:{title:"", ticktext:samples, tickvals:samples.map(function(_,i){return i;}), showgrid:false},
+    yaxis:{title:metric, showgrid:true},
+    hovermode:"closest", dragmode:"pan"
+  }, {
+    displayModeBar: true,
+    modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
+    displaylogo: false
+  });
 }
 
 // =========================================================================
+// RENDER: Single metric / By sample — one sample, 3 metrics on x-axis
+// =========================================================================
+function _PLOT_renderSmSample(d) {
+  var canvas = document.getElementById("plot-active-canvas");
+  if (!canvas) return;
+  canvas.style.overflowY = "hidden";
+  canvas.style.overflowX = "hidden";
+
+  var op = _PLOT_focusOpacities(_PLOT_STATE.single.focus);
+  var sample = _PLOT_STATE.single.sample;
+  if (!sample) return;
+
+  canvas.innerHTML = "";
+  var panel = document.createElement("div");
+  panel.style.cssText = "width:100%;height:100%;";
+  panel.id = "plot-sm-panel";
+  canvas.appendChild(panel);
+
+  var metrics = ["nCount_RNA","nFeature_RNA","percent_mt"];
+  var mLabels = ["nCount_RNA","nFeature_RNA","percent.mt"];
+  var fillCol = (d.sample_colors && d.sample_colors[sample]) || "#888";
+  var traces = [];
+
+  for (var mi = 0; mi < metrics.length; mi++) {
+    var metric = metrics[mi];
+    var yVals = []; var hovers = [];
+    for (var ci = 0; ci < d.cells.length; ci++) {
+      if (d.cells[ci].sample !== sample) continue;
+      yVals.push(d.cells[ci][metric]);
+      hovers.push("Cell: "+d.cells[ci].cell+"<br>"+metric+": "+d.cells[ci][metric]);
+    }
+    if (!yVals.length) continue;
+
+    traces.push({
+      x: new Array(yVals.length).fill(mi), y: yVals,
+      type:"violin", points:false, name:mLabels[mi], showlegend:false,
+      fillcolor:fillCol, line:{color:fillCol, width:1.5},
+      opacity:op.v, hoverinfo:"y"
+    });
+    if (op.p > 0.001) {
+      var px=[]; var py=[]; var pt=[];
+      var total = yVals.length > 500 ? 500 : yVals.length;
+      var step = Math.max(1, Math.floor(yVals.length/total));
+      for (var k=0; k<yVals.length; k+=step) {
+        px.push(mi + (Math.random()-0.5)*0.3);
+        py.push(yVals[k]); pt.push(hovers[k]||"");
+      }
+      traces.push({
+        x:px, y:py, text:pt, type:"scatter", mode:"markers", hoverinfo:"text",
+        marker:{color:fillCol, size:2, opacity:op.p, line:{width:0}},
+        name:"pts_"+mi, showlegend:false
+      });
+    }
+  }
+
+  Plotly.newPlot(panel, traces, {
+    title: "QC — " + sample, margin:{l:80,r:30,b:60,t:50},
+    xaxis:{title:"", ticktext:mLabels, tickvals:[0,1,2], showgrid:false},
+    yaxis:{title:"value", showgrid:true},
+    hovermode:"closest", dragmode:"pan"
+  }, {
+    displayModeBar: true,
+    modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
+    displaylogo: false
+  });
+}
+
+// =========================================================================
+// RENDER: nCount vs nFeature scatter
+// =========================================================================
+function _PLOT_renderScatter(d) {
+  var canvas = document.getElementById("plot-active-canvas");
+  if (!canvas) return;
+  canvas.style.overflowY = "hidden";
+  canvas.style.overflowX = "hidden";
+
+  var hl = _PLOT_STATE.scatter.highlightedSample;
+  var samples = d.samples;
+
+  canvas.innerHTML = "";
+  var panel = document.createElement("div");
+  panel.style.cssText = "width:100%;height:100%;";
+  panel.id = "plot-sc-panel";
+  canvas.appendChild(panel);
+
+  var traces = [];
+  for (var si = 0; si < samples.length; si++) {
+    var s = samples[si];
+    var xVals=[]; var yVals=[]; var hovers=[];
+    for (var ci = 0; ci < d.cells.length; ci++) {
+      if (d.cells[ci].sample !== s) continue;
+      xVals.push(d.cells[ci].nCount_RNA);
+      yVals.push(d.cells[ci].nFeature_RNA);
+      hovers.push("Cell: "+d.cells[ci].cell+"<br>Sample: "+s+
+        "<br>nCount: "+d.cells[ci].nCount_RNA+"<br>nFeature: "+d.cells[ci].nFeature_RNA);
+    }
+    if (!xVals.length) continue;
+
+    var fillCol = (d.sample_colors && d.sample_colors[s]) || "#888";
+    var opac = 0.7;
+    if (hl) { opac = (s === hl) ? 0.85 : 0.06; }
+
+    // Sample points for scatter (can be large)
+    var total = xVals.length > 2000 ? 2000 : xVals.length;
+    var step = Math.max(1, Math.floor(xVals.length / total));
+    var sx=[]; var sy=[]; var sh=[];
+    for (var k=0; k<xVals.length; k+=step) {
+      sx.push(xVals[k]); sy.push(yVals[k]); sh.push(hovers[k]||"");
+    }
+
+    traces.push({
+      x:sx, y:sy, text:sh,
+      type:"scatter", mode:"markers", hoverinfo:"text",
+      marker:{color:fillCol, size:3, opacity:opac},
+      name:s, showlegend:false
+    });
+  }
+
+  Plotly.newPlot(panel, traces, {
+    title:"QC — nCount_RNA vs nFeature_RNA",
+    margin:{l:80,r:30,b:60,t:50},
+    xaxis:{title:"nCount_RNA", showgrid:false},
+    yaxis:{title:"nFeature_RNA", showgrid:false},
+    hovermode:"closest", dragmode:"pan"
+  }, {
+    displayModeBar: true,
+    modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
+    displaylogo: false
+  });
+}
+
+// =========================================================================
+// Control functions — update _PLOT_STATE, update UI, schedule render
+// =========================================================================
+
 // ---- OVERVIEW ----
-// =========================================================================
-
-function _PLOT_applyOvView() {
-  var metricCtr = document.getElementById("plot-qc-overview-metric");
-  var sampleCtr = document.getElementById("plot-qc-overview-sample");
-  if (metricCtr) metricCtr.classList.toggle("qc-visible", _PLOT_OV_MODE === "metric");
-  if (sampleCtr) sampleCtr.classList.toggle("qc-visible", _PLOT_OV_MODE === "sample");
-
-  var activeId = _PLOT_OV_MODE === "metric" ? "plot-qc-overview-metric" : "plot-qc-overview-sample";
-  _PLOT_resizeVisible();
-  setTimeout(function() { _PLOT_applyFocusToContainer(activeId); }, 120);
-}
-
 function _PLOT_setOvMode(mode) {
   if (!_SR_isActiveView("plot")) return;
-  _PLOT_OV_MODE = mode;
-  var btnMetric = document.getElementById("plot-ov-mode-metric");
-  var btnSample = document.getElementById("plot-ov-mode-sample");
-  if (btnMetric) btnMetric.classList.toggle("active", mode === "metric");
-  if (btnSample) btnSample.classList.toggle("active", mode === "sample");
-  _PLOT_applyOvView();
+  _PLOT_STATE.overview.mode = mode;
+  var bM = document.getElementById("plot-ov-mode-metric");
+  var bS = document.getElementById("plot-ov-mode-sample");
+  if (bM) bM.classList.toggle("active", mode === "metric");
+  if (bS) bS.classList.toggle("active", mode === "sample");
+  _PLOT_scheduleRender();
 }
-
 function _PLOT_setOvFocus(focus) {
   if (!_SR_isActiveView("plot")) return;
-  _PLOT_OV_FOCUS = focus;
-  var bV = document.getElementById("plot-ov-focus-violin");
-  var bP = document.getElementById("plot-ov-focus-point");
-  var bB = document.getElementById("plot-ov-focus-balanced");
-  if (bV) bV.classList.toggle("active", focus === "violin");
-  if (bP) bP.classList.toggle("active", focus === "point");
-  if (bB) bB.classList.toggle("active", focus === "balanced");
-  var activeId = _PLOT_OV_MODE === "metric" ? "plot-qc-overview-metric" : "plot-qc-overview-sample";
-  _PLOT_applyFocusToContainer(activeId);
+  _PLOT_STATE.overview.focus = focus;
+  ["violin","point","balanced"].forEach(function(f) {
+    var b = document.getElementById("plot-ov-focus-"+f);
+    if (b) b.classList.toggle("active", f === focus);
+  });
+  _PLOT_scheduleRender();
 }
 
-// =========================================================================
 // ---- SINGLE METRIC ----
-// =========================================================================
-
-function _PLOT_applySmView() {
-  var metricCtr   = document.getElementById("plot-qc-single-metric");
-  var sampleCtr   = document.getElementById("plot-qc-single-sample");
-  var metricSelGrp = document.getElementById("plot-sm-metric-sel");
-  var sampleSelGrp = document.getElementById("plot-sm-sample-sel");
-
-  if (metricCtr)   metricCtr.classList.toggle("qc-visible", _PLOT_SM_MODE === "metric");
-  if (sampleCtr)   sampleCtr.classList.toggle("qc-visible", _PLOT_SM_MODE === "sample");
-  if (metricSelGrp) metricSelGrp.classList.toggle("plot-params-hidden", _PLOT_SM_MODE !== "metric");
-  if (sampleSelGrp) sampleSelGrp.classList.toggle("plot-params-hidden", _PLOT_SM_MODE !== "sample");
-
-  if (_PLOT_SM_MODE === "metric") {
-    _PLOT_refreshSmMetric();
-  } else {
-    _PLOT_refreshSmSample();
-  }
-
-  _PLOT_resizeVisible();
-  setTimeout(function() {
-    var activeId = _PLOT_SM_MODE === "metric" ? "plot-qc-single-metric" : "plot-qc-single-sample";
-    _PLOT_applyFocusToContainer(activeId);
-  }, 120);
-}
-
 function _PLOT_setSmMode(mode) {
   if (!_SR_isActiveView("plot")) return;
-  _PLOT_SM_MODE = mode;
-  var btnMetric = document.getElementById("plot-sm-mode-metric");
-  var btnSample = document.getElementById("plot-sm-mode-sample");
-  if (btnMetric) btnMetric.classList.toggle("active", mode === "metric");
-  if (btnSample) btnSample.classList.toggle("active", mode === "sample");
-  _PLOT_applySmView();
+  _PLOT_STATE.single.mode = mode;
+  var bM = document.getElementById("plot-sm-mode-metric");
+  var bS = document.getElementById("plot-sm-mode-sample");
+  var gM = document.getElementById("plot-sm-metric-sel");
+  var gS = document.getElementById("plot-sm-sample-sel");
+  if (bM) bM.classList.toggle("active", mode === "metric");
+  if (bS) bS.classList.toggle("active", mode === "sample");
+  if (gM) gM.classList.toggle("plot-params-hidden", mode !== "metric");
+  if (gS) gS.classList.toggle("plot-params-hidden", mode !== "sample");
+  _PLOT_scheduleRender();
 }
-
 function _PLOT_setSmMetric(metric) {
   if (!_SR_isActiveView("plot")) return;
-  _PLOT_SM_METRIC = metric;
-  if (_PLOT_QC_VIEW === "single" && _PLOT_SM_MODE === "metric") {
-    _PLOT_refreshSmMetric();
-    _PLOT_resizeVisible();
-    setTimeout(function() { _PLOT_applyFocusToContainer("plot-qc-single-metric"); }, 120);
-  }
+  _PLOT_STATE.single.metric = metric;
+  _PLOT_scheduleRender();
 }
-
-function _PLOT_refreshSmMetric() {
-  var m = (_PLOT_SM_METRIC === "percent_mt") ? "pctmt" :
-          (_PLOT_SM_METRIC === "nFeature_RNA") ? "nfeature" : "ncount";
-  var targetId = "plot-qc-single-metric-" + m;
-  var parent = document.getElementById("plot-qc-single-metric");
-  if (!parent) return;
-  var children = parent.children;
-  for (var i = 0; i < children.length; i++) {
-    children[i].style.display = (children[i].id === targetId) ? "" : "none";
-  }
-}
-
 function _PLOT_setSmSample(sample) {
   if (!_SR_isActiveView("plot")) return;
-  _PLOT_SM_SAMPLE = sample;
-  if (_PLOT_QC_VIEW === "single" && _PLOT_SM_MODE === "sample") {
-    _PLOT_refreshSmSample();
-    _PLOT_resizeVisible();
-    setTimeout(function() { _PLOT_applyFocusToContainer("plot-qc-single-sample"); }, 120);
-  }
+  _PLOT_STATE.single.sample = sample;
+  _PLOT_scheduleRender();
 }
-
-function _PLOT_refreshSmSample() {
-  if (!_PLOT_SM_SAMPLE) return;
-  var targetId = "plot-qc-single-sample-" + String(_PLOT_SM_SAMPLE).replace(/[. ]/g, "_");
-  var parent = document.getElementById("plot-qc-single-sample");
-  if (!parent) return;
-  var children = parent.children;
-  for (var i = 0; i < children.length; i++) {
-    children[i].style.display = (children[i].id === targetId) ? "" : "none";
-  }
-}
-
 function _PLOT_setSmFocus(focus) {
   if (!_SR_isActiveView("plot")) return;
-  _PLOT_SM_FOCUS = focus;
-  var bV = document.getElementById("plot-sm-focus-violin");
-  var bP = document.getElementById("plot-sm-focus-point");
-  var bB = document.getElementById("plot-sm-focus-balanced");
-  if (bV) bV.classList.toggle("active", focus === "violin");
-  if (bP) bP.classList.toggle("active", focus === "point");
-  if (bB) bB.classList.toggle("active", focus === "balanced");
-  var activeId = _PLOT_SM_MODE === "metric" ? "plot-qc-single-metric" : "plot-qc-single-sample";
-  _PLOT_applyFocusToContainer(activeId);
+  _PLOT_STATE.single.focus = focus;
+  ["violin","point","balanced"].forEach(function(f) {
+    var b = document.getElementById("plot-sm-focus-"+f);
+    if (b) b.classList.toggle("active", f === focus);
+  });
+  _PLOT_scheduleRender();
 }
 
-// =========================================================================
 // ---- SCATTER ----
-// =========================================================================
-
-function _PLOT_applyScView() {
-  _PLOT_applyScatterHighlight();
-  _PLOT_resizeVisible();
-}
-
 function _PLOT_selectScSample(sample) {
   if (!_SR_isActiveView("plot")) return;
-  _PLOT_SC_SAMPLE = sample;
-
-  // Update active state on sample list items
+  _PLOT_STATE.scatter.highlightedSample = sample;
+  // Update active class on sample list
   var list = document.getElementById("plot-sc-sample-list");
   if (list) {
     var items = list.querySelectorAll(".plot-sc-sample-item");
     for (var i = 0; i < items.length; i++) {
-      var dataSample = items[i].getAttribute("data-sc-sample") || null;
-      // null from attribute is string "null"? No — getAttribute returns null if missing.
-      // For the "None" item, data-sc-sample is not set → getAttribute returns null.
-      var match = (dataSample === null && sample === null) ||
-                  (dataSample !== null && dataSample === sample);
+      var ds = items[i].getAttribute("data-sc-sample");
+      var match = (ds === null && sample === null) || (ds === sample);
       items[i].classList.toggle("active", match);
     }
   }
-
-  _PLOT_applyScatterHighlight();
-}
-
-function _PLOT_applyScatterHighlight() {
-  var ctr = document.getElementById("plot-qc-scatter");
-  if (!ctr) return;
-  var plots = ctr.querySelectorAll(".js-plotly-plot, .plotly");
-  plots.forEach(function(gd) {
-    if (!gd || !gd.data) return;
-    try {
-      var n = gd.data.length;
-      var up = [];
-      for (var t = 0; t < n; t++) {
-        var nm = gd.data[t].name || "";
-        var isSc = nm.indexOf("qc_scatter_") === 0;
-        if (!isSc) { up.push({}); continue; }
-        if (!_PLOT_SC_SAMPLE) {
-          up.push({"marker.opacity": 0.7});
-        } else {
-          var isTarget = nm === "qc_scatter_" + _PLOT_SC_SAMPLE;
-          up.push({"marker.opacity": isTarget ? 0.85 : 0.06});
-        }
-      }
-      if (up.length === n) Plotly.restyle(gd, up);
-    } catch(e) {}
-  });
+  _PLOT_scheduleRender();
 }
 
 // =========================================================================
-// Init: populate sample selectors + scatter sample list
+// Init: populate sample dropdowns from _QC_DATA
 // =========================================================================
 function _PLOT_init() {
-  if (_PLOT_INITIALIZED) return;
-  _PLOT_INITIALIZED = true;
+  if (_PLOT_STATE._initialized) return;
+  _PLOT_STATE._initialized = true;
 
-  var samples = window._QC_SAMPLES || [];
-  if (!samples.length) return;
+  var d = window._QC_DATA;
+  if (!d || !d.samples || !d.samples.length) return;
 
-  // Populate Single metric / By sample dropdown
+  var samples = d.samples;
+
+  // Single metric sample dropdown
   var smSel = document.getElementById("plot-sm-select-sample");
   if (smSel) {
     for (var i = 0; i < samples.length; i++) {
       var opt = document.createElement("option");
-      opt.value = samples[i];
-      opt.textContent = samples[i];
+      opt.value = samples[i]; opt.textContent = samples[i];
       smSel.appendChild(opt);
     }
-    _PLOT_SM_SAMPLE = samples[0];
+    _PLOT_STATE.single.sample = samples[0];
   }
 
-  // Populate scatter sample list
+  // Scatter sample list
   var scList = document.getElementById("plot-sc-sample-list");
   if (scList) {
     for (var i = 0; i < samples.length; i++) {
@@ -1536,15 +1775,17 @@ function _PLOT_init() {
       item.className = "plot-sc-sample-item";
       item.setAttribute("data-sc-sample", samples[i]);
       item.textContent = samples[i];
-      item.onclick = (function(s) { return function() { _PLOT_selectScSample(s); }; })(samples[i]);
+      (function(s) { item.onclick = function() { _PLOT_selectScSample(s); }; })(samples[i]);
       scList.appendChild(item);
     }
   }
+
+  // Trigger initial render
+  _PLOT_scheduleRender();
 }
 
-// Lazy-init on first Plot view open
 function _PLOT_ensureInit() {
-  if (!_PLOT_INITIALIZED) _PLOT_init();
+  if (!_PLOT_STATE._initialized) _PLOT_init();
 }
 
 // =========================================================================
@@ -2776,7 +3017,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                              pca_all_pcs_json = "[]",
                              pca_loading_json = "[]",
                              pca_loading_top_n = 10,
-                             qc_plots = NULL,
+                             qc_payload = NULL,
                              use_webgl = TRUE,
                              output, title, dim_opacity, marker_n_top,
                              panels = c("umap", "marker_table")) {
@@ -2786,7 +3027,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   n_total      <- nrow(umap_df)
   has_samples  <- !is.null(sample_col)
   has_pca      <- !is.null(pca_df) && "pca" %in% panels
-  has_plot     <- !is.null(qc_plots) && "plot" %in% panels
+  has_plot     <- !is.null(qc_payload) && "plot" %in% panels
 
   # ---- Sidebar: Cluster section ----
   cluster_html <- lapply(clusters, function(cl) {
@@ -3017,7 +3258,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         # Main layout with view containers
         tags$div(class = "main-layout",
 
-          # ---- Plot view container (v0.3.0 — three-column layout) ----
+          # ---- Plot view container (v0.3.0 — single active canvas) ----
           if (has_plot) tags$div(
             id    = "sr-view-plot",
             class = "sr-view-plot",
@@ -3035,47 +3276,11 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                   onclick = "_PLOT_selectQcView('scatter')",
                   tags$span(class = "plot-nav-dot"), "nCount vs nFeature")
               ),
-              # Center: plot area
+              # Center: single active canvas
               tags$div(class = "plot-main", id = "plot-main",
-                # ---- Overview / By metric (default) ----
-                tags$div(class = "qc-container qc-visible", id = "plot-qc-overview-metric",
-                  tags$div(class = "qc-overview-panels",
-                    tags$div(class = "qc-overview-panel",
-                      tags$span(class = "metric-label", "nCount_RNA"),
-                      htmltools::as.tags(qc_plots[["ov_ncount"]])),
-                    tags$div(class = "qc-overview-panel",
-                      tags$span(class = "metric-label", "nFeature_RNA"),
-                      htmltools::as.tags(qc_plots[["ov_nfeature"]])),
-                    tags$div(class = "qc-overview-panel",
-                      tags$span(class = "metric-label", "percent.mt"),
-                      htmltools::as.tags(qc_plots[["ov_pctmt"]])))),
-                # ---- Overview / By sample (hidden, horizontal scroll) ----
-                tags$div(class = "qc-container", id = "plot-qc-overview-sample",
-                  tags$div(class = "qc-by-sample-scroll",
-                    lapply(names(qc_plots[["ov_by_sample"]]), function(sn) {
-                      tags$div(class = "qc-sample-group",
-                        tags$div(class = "qc-sample-group-label", sn),
-                        htmltools::as.tags(qc_plots[["ov_by_sample"]][[sn]]))
-                    }))),
-                # ---- Single metric / By metric (hidden) ----
-                tags$div(class = "qc-container", id = "plot-qc-single-metric",
-                  tags$div(id = "plot-qc-single-metric-ncount", style = "flex:1;min-height:0;",
-                    htmltools::as.tags(qc_plots[["nCount_RNA"]])),
-                  tags$div(id = "plot-qc-single-metric-nfeature", style = "display:none;flex:1;min-height:0;",
-                    htmltools::as.tags(qc_plots[["nFeature_RNA"]])),
-                  tags$div(id = "plot-qc-single-metric-pctmt", style = "display:none;flex:1;min-height:0;",
-                    htmltools::as.tags(qc_plots[["percent_mt"]]))),
-                # ---- Single metric / By sample (hidden) ----
-                tags$div(class = "qc-container", id = "plot-qc-single-sample",
-                  lapply(names(qc_plots[["sm_by_sample"]]), function(sn) {
-                    tags$div(id = paste0("plot-qc-single-sample-", gsub("[. ]", "_", sn)),
-                             style = "display:none;flex:1;min-height:0;",
-                             htmltools::as.tags(qc_plots[["sm_by_sample"]][[sn]]))
-                  })),
-                # ---- Scatter ----
-                tags$div(class = "qc-container", id = "plot-qc-scatter",
-                  htmltools::as.tags(qc_plots[["ncount_vs_nfeature"]]))),
-              # Right: context-sensitive controls (only one pane visible)
+                tags$div(id = "plot-active-canvas", style = "flex:1;min-height:0;")
+              ),
+              # Right: context-sensitive controls
               tags$div(class = "plot-params", id = "plot-params",
                 # ==================== Overview pane ====================
                 tags$div(class = "plot-params-pane", id = "plot-params-overview",
@@ -3130,7 +3335,8 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                     tags$div(class = "plot-params-label", "Sample highlight"),
                     tags$div(class = "plot-sc-sample-list", id = "plot-sc-sample-list",
                       tags$div(class = "plot-sc-sample-item active", id = "plot-sc-sample-none",
-                        onclick = "_PLOT_selectScSample(null)", "None / All")))))
+                        onclick = "_PLOT_selectScSample(null)", "None / All"))))
+              )
             )
           ),
           # ---- UMAP view container ----
@@ -3261,7 +3467,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         gene_expr_json
       ))),
       if (has_plot) tags$script(htmltools::HTML(paste0(
-        "window._QC_SAMPLES = ", jsonlite::toJSON(qc_plots[["qc_samples"]], auto_unbox = TRUE), ";"
+        "window._QC_DATA = ", jsonlite::toJSON(qc_payload, auto_unbox = TRUE, digits = 6), ";"
       ))),
       if (has_pca) list(
         tags$script(htmltools::HTML(paste0("window._PCA_DATA = ", pca_data_json, ";"))),
@@ -3462,7 +3668,7 @@ sc_report <- function(umap_df,
   )
 
   # ---- Build QC plots (v0.3.0) ----
-  qc_plots <- NULL
+  qc_payload <- NULL
   if (!is.null(qc_df) && "plot" %in% panels) {
     qc_sample_col <- if (!is.null(sample_col) && sample_col %in% colnames(qc_df)) {
       sample_col
@@ -3473,12 +3679,11 @@ sc_report <- function(umap_df,
            call. = FALSE)
     }
     message("scReportLite: building QC diagnostic plots...")
-    qc_plots <- build_qc_plotly(
+    qc_payload <- build_qc_payload(
       qc_df,
       cluster_col = cluster_col,
       cell_col    = cell_col,
-      sample_col  = qc_sample_col,
-      use_webgl   = FALSE  # SVG for QC — avoid too many WebGL contexts
+      sample_col  = qc_sample_col
     )
   }
 
@@ -3561,7 +3766,7 @@ sc_report <- function(umap_df,
     sample_col    = sample_col,
     gene_expr_df  = gene_expr_df,
     pca_df        = pca_df,
-    qc_plots      = qc_plots,
+    qc_payload    = qc_payload,
     pca_data_json  = pca_data_json,
     pca_has_sample = pca_has_sample,
     pca_color_by   = pca_color_by,
