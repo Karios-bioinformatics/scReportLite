@@ -3375,7 +3375,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   # ---- Marker data as JSON ----
   if (!is.null(marker_df) && nrow(marker_df) > 0) {
     marker_df$cluster <- as.character(marker_df$cluster)
-    marker_json <- jsonlite::toJSON(marker_df, dataframe = "rows", auto_unbox = FALSE)
+    marker_json <- jsonlite::toJSON(marker_df, dataframe = "rows", auto_unbox = TRUE)
   } else {
     marker_json <- "[]"
   }
@@ -3418,10 +3418,11 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                onclick = "switchTab('gene')", "Genes")
     ))
     gene_html <- lapply(gene_names, function(g) {
+      g_esc <- gsub("'", "\\\\'", g)
       tags$div(
         class = "gene-item",
         `data-gene` = g,
-        onclick = sprintf("selectGene('%s')", g),
+        onclick = sprintf("selectGene('%s')", g_esc),
         g
       )
     })
