@@ -1588,7 +1588,7 @@ function _PLOT_renderOvMetric(d) {
         y: yVals,
         type: "violin", points: false, name: s, showlegend: false,
         fillcolor: fillCol, line: {color: fillCol, width: 1.2},
-        opacity: op.v, hoverinfo: "y", width: 0.6, spanmode: "hard", span: [0, null]
+        opacity: op.v, hoverinfo: "all", width: 0.6, spanmode: "hard", span: [0, null]
       });
       // Point trace (sampled overlay)
       if (op.p > 0.001) {
@@ -1617,6 +1617,7 @@ function _PLOT_renderOvMetric(d) {
       hovermode: "closest", dragmode: "pan"
     }, {
       displayModeBar: true,
+      modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
       modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
       displaylogo: false
     });
@@ -1712,7 +1713,7 @@ function _PLOT_renderOvSample(d) {
         x: new Array(yVals.length).fill(0),
         y: yVals, type: "violin", points: false, name: mLabels[mi], showlegend: false,
         fillcolor: fillCol, line: {color: fillCol, width: 1.2},
-        opacity: op.v, hoverinfo: "y", width: 0.6, spanmode: "hard", span: [0, null]
+        opacity: op.v, hoverinfo: "all", width: 0.6, spanmode: "hard", span: [0, null]
       });
       if (op.p > 0.001) {
         var px=[], py=[], pt=[];
@@ -1735,7 +1736,9 @@ function _PLOT_renderOvSample(d) {
         yaxis:{title:"", showgrid:true, zeroline:false, range:metricRanges[metric]},
         hovermode:"closest", dragmode:"pan"
       }, {
-        displayModeBar: false,
+        displayModeBar: true,
+        modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
+        modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
         displaylogo: false
       });
     }
@@ -1780,7 +1783,7 @@ function _PLOT_renderSmMetric(d) {
       x: new Array(yVals.length).fill(si), y: yVals,
       type:"violin", points:false, name:s, showlegend:false,
       fillcolor:fillCol, line:{color:fillCol, width:1.5},
-      opacity:op.v, hoverinfo:"y", width:0.6, spanmode:"hard", span:[0,null]
+      opacity:op.v, hoverinfo:"all", width:0.6, spanmode:"hard", span:[0,null]
     });
     if (op.p > 0.001) {
       var px=[]; var py=[]; var pt=[];
@@ -1805,6 +1808,7 @@ function _PLOT_renderSmMetric(d) {
     hovermode:"closest", dragmode:"pan"
   }, {
     displayModeBar: true,
+    modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
     modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
     displaylogo: false
   });
@@ -1878,7 +1882,7 @@ function _PLOT_renderSmSample(d) {
       x: new Array(yVals.length).fill(0), y: yVals,
       type:"violin", points:false, name:mLabels[mi], showlegend:false,
       fillcolor:fillCol, line:{color:fillCol, width:1.5},
-      opacity:op.v, hoverinfo:"y", width:0.6, spanmode:"hard", span:[0,null]
+      opacity:op.v, hoverinfo:"all", width:0.6, spanmode:"hard", span:[0,null]
     });
     if (op.p > 0.001) {
       var px=[], py=[], pt=[];
@@ -1902,6 +1906,7 @@ function _PLOT_renderSmSample(d) {
       hovermode:"closest", dragmode:"pan"
     }, {
       displayModeBar: true,
+      modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
       modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
       displaylogo: false
     });
@@ -1969,6 +1974,7 @@ function _PLOT_renderScatter(d) {
     hovermode:"closest", dragmode:"pan"
   }, {
     displayModeBar: true,
+    modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
     modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
     displaylogo: false
   });
@@ -2238,6 +2244,7 @@ function renderPcaPairScatter() {
     hovermode: "closest", margin: { l: 60, r: 30, b: 60, t: 30 }, dragmode: "pan"
   }, {
     displayModeBar: true,
+    modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
     modeBarButtonsToRemove: ["sendDataToCloud", "lasso2d", "select2d",
       "autoScale2d", "toggleSpikelines"],
     displaylogo: false
@@ -2310,6 +2317,7 @@ function renderSinglePcPlot() {
     hovermode: "closest", margin: { l: 60, r: 30, b: 40, t: 30 }, dragmode: "pan"
   }, {
     displayModeBar: true,
+    modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
     modeBarButtonsToRemove: ["sendDataToCloud", "lasso2d", "select2d",
       "autoScale2d", "toggleSpikelines"],
     displaylogo: false
