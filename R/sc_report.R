@@ -1308,6 +1308,178 @@ function _PLOT_scheduleRender() {
 }
 
 // =========================================================================
+// Controls registry — composable right-pane menu system (v0.3.0)
+// =========================================================================
+
+// ---- DOM helpers ----
+function _PLOT_mkGroup(label) {
+  var g = document.createElement("div");
+  g.className = "plot-params-group";
+  var lbl = document.createElement("div");
+  lbl.className = "plot-params-label";
+  lbl.textContent = label;
+  g.appendChild(lbl);
+  return g;
+}
+function _PLOT_mkToggleBtn(text, active, onclick) {
+  var b = document.createElement("button");
+  b.className = "plot-toggle-btn" + (active ? " active" : "");
+  b.textContent = text;
+  b.onclick = onclick;
+  return b;
+}
+function _PLOT_mkToggleRow(btns) {
+  var row = document.createElement("div");
+  row.className = "plot-toggle-row";
+  btns.forEach(function(b) { row.appendChild(b); });
+  return row;
+}
+function _PLOT_mkSelect(value, onchange) {
+  var s = document.createElement("select");
+  s.className = "plot-param-select";
+  s.onchange = function() { onchange(s.value); };
+  // options filled by caller
+  return s;
+}
+
+// ---- Control renderers (each produces its own DOM) ----
+var _PLOT_CONTROL_REGISTRY = {
+  viewMode: {
+    render: function(container) {
+      var g = _PLOT_mkGroup("View mode");
+      g.appendChild(_PLOT_mkToggleRow([
+        _PLOT_mkToggleBtn("By metric", _PLOT_STATE.overview.mode === "metric", function() { _PLOT_setOvMode("metric"); }),
+        _PLOT_mkToggleBtn("By sample", _PLOT_STATE.overview.mode === "sample", function() { _PLOT_setOvMode("sample"); })
+      ]));
+      container.appendChild(g);
+    }
+  },
+
+  overviewFocus: {
+    render: function(container) {
+      var g = _PLOT_mkGroup("Display focus");
+      var f = _PLOT_STATE.overview.focus;
+      g.appendChild(_PLOT_mkToggleRow([
+        _PLOT_mkToggleBtn("Violin",   f === "violin",   function() { _PLOT_setOvFocus("violin"); }),
+        _PLOT_mkToggleBtn("Point",    f === "point",    function() { _PLOT_setOvFocus("point"); }),
+        _PLOT_mkToggleBtn("Balanced", f === "balanced", function() { _PLOT_setOvFocus("balanced"); })
+      ]));
+      container.appendChild(g);
+    }
+  },
+
+  comparisonMode: {
+    render: function(container) {
+      var g = _PLOT_mkGroup("Comparison mode");
+      var m = _PLOT_STATE.single.mode;
+      g.appendChild(_PLOT_mkToggleRow([
+        _PLOT_mkToggleBtn("By metric", m === "metric", function() { _PLOT_setSmMode("metric"); }),
+        _PLOT_mkToggleBtn("By sample", m === "sample", function() { _PLOT_setSmMode("sample"); })
+      ]));
+      container.appendChild(g);
+    }
+  },
+
+  singleSelector: {
+    render: function(container) {
+      var mode = _PLOT_STATE.single.mode;
+      var d = window._QC_DATA;
+      var samples = (d && d.samples) ? d.samples : [];
+
+      if (mode === "metric") {
+        var g = _PLOT_mkGroup("Metric");
+        var sel = _PLOT_mkSelect(_PLOT_STATE.single.metric, function(v) { _PLOT_setSmMetric(v); });
+        ["nCount_RNA","nFeature_RNA","percent_mt"].forEach(function(v) {
+          var o = document.createElement("option");
+          o.value = v; o.textContent = v === "percent_mt" ? "percent.mt" : v;
+          sel.appendChild(o);
+        });
+        sel.value = _PLOT_STATE.single.metric;
+        g.appendChild(sel);
+        container.appendChild(g);
+      } else {
+        var sg = _PLOT_mkGroup("Sample");
+        var ssel = _PLOT_mkSelect(_PLOT_STATE.single.sample, function(v) { _PLOT_setSmSample(v); });
+        for (var i = 0; i < samples.length; i++) {
+          var o = document.createElement("option");
+          o.value = samples[i]; o.textContent = samples[i];
+          ssel.appendChild(o);
+        }
+        ssel.value = _PLOT_STATE.single.sample;
+        sg.appendChild(ssel);
+        container.appendChild(sg);
+      }
+    }
+  },
+
+  singleFocus: {
+    render: function(container) {
+      var g = _PLOT_mkGroup("Display focus");
+      var f = _PLOT_STATE.single.focus;
+      g.appendChild(_PLOT_mkToggleRow([
+        _PLOT_mkToggleBtn("Violin",   f === "violin",   function() { _PLOT_setSmFocus("violin"); }),
+        _PLOT_mkToggleBtn("Point",    f === "point",    function() { _PLOT_setSmFocus("point"); }),
+        _PLOT_mkToggleBtn("Balanced", f === "balanced", function() { _PLOT_setSmFocus("balanced"); })
+      ]));
+      container.appendChild(g);
+    }
+  },
+
+  scatterSampleHighlight: {
+    render: function(container) {
+      var g = _PLOT_mkGroup("Sample highlight");
+      var list = document.createElement("div");
+      list.className = "plot-sc-sample-list";
+
+      var noneItem = document.createElement("div");
+      noneItem.className = "plot-sc-sample-item" + (_PLOT_STATE.scatter.highlightedSample === null ? " active" : "");
+      noneItem.textContent = "None / All";
+      noneItem.onclick = function() { _PLOT_selectScSample(null); };
+      list.appendChild(noneItem);
+
+      var d = window._QC_DATA;
+      var samples = (d && d.samples) ? d.samples : [];
+      for (var i = 0; i < samples.length; i++) {
+        var s = samples[i];
+        var item = document.createElement("div");
+        item.className = "plot-sc-sample-item" + (_PLOT_STATE.scatter.highlightedSample === s ? " active" : "");
+        item.textContent = s;
+        (function(sv) { item.onclick = function() { _PLOT_selectScSample(sv); }; })(s);
+        list.appendChild(item);
+      }
+
+      g.appendChild(list);
+      container.appendChild(g);
+    }
+  }
+};
+
+// ---- Module configs (which controls each module declares) ----
+var _PLOT_MODULES = {
+  overview: { controls: ["viewMode", "overviewFocus"] },
+  single:   { controls: ["comparisonMode", "singleSelector", "singleFocus"] },
+  scatter:  { controls: ["scatterSampleHighlight"] }
+};
+
+// ---- Render right pane from registry ----
+function _PLOT_renderControls() {
+  var container = document.getElementById("plot-controls-dynamic");
+  if (!container) return;
+  container.innerHTML = "";
+
+  var module = _PLOT_STATE.activeModule;
+  var cfg = _PLOT_MODULES[module];
+  if (!cfg || !cfg.controls) return;
+
+  cfg.controls.forEach(function(name) {
+    var ctrl = _PLOT_CONTROL_REGISTRY[name];
+    if (ctrl && typeof ctrl.render === "function") {
+      ctrl.render(container);
+    }
+  });
+}
+
+// =========================================================================
 // Unified render entry — reads _PLOT_STATE + _QC_DATA, renders on canvas
 // =========================================================================
 function _PLOT_renderCurrentState() {
@@ -1315,7 +1487,7 @@ function _PLOT_renderCurrentState() {
   var d = window._QC_DATA;
   if (!d || !d.cells || !d.cells.length) return;
 
-  _PLOT_updateRightPane();
+  _PLOT_renderControls();
   _PLOT_STATE.isRendering = true;
   try {
     var m = _PLOT_STATE.activeModule;
@@ -1340,16 +1512,8 @@ function _PLOT_selectQcView(view) {
   if (!_SR_isActiveView("plot")) return;
   _PLOT_STATE.activeModule = view;
   _PLOT_updateNav(view);
-  _PLOT_updateRightPane();
+  _PLOT_renderControls();
   _PLOT_scheduleRender();
-}
-
-function _PLOT_updateRightPane() {
-  var module = _PLOT_STATE.activeModule;
-  ["overview","single","scatter"].forEach(function(name) {
-    var el = document.getElementById("plot-params-" + name);
-    if (el) el.classList.toggle("plot-params-hidden", name !== module);
-  });
 }
 
 function _PLOT_updateNav(activeView) {
@@ -1368,6 +1532,7 @@ function _PLOT_updateNav(activeView) {
 function _PLOT_renderOvMetric(d) {
   var canvas = document.getElementById("plot-active-canvas");
   if (!canvas) return;
+  canvas.scrollTop = 0;
   canvas.style.overflowY = "auto";
   canvas.style.overflowX = "hidden";
 
@@ -1385,7 +1550,7 @@ function _PLOT_renderOvMetric(d) {
   for (var mi = 0; mi < metrics.length; mi++) {
     var metric = metrics[mi];
     var panel = document.createElement("div");
-    panel.style.cssText = "height:33%;min-height:200px;flex-shrink:0;";
+    panel.style.cssText = "min-height:260px;flex-shrink:0;";
     panel.id = "plot-ov-metric-" + mi;
     wrapper.appendChild(panel);
   }
@@ -1464,65 +1629,72 @@ function _PLOT_renderOvMetric(d) {
 function _PLOT_renderOvSample(d) {
   var canvas = document.getElementById("plot-active-canvas");
   if (!canvas) return;
+  canvas.scrollLeft = 0;
   canvas.style.overflowX = "auto";
   canvas.style.overflowY = "hidden";
 
   var op = _PLOT_focusOpacities(_PLOT_STATE.overview.focus);
   var samples = d.samples;
-  _PLOT_STATE._activeCanvasIds = samples.map(function(_,i){return "plot-ov-sample-"+i;});
   var metrics = ["nCount_RNA","nFeature_RNA","percent_mt"];
-  var mLabels = ["nCount","nFeature","%MT"];
+  var mLabels = ["nCount_RNA","nFeature_RNA","percent.mt"];
+
+  // ---- Compute per-metric global y-ranges (same metric shares range across samples) ----
+  var metricRanges = {};
+  for (var gm = 0; gm < metrics.length; gm++) {
+    var gmName = metrics[gm];
+    var gMax = 0;
+    for (var gs = 0; gs < samples.length; gs++) {
+      for (var gc = 0; gc < d.cells.length; gc++) {
+        if (d.cells[gc].sample !== samples[gs]) continue;
+        var gv = d.cells[gc][gmName];
+        if (gv > gMax) gMax = gv;
+      }
+    }
+    metricRanges[gmName] = [0, gMax * 1.05];
+  }
 
   canvas.innerHTML = "";
   var wrapper = document.createElement("div");
   wrapper.style.cssText = "display:flex;flex-direction:row;gap:8px;height:100%;min-width:max-content;";
 
+  // Build sample cards (each with 3 metric panels)
+  var allPanelIds = [];
   for (var si = 0; si < samples.length; si++) {
     var s = samples[si];
-    var group = document.createElement("div");
-    group.style.cssText = "flex:0 0 280px;display:flex;flex-direction:column;min-height:0;";
+    var card = document.createElement("div");
+    card.style.cssText = "flex:0 0 250px;display:flex;flex-direction:column;min-height:0;";
 
     var label = document.createElement("div");
     label.textContent = s;
-    label.style.cssText = "font-size:0.78em;font-weight:600;color:#636e72;text-align:center;padding:2px 0 4px;flex-shrink:0;";
-    group.appendChild(label);
+    label.style.cssText = "font-size:0.78em;font-weight:600;color:#636e72;text-align:center;padding:4px 0;flex-shrink:0;";
+    card.appendChild(label);
 
-    var panel = document.createElement("div");
-    panel.style.cssText = "flex:1;min-height:0;";
-    panel.id = "plot-ov-sample-" + si;
-    group.appendChild(panel);
-    wrapper.appendChild(group);
+    for (var mi = 0; mi < metrics.length; mi++) {
+      var pid = "plot-ov-sample-" + si + "-" + mi;
+      allPanelIds.push(pid);
+      var panel = document.createElement("div");
+      panel.style.cssText = "min-height:180px;flex:1 1 0;";
+      panel.id = pid;
+      card.appendChild(panel);
+    }
+    wrapper.appendChild(card);
   }
   canvas.appendChild(wrapper);
+  _PLOT_STATE._activeCanvasIds = allPanelIds;
 
-  // Compute global y-max for unified scale across sample panels
-  var ovSampleGlobalMax = 0;
-  for (var gi = 0; gi < samples.length; gi++) {
-    var gs = samples[gi];
-    for (var gm = 0; gm < metrics.length; gm++) {
-      var gmetric = metrics[gm];
-      for (var gc = 0; gc < d.cells.length; gc++) {
-        if (d.cells[gc].sample !== gs) continue;
-        var gv = d.cells[gc][gmetric];
-        if (gv > ovSampleGlobalMax) ovSampleGlobalMax = gv;
-      }
-    }
-  }
-  var ovSampleYrange = [0, ovSampleGlobalMax * 1.05];
-
-  // Render per-sample triple-violin
+  // Render each sample × metric panel
   for (var si = 0; si < samples.length; si++) {
     var s = samples[si];
-    var panel = document.getElementById("plot-ov-sample-" + si);
-    if (!panel) continue;
     var fillCol = _PLOT_getSampleColor(s);
 
-    var traces = [];
     for (var mi = 0; mi < metrics.length; mi++) {
       var metric = metrics[mi];
-      var yVals = [];
-      var hovers = [];
-      var cellIds = [];
+      var pid = "plot-ov-sample-" + si + "-" + mi;
+      var panel = document.getElementById(pid);
+      if (!panel) continue;
+
+      // Gather cells for this sample+metric
+      var yVals = []; var hovers = []; var cellIds = [];
       for (var ci = 0; ci < d.cells.length; ci++) {
         if (d.cells[ci].sample !== s) continue;
         yVals.push(d.cells[ci][metric]);
@@ -1531,18 +1703,19 @@ function _PLOT_renderOvSample(d) {
       }
       if (!yVals.length) continue;
 
+      var traces = [];
       traces.push({
-        x: new Array(yVals.length).fill(mi),
+        x: new Array(yVals.length).fill(0),
         y: yVals, type: "violin", points: false, name: mLabels[mi], showlegend: false,
         fillcolor: fillCol, line: {color: fillCol, width: 1.2},
         opacity: op.v, hoverinfo: "y", width: 0.6, spanmode: "hard", span: [0, null]
       });
       if (op.p > 0.001) {
-        var px=[]; var py=[]; var pt=[];
+        var px=[], py=[], pt=[];
         var total = yVals.length > 500 ? 500 : yVals.length;
         var step = Math.max(1, Math.floor(yVals.length/total));
         for (var k=0; k<yVals.length; k+=step) {
-          px.push(mi + _PLOT_stableJitter(cellIds[k] + "_" + metric + "_" + s, 0.3));
+          px.push(_PLOT_stableJitter(cellIds[k] + "_" + metric + "_" + s, 0.3));
           py.push(yVals[k]); pt.push(hovers[k]||"");
         }
         traces.push({
@@ -1551,18 +1724,17 @@ function _PLOT_renderOvSample(d) {
           name:"pts_"+mi, showlegend:false
         });
       }
-    }
 
-    Plotly.newPlot(panel, traces, {
-      title:"", margin:{l:55,r:10,b:40,t:10},
-      xaxis:{title:"", ticktext:mLabels, tickvals:[0,1,2], showgrid:false, zeroline:false},
-      yaxis:{title:"", showgrid:true, zeroline:false, range:ovSampleYrange},
-      hovermode:"closest", dragmode:"pan"
-    }, {
-      displayModeBar: true,
-      modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
-      displaylogo: false
-    });
+      Plotly.newPlot(panel, traces, {
+        title:"", margin:{l:50,r:8,b:25,t:5},
+        xaxis:{title:"", showgrid:false, zeroline:false, showticklabels:false, range:[-0.5, 0.5]},
+        yaxis:{title:"", showgrid:true, zeroline:false, range:metricRanges[metric]},
+        hovermode:"closest", dragmode:"pan"
+      }, {
+        displayModeBar: false,
+        displaylogo: false
+      });
+    }
   }
 }
 
@@ -1572,6 +1744,7 @@ function _PLOT_renderOvSample(d) {
 function _PLOT_renderSmMetric(d) {
   var canvas = document.getElementById("plot-active-canvas");
   if (!canvas) return;
+  canvas.scrollTop = 0;
   canvas.style.overflowY = "hidden";
   canvas.style.overflowX = "hidden";
 
@@ -1639,27 +1812,53 @@ function _PLOT_renderSmMetric(d) {
 function _PLOT_renderSmSample(d) {
   var canvas = document.getElementById("plot-active-canvas");
   if (!canvas) return;
-  canvas.style.overflowY = "hidden";
+  canvas.scrollTop = 0;
+  canvas.style.overflowY = "auto";
   canvas.style.overflowX = "hidden";
 
   var op = _PLOT_focusOpacities(_PLOT_STATE.single.focus);
-  _PLOT_STATE._activeCanvasIds = ["plot-sm-panel"];
   var sample = _PLOT_STATE.single.sample;
   if (!sample) return;
-
-  canvas.innerHTML = "";
-  var panel = document.createElement("div");
-  panel.style.cssText = "width:100%;height:100%;";
-  panel.id = "plot-sm-panel";
-  canvas.appendChild(panel);
 
   var metrics = ["nCount_RNA","nFeature_RNA","percent_mt"];
   var mLabels = ["nCount_RNA","nFeature_RNA","percent.mt"];
   var fillCol = _PLOT_getSampleColor(sample);
-  var traces = [];
 
+  // ---- Compute per-metric y-ranges for this sample ----
+  var metricRanges = {};
+  for (var gm = 0; gm < metrics.length; gm++) {
+    var gmName = metrics[gm];
+    var gMax = 0;
+    for (var gc = 0; gc < d.cells.length; gc++) {
+      if (d.cells[gc].sample !== sample) continue;
+      var gv = d.cells[gc][gmName];
+      if (gv > gMax) gMax = gv;
+    }
+    metricRanges[gmName] = [0, gMax * 1.05];
+  }
+
+  canvas.innerHTML = "";
+  var wrapper = document.createElement("div");
+  wrapper.style.cssText = "display:flex;flex-direction:column;gap:4px;min-height:min-content;";
+
+  var panelIds = [];
+  for (var mi = 0; mi < metrics.length; mi++) {
+    var pid = "plot-sm-metric-" + mi;
+    panelIds.push(pid);
+    var panel = document.createElement("div");
+    panel.style.cssText = "min-height:200px;flex-shrink:0;";
+    panel.id = pid;
+    wrapper.appendChild(panel);
+  }
+  canvas.appendChild(wrapper);
+  _PLOT_STATE._activeCanvasIds = panelIds;
+
+  // Render each metric panel
   for (var mi = 0; mi < metrics.length; mi++) {
     var metric = metrics[mi];
+    var panel = document.getElementById("plot-sm-metric-" + mi);
+    if (!panel) continue;
+
     var yVals = []; var hovers = []; var cellIds = [];
     for (var ci = 0; ci < d.cells.length; ci++) {
       if (d.cells[ci].sample !== sample) continue;
@@ -1669,18 +1868,19 @@ function _PLOT_renderSmSample(d) {
     }
     if (!yVals.length) continue;
 
+    var traces = [];
     traces.push({
-      x: new Array(yVals.length).fill(mi), y: yVals,
+      x: new Array(yVals.length).fill(0), y: yVals,
       type:"violin", points:false, name:mLabels[mi], showlegend:false,
       fillcolor:fillCol, line:{color:fillCol, width:1.5},
       opacity:op.v, hoverinfo:"y", width:0.6, spanmode:"hard", span:[0,null]
     });
     if (op.p > 0.001) {
-      var px=[]; var py=[]; var pt=[];
+      var px=[], py=[], pt=[];
       var total = yVals.length > 500 ? 500 : yVals.length;
       var step = Math.max(1, Math.floor(yVals.length/total));
       for (var k=0; k<yVals.length; k+=step) {
-        px.push(mi + _PLOT_stableJitter(cellIds[k] + "_" + metric + "_" + sample, 0.3));
+        px.push(_PLOT_stableJitter(cellIds[k] + "_" + metric + "_" + sample, 0.3));
         py.push(yVals[k]); pt.push(hovers[k]||"");
       }
       traces.push({
@@ -1689,18 +1889,18 @@ function _PLOT_renderSmSample(d) {
         name:"pts_"+mi, showlegend:false
       });
     }
-  }
 
-  Plotly.newPlot(panel, traces, {
-    title: "QC — " + sample, margin:{l:80,r:30,b:60,t:50},
-    xaxis:{title:"", ticktext:mLabels, tickvals:[0,1,2], showgrid:false},
-    yaxis:{title:"value", showgrid:true, rangemode:"nonnegative"},
-    hovermode:"closest", dragmode:"pan"
-  }, {
-    displayModeBar: true,
-    modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
-    displaylogo: false
-  });
+    Plotly.newPlot(panel, traces, {
+      title:mLabels[mi], margin:{l:70,r:15,b:30,t:30},
+      xaxis:{title:"", showgrid:false, zeroline:false, showticklabels:false, range:[-0.5,0.5]},
+      yaxis:{title:mLabels[mi], showgrid:true, zeroline:false, range:metricRanges[metric]},
+      hovermode:"closest", dragmode:"pan"
+    }, {
+      displayModeBar: true,
+      modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
+      displaylogo: false
+    });
+  }
 }
 
 // =========================================================================
@@ -1709,6 +1909,7 @@ function _PLOT_renderSmSample(d) {
 function _PLOT_renderScatter(d) {
   var canvas = document.getElementById("plot-active-canvas");
   if (!canvas) return;
+  canvas.scrollTop = 0;
   canvas.style.overflowY = "hidden";
   canvas.style.overflowX = "hidden";
 
@@ -1776,19 +1977,13 @@ function _PLOT_renderScatter(d) {
 function _PLOT_setOvMode(mode) {
   if (!_SR_isActiveView("plot")) return;
   _PLOT_STATE.overview.mode = mode;
-  var bM = document.getElementById("plot-ov-mode-metric");
-  var bS = document.getElementById("plot-ov-mode-sample");
-  if (bM) bM.classList.toggle("active", mode === "metric");
-  if (bS) bS.classList.toggle("active", mode === "sample");
+  _PLOT_renderControls();
   _PLOT_scheduleRender();
 }
 function _PLOT_setOvFocus(focus) {
   if (!_SR_isActiveView("plot")) return;
   _PLOT_STATE.overview.focus = focus;
-  ["violin","point","balanced"].forEach(function(f) {
-    var b = document.getElementById("plot-ov-focus-"+f);
-    if (b) b.classList.toggle("active", f === focus);
-  });
+  _PLOT_renderControls();
   _PLOT_applyFocusOnly();
 }
 
@@ -1796,14 +1991,7 @@ function _PLOT_setOvFocus(focus) {
 function _PLOT_setSmMode(mode) {
   if (!_SR_isActiveView("plot")) return;
   _PLOT_STATE.single.mode = mode;
-  var bM = document.getElementById("plot-sm-mode-metric");
-  var bS = document.getElementById("plot-sm-mode-sample");
-  var gM = document.getElementById("plot-sm-metric-sel");
-  var gS = document.getElementById("plot-sm-sample-sel");
-  if (bM) bM.classList.toggle("active", mode === "metric");
-  if (bS) bS.classList.toggle("active", mode === "sample");
-  if (gM) gM.classList.toggle("plot-params-hidden", mode !== "metric");
-  if (gS) gS.classList.toggle("plot-params-hidden", mode !== "sample");
+  _PLOT_renderControls();  // re-render singleSelector
   _PLOT_scheduleRender();
 }
 function _PLOT_setSmMetric(metric) {
@@ -1819,10 +2007,7 @@ function _PLOT_setSmSample(sample) {
 function _PLOT_setSmFocus(focus) {
   if (!_SR_isActiveView("plot")) return;
   _PLOT_STATE.single.focus = focus;
-  ["violin","point","balanced"].forEach(function(f) {
-    var b = document.getElementById("plot-sm-focus-"+f);
-    if (b) b.classList.toggle("active", f === focus);
-  });
+  _PLOT_renderControls();
   _PLOT_applyFocusOnly();
 }
 
@@ -1830,16 +2015,7 @@ function _PLOT_setSmFocus(focus) {
 function _PLOT_selectScSample(sample) {
   if (!_SR_isActiveView("plot")) return;
   _PLOT_STATE.scatter.highlightedSample = sample;
-  // Update active class on sample list
-  var list = document.getElementById("plot-sc-sample-list");
-  if (list) {
-    var items = list.querySelectorAll(".plot-sc-sample-item");
-    for (var i = 0; i < items.length; i++) {
-      var ds = items[i].getAttribute("data-sc-sample");
-      var match = (ds === null && sample === null) || (ds === sample);
-      items[i].classList.toggle("active", match);
-    }
-  }
+  _PLOT_renderControls();  // re-render sample list with active state
   _PLOT_scheduleRender();
 }
 
@@ -1853,33 +2029,10 @@ function _PLOT_init() {
   var d = window._QC_DATA;
   if (!d || !d.samples || !d.samples.length) return;
 
-  var samples = d.samples;
+  // Set default single sample (first in natural order)
+  _PLOT_STATE.single.sample = d.samples[0];
 
-  // Single metric sample dropdown
-  var smSel = document.getElementById("plot-sm-select-sample");
-  if (smSel) {
-    for (var i = 0; i < samples.length; i++) {
-      var opt = document.createElement("option");
-      opt.value = samples[i]; opt.textContent = samples[i];
-      smSel.appendChild(opt);
-    }
-    _PLOT_STATE.single.sample = samples[0];
-  }
-
-  // Scatter sample list
-  var scList = document.getElementById("plot-sc-sample-list");
-  if (scList) {
-    for (var i = 0; i < samples.length; i++) {
-      var item = document.createElement("div");
-      item.className = "plot-sc-sample-item";
-      item.setAttribute("data-sc-sample", samples[i]);
-      item.textContent = samples[i];
-      (function(s) { item.onclick = function() { _PLOT_selectScSample(s); }; })(samples[i]);
-      scList.appendChild(item);
-    }
-  }
-
-  // Trigger initial render
+  // Trigger initial render (controls rendered by _PLOT_renderControls)
   _PLOT_scheduleRender();
 }
 
@@ -3412,62 +3565,9 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
               tags$div(class = "plot-main", id = "plot-main",
                 tags$div(id = "plot-active-canvas", style = "flex:1;min-height:0;")
               ),
-              # Right: context-sensitive controls
+              # Right: dynamic controls (v0.3.0 — registry-driven)
               tags$div(class = "plot-params", id = "plot-params",
-                # ==================== Overview pane ====================
-                tags$div(class = "plot-params-pane", id = "plot-params-overview",
-                  tags$div(class = "plot-params-group",
-                    tags$div(class = "plot-params-label", "View mode"),
-                    tags$div(class = "plot-toggle-row",
-                      tags$button(class = "plot-toggle-btn active", id = "plot-ov-mode-metric",
-                        onclick = "_PLOT_setOvMode('metric')", "By metric"),
-                      tags$button(class = "plot-toggle-btn", id = "plot-ov-mode-sample",
-                        onclick = "_PLOT_setOvMode('sample')", "By sample"))),
-                  tags$div(class = "plot-params-group",
-                    tags$div(class = "plot-params-label", "Display focus"),
-                    tags$div(class = "plot-toggle-row",
-                      tags$button(class = "plot-toggle-btn active", id = "plot-ov-focus-violin",
-                        onclick = "_PLOT_setOvFocus('violin')", "Violin"),
-                      tags$button(class = "plot-toggle-btn", id = "plot-ov-focus-point",
-                        onclick = "_PLOT_setOvFocus('point')", "Point"),
-                      tags$button(class = "plot-toggle-btn", id = "plot-ov-focus-balanced",
-                        onclick = "_PLOT_setOvFocus('balanced')", "Balanced")))),
-                # ==================== Single metric pane ====================
-                tags$div(class = "plot-params-pane plot-params-hidden", id = "plot-params-single",
-                  tags$div(class = "plot-params-group",
-                    tags$div(class = "plot-params-label", "Comparison mode"),
-                    tags$div(class = "plot-toggle-row",
-                      tags$button(class = "plot-toggle-btn active", id = "plot-sm-mode-metric",
-                        onclick = "_PLOT_setSmMode('metric')", "By metric"),
-                      tags$button(class = "plot-toggle-btn", id = "plot-sm-mode-sample",
-                        onclick = "_PLOT_setSmMode('sample')", "By sample"))),
-                  tags$div(class = "plot-params-group", id = "plot-sm-metric-sel",
-                    tags$div(class = "plot-params-label", "Metric"),
-                    tags$select(class = "plot-param-select", id = "plot-sm-select-metric",
-                      onchange = "_PLOT_setSmMetric(this.value)",
-                      tags$option(value = "nCount_RNA", "nCount_RNA"),
-                      tags$option(value = "nFeature_RNA", "nFeature_RNA"),
-                      tags$option(value = "percent_mt", "percent.mt"))),
-                  tags$div(class = "plot-params-group plot-params-hidden", id = "plot-sm-sample-sel",
-                    tags$div(class = "plot-params-label", "Sample"),
-                    tags$select(class = "plot-param-select", id = "plot-sm-select-sample",
-                      onchange = "_PLOT_setSmSample(this.value)")),
-                  tags$div(class = "plot-params-group",
-                    tags$div(class = "plot-params-label", "Display focus"),
-                    tags$div(class = "plot-toggle-row",
-                      tags$button(class = "plot-toggle-btn active", id = "plot-sm-focus-violin",
-                        onclick = "_PLOT_setSmFocus('violin')", "Violin"),
-                      tags$button(class = "plot-toggle-btn", id = "plot-sm-focus-point",
-                        onclick = "_PLOT_setSmFocus('point')", "Point"),
-                      tags$button(class = "plot-toggle-btn", id = "plot-sm-focus-balanced",
-                        onclick = "_PLOT_setSmFocus('balanced')", "Balanced")))),
-                # ==================== Scatter pane ====================
-                tags$div(class = "plot-params-pane plot-params-hidden", id = "plot-params-scatter",
-                  tags$div(class = "plot-params-group",
-                    tags$div(class = "plot-params-label", "Sample highlight"),
-                    tags$div(class = "plot-sc-sample-list", id = "plot-sc-sample-list",
-                      tags$div(class = "plot-sc-sample-item active", id = "plot-sc-sample-none",
-                        onclick = "_PLOT_selectScSample(null)", "None / All"))))
+                tags$div(id = "plot-controls-dynamic")
               )
             )
           ),
