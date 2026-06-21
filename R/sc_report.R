@@ -1550,7 +1550,7 @@ function _PLOT_renderOvMetric(d) {
   for (var mi = 0; mi < metrics.length; mi++) {
     var metric = metrics[mi];
     var panel = document.createElement("div");
-    panel.style.cssText = "min-height:260px;flex-shrink:0;";
+    panel.style.cssText = "height:300px;min-height:300px;flex:0 0 300px;";
     panel.id = "plot-ov-metric-" + mi;
     wrapper.appendChild(panel);
   }
@@ -1657,26 +1657,30 @@ function _PLOT_renderOvSample(d) {
   var wrapper = document.createElement("div");
   wrapper.style.cssText = "display:flex;flex-direction:row;gap:8px;height:100%;min-width:max-content;";
 
-  // Build sample cards (each with 3 metric panels)
+  // Build sample cards (each with label + 3-column metric row)
   var allPanelIds = [];
   for (var si = 0; si < samples.length; si++) {
     var s = samples[si];
     var card = document.createElement("div");
-    card.style.cssText = "flex:0 0 250px;display:flex;flex-direction:column;min-height:0;";
+    card.style.cssText = "flex:0 0 640px;display:flex;flex-direction:column;min-height:0;";
 
     var label = document.createElement("div");
     label.textContent = s;
     label.style.cssText = "font-size:0.78em;font-weight:600;color:#636e72;text-align:center;padding:4px 0;flex-shrink:0;";
     card.appendChild(label);
 
+    var metricRow = document.createElement("div");
+    metricRow.style.cssText = "display:flex;flex-direction:row;gap:4px;flex:1;min-height:0;";
+
     for (var mi = 0; mi < metrics.length; mi++) {
       var pid = "plot-ov-sample-" + si + "-" + mi;
       allPanelIds.push(pid);
       var panel = document.createElement("div");
-      panel.style.cssText = "min-height:180px;flex:1 1 0;";
+      panel.style.cssText = "flex:0 0 200px;min-height:0;";
       panel.id = pid;
-      card.appendChild(panel);
+      metricRow.appendChild(panel);
     }
+    card.appendChild(metricRow);
     wrapper.appendChild(card);
   }
   canvas.appendChild(wrapper);
@@ -1812,9 +1816,9 @@ function _PLOT_renderSmMetric(d) {
 function _PLOT_renderSmSample(d) {
   var canvas = document.getElementById("plot-active-canvas");
   if (!canvas) return;
-  canvas.scrollTop = 0;
-  canvas.style.overflowY = "auto";
-  canvas.style.overflowX = "hidden";
+  canvas.scrollLeft = 0;
+  canvas.style.overflowY = "hidden";
+  canvas.style.overflowX = "auto";
 
   var op = _PLOT_focusOpacities(_PLOT_STATE.single.focus);
   var sample = _PLOT_STATE.single.sample;
@@ -1839,14 +1843,15 @@ function _PLOT_renderSmSample(d) {
 
   canvas.innerHTML = "";
   var wrapper = document.createElement("div");
-  wrapper.style.cssText = "display:flex;flex-direction:column;gap:4px;min-height:min-content;";
+  wrapper.style.cssText = "display:flex;flex-direction:row;gap:8px;height:100%;min-width:max-content;";
 
+  var nMetrics = metrics.length;
   var panelIds = [];
-  for (var mi = 0; mi < metrics.length; mi++) {
+  for (var mi = 0; mi < nMetrics; mi++) {
     var pid = "plot-sm-metric-" + mi;
     panelIds.push(pid);
     var panel = document.createElement("div");
-    panel.style.cssText = "min-height:200px;flex-shrink:0;";
+    panel.style.cssText = "flex:0 0 300px;min-width:250px;height:100%;";
     panel.id = pid;
     wrapper.appendChild(panel);
   }
@@ -1854,7 +1859,7 @@ function _PLOT_renderSmSample(d) {
   _PLOT_STATE._activeCanvasIds = panelIds;
 
   // Render each metric panel
-  for (var mi = 0; mi < metrics.length; mi++) {
+  for (var mi = 0; mi < nMetrics; mi++) {
     var metric = metrics[mi];
     var panel = document.getElementById("plot-sm-metric-" + mi);
     if (!panel) continue;
