@@ -455,19 +455,6 @@ Planned directions:
 
 ## Changelog
 
-### v0.3.1 — Preprocess / Feature Selection report layer
-
-v0.3.1 adds an optional Preprocess / Feature Selection report layer for displaying user-provided variable feature results and preprocessing metadata between QC and PCA.
-
-- Added `feature_df` parameter for user-provided variable feature selection results
-- Added `preprocess_meta` parameter for preprocessing workflow metadata
-- Added `feature_top_n` parameter to control the number of top features displayed
-- Added `"preprocess"` panel with Summary, Variable Features scatter, and Top Features table
-- Added `build_preprocess_payload()` for JSON-serialisable payload preparation
-- Added preprocess view tab in Plot | Preprocess | PCA | UMAP order
-- Preprocess view only appears when explicitly added to `panels` and data is provided
-- Backward-compatible: existing reports without preprocess data are unaffected
-
 ### v0.3.0 — Plot/QC diagnostics and multi-view report foundation
 
 - Added top-level `Plot | PCA | UMAP` report structure

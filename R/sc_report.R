@@ -340,7 +340,7 @@ body {
   background: #f8f9fc;
 }
 
-/* --- Plot view (v0.3.1 — three-column layout) --- */
+/* --- Plot view (v0.3.0 — three-column layout) --- */
 .sr-view-plot {
   flex: 1;
   min-height: 0;
@@ -1080,149 +1080,6 @@ body {
 .reset-btn:hover {
   background: #b2bec3;
 }
-
-/* --- Preprocess view (v0.3.1) --- */
-.sr-view-preprocess {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.preprocess-layout {
-  display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
-  height: 100%;
-  overflow: hidden;
-}
-
-.preprocess-nav {
-  width: 180px;
-  min-width: 180px;
-  background: #fff;
-  border-right: 1px solid #dfe6e9;
-  overflow-y: auto;
-  padding: 12px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.preprocess-nav-label {
-  font-size: 0.72em;
-  font-weight: 700;
-  color: #b2bec3;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  padding: 4px 8px;
-  margin-top: 8px;
-  margin-bottom: 2px;
-}
-.preprocess-nav-label:first-child { margin-top: 0; }
-
-.preprocess-nav-item {
-  display: flex;
-  align-items: center;
-  padding: 5px 8px;
-  cursor: pointer;
-  border-radius: 4px;
-  font-size: 0.80em;
-  color: #636e72;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-  user-select: none;
-  border-left: 3px solid transparent;
-  gap: 6px;
-}
-.preprocess-nav-item:hover { background: #f0f1f5; }
-.preprocess-nav-item.active {
-  background: #e8ecf8;
-  border-left-color: #00b894;
-  font-weight: 600;
-  color: #2d3436;
-}
-
-.preprocess-nav-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: #00b894;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.preprocess-nav-item.active .preprocess-nav-dot { opacity: 1; }
-
-.preprocess-main {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  padding: 16px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.preprocess-card {
-  background: #fff;
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  padding: 16px;
-  margin-bottom: 12px;
-}
-.preprocess-card:last-child { margin-bottom: 0; }
-.preprocess-card .section-title {
-  font-size: 0.85em;
-  font-weight: 600;
-  color: #636e72;
-  margin-bottom: 10px;
-}
-
-.preprocess-container {
-  min-height: 300px;
-}
-.preprocess-container > *,
-.preprocess-container .html-widget,
-.preprocess-container .plotly,
-.preprocess-container .js-plotly-plot {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.preprocess-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.82em;
-}
-.preprocess-table thead {
-  position: sticky;
-  top: 0;
-  background: #f8f9fc;
-}
-.preprocess-table th {
-  text-align: left;
-  padding: 6px 8px;
-  border-bottom: 2px solid #dfe6e9;
-  font-weight: 600;
-  color: #636e72;
-  font-size: 0.85em;
-}
-.preprocess-table td {
-  padding: 4px 8px;
-  border-bottom: 1px solid #f0f1f5;
-}
-.preprocess-table tbody tr:hover {
-  background: #f8f9fc;
-}
-
-.preprocess-meta-label {
-  color: #636e72;
-  font-weight: 500;
-  width: 200px;
-  white-space: nowrap;
-}
-.preprocess-meta-value {
-  color: #2d3436;
-  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
-}
 '
 }
 
@@ -1287,22 +1144,20 @@ function switchView(view) {
   _ACTIVE_VIEW = view;
   _SR_ACTIVE_VIEW = view;  // canonical active view for lazy rendering
 
-  var plotView    = document.getElementById("sr-view-plot");
-  var preprocView = document.getElementById("sr-view-preprocess");
-  var pcaView     = document.getElementById("sr-view-pca");
-  var umapView    = document.getElementById("sr-view-umap");
-  var tabPlot     = document.getElementById("view-tab-plot");
-  var tabPre      = document.getElementById("view-tab-preprocess");
-  var tabP        = document.getElementById("view-tab-pca");
-  var tabU        = document.getElementById("view-tab-umap");
+  var plotView = document.getElementById("sr-view-plot");
+  var pcaView  = document.getElementById("sr-view-pca");
+  var umapView = document.getElementById("sr-view-umap");
+  var tabPlot  = document.getElementById("view-tab-plot");
+  var tabP     = document.getElementById("view-tab-pca");
+  var tabU     = document.getElementById("view-tab-umap");
 
   // Hide all views and deactivate all tabs
-  [plotView, preprocView, pcaView, umapView].forEach(function(v) {
-    if (v) v.style.display = "none";
-  });
-  [tabPlot, tabPre, tabP, tabU].forEach(function(t) {
-    if (t) t.classList.remove("active");
-  });
+  if (plotView) plotView.style.display = "none";
+  if (pcaView)  pcaView.style.display  = "none";
+  if (umapView) umapView.style.display = "none";
+  if (tabPlot)  tabPlot.classList.remove("active");
+  if (tabP)     tabP.classList.remove("active");
+  if (tabU)     tabU.classList.remove("active");
 
   // Show active view
   var activeViewEl = null;
@@ -1311,11 +1166,6 @@ function switchView(view) {
     plotView.style.display = "";
     if (tabPlot) tabPlot.classList.add("active");
     try { _PLOT_ensureInit(); } catch(e) {}
-  } else if (view === "preprocess" && preprocView) {
-    activeViewEl = preprocView;
-    preprocView.style.display = "";
-    if (tabPre) tabPre.classList.add("active");
-    try { initPreprocessView(); } catch(e) {}
   } else if (view === "pca" && pcaView) {
     activeViewEl = pcaView;
     pcaView.style.display = "";
@@ -3414,192 +3264,6 @@ onPlotlyReady(function(gd) {
   updatePanelVisibility();
 });
 
-// =========================================================================
-// Preprocess / Feature Selection view (v0.3.1)
-// =========================================================================
-
-var _PREPROCESS_STATE = { subView: "summary" };
-var _PREPROCESS_INITIALIZED = false;
-
-function initPreprocessView() {
-  if (_PREPROCESS_INITIALIZED) return;
-  _PREPROCESS_INITIALIZED = true;
-
-  renderPreprocessSummary();
-  renderVariableFeaturePlot();
-  renderTopFeatureTable();
-}
-
-function _SR_preprocessData() {
-  return window._PREPROCESS_DATA || { has_feature_data: false, has_meta: false };
-}
-
-function switchPreprocessSubView(view) {
-  _PREPROCESS_STATE.subView = view;
-
-  var nav = document.querySelector(".preprocess-nav");
-  if (nav) {
-    var items = nav.querySelectorAll(".preprocess-nav-item");
-    for (var i = 0; i < items.length; i++) {
-      items[i].classList.toggle("active",
-        items[i].getAttribute("data-preprocess-nav") === view);
-    }
-  }
-
-  var summary = document.getElementById("preprocess-summary-section");
-  var scatter = document.getElementById("preprocess-scatter-section");
-  var table   = document.getElementById("preprocess-table-section");
-  if (summary) summary.style.display = (view === "summary") ? "" : "none";
-  if (scatter) scatter.style.display = (view === "variable_features") ? "" : "none";
-  if (table)   table.style.display   = (view === "top_features") ? "" : "none";
-
-  setTimeout(function() {
-    var target = (view === "summary") ? summary :
-                 (view === "variable_features") ? scatter : table;
-    if (target) _SR_resizePlotsInView(target);
-  }, 50);
-}
-
-function renderPreprocessSummary() {
-  var container = document.getElementById("preprocess-summary-content");
-  if (!container) return;
-  var d = _SR_preprocessData();
-
-  if (!d.has_meta) {
-    container.innerHTML = `<p class="no-data">No preprocessing metadata provided.</p>`;
-    return;
-  }
-
-  var meta = d.meta || {};
-
-  var fields = [
-    { key: "normalization",           label: "Normalization" },
-    { key: "scale_factor",            label: "Scale Factor" },
-    { key: "variable_feature_method", label: "Variable Feature Method" },
-    { key: "n_variable_features",     label: "N Variable Features" },
-    { key: "scaled_features",         label: "Scaled Features" },
-    { key: "regress_vars",            label: "Regressed Variables" }
-  ];
-
-  var html = `<table class="preprocess-table"><tbody>`;
-  for (var fi = 0; fi < fields.length; fi++) {
-    var f = fields[fi];
-    var val = meta[f.key];
-    var display;
-    if (val === undefined || val === null) {
-      display = `<span style="color:#b2bec3;font-style:italic;">Not provided</span>`;
-    } else if (Array.isArray(val)) {
-      display = escHtml(val.join(", "));
-    } else {
-      display = escHtml(String(val));
-    }
-    html += `<tr><td class="preprocess-meta-label">${f.label}</td>`;
-    html += `<td class="preprocess-meta-value">${display}</td></tr>`;
-  }
-  html += `</tbody></table>`;
-
-  container.innerHTML = html;
-}
-
-function renderVariableFeaturePlot() {
-  if (!_SR_isActiveView("preprocess")) return;
-  var container = document.getElementById("preprocess-scatter-container");
-  if (!container) return;
-  var d = _SR_preprocessData();
-
-  if (!d.has_feature_data || !d.features || !d.features.gene || !d.features.gene.length) {
-    container.innerHTML = `<p class="no-data">No feature data provided.</p>`;
-    return;
-  }
-
-  var f = d.features;
-  var n = f.gene.length;
-
-  var xVar = [], yVar = [], hVar = [];
-  var xNon = [], yNon = [], hNon = [];
-
-  for (var i = 0; i < n; i++) {
-    var hv = "Gene: " + escHtml(f.gene[i]) +
-             "<br>Mean: " + (f.mean[i] != null ? f.mean[i].toFixed(4) : "NA") +
-             "<br>Variance: " + (f.variance[i] != null ? f.variance[i].toFixed(4) : "NA") +
-             "<br>Standardized variance: " +
-               (f.variance_standardized[i] != null ? f.variance_standardized[i].toFixed(4) : "NA") +
-             "<br>Rank: " + f.rank[i] +
-             "<br>Variable: " + (f.is_variable[i] ? "TRUE" : "FALSE");
-    if (f.is_variable[i]) {
-      xVar.push(f.mean[i]);
-      yVar.push(f.variance_standardized[i]);
-      hVar.push(hv);
-    } else {
-      xNon.push(f.mean[i]);
-      yNon.push(f.variance_standardized[i]);
-      hNon.push(hv);
-    }
-  }
-
-  var traces = [];
-
-  if (xNon.length > 0) {
-    traces.push({
-      x: xNon, y: yNon, text: hNon,
-      type: "scatter", mode: "markers",
-      marker: { color: "#b2bec3", size: 3, opacity: 0.4 },
-      name: "Non-variable", hoverinfo: "text", showlegend: false
-    });
-  }
-
-  if (xVar.length > 0) {
-    traces.push({
-      x: xVar, y: yVar, text: hVar,
-      type: "scatter", mode: "markers",
-      marker: { color: "#00b894", size: 4, opacity: 0.7 },
-      name: "Variable", hoverinfo: "text", showlegend: false
-    });
-  }
-
-  Plotly.newPlot(container, traces, {
-    title: "Variable Features",
-    xaxis: { title: "Mean expression", showgrid: true, zeroline: false },
-    yaxis: { title: "Standardized Variance", showgrid: true, zeroline: false },
-    hovermode: "closest",
-    margin: { l: 70, r: 30, b: 60, t: 50 },
-    dragmode: "pan"
-  }, _SR_cartesianModebarConfig());
-}
-
-function renderTopFeatureTable() {
-  var container = document.getElementById("preprocess-table-content");
-  if (!container) return;
-  var d = _SR_preprocessData();
-
-  if (!d.top_features || !d.top_features.length) {
-    container.innerHTML = `<p class="no-data">No top variable features available.</p>`;
-    return;
-  }
-
-  var rows = d.top_features;
-
-  var html = `<table class="preprocess-table"><thead><tr>
-    <th>#</th><th>Gene</th><th>Mean</th><th>Variance</th>
-    <th>Std. Variance</th><th>Rank</th>
-    </tr></thead><tbody>`;
-
-  for (var i = 0; i < rows.length; i++) {
-    var r = rows[i];
-    html += `<tr>
-      <td style="color:#b2bec3;font-size:0.8em;">${i + 1}</td>
-      <td style="font-family:monospace;font-style:italic;">${escHtml(r.gene)}</td>
-      <td>${r.mean != null ? r.mean.toFixed(4) : "NA"}</td>
-      <td>${r.variance != null ? r.variance.toFixed(4) : "NA"}</td>
-      <td>${r.variance_standardized != null ? r.variance_standardized.toFixed(4) : "NA"}</td>
-      <td>${r.rank}</td>
-      </tr>`;
-  }
-
-  html += `</tbody></table>`;
-  container.innerHTML = html;
-}
-
 // ---- Global resize handler for all plotly charts ----
 window.addEventListener("resize", function() {
   var gd = getPlotDiv();
@@ -3645,7 +3309,6 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                              pca_loading_json = "[]",
                              pca_loading_top_n = 10,
                              qc_payload = NULL,
-                             feature_payload = NULL,
                              use_webgl = TRUE,
                              output, title, dim_opacity, marker_n_top,
                              panels = c("umap", "marker_table")) {
@@ -3656,13 +3319,6 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   has_samples  <- !is.null(sample_col)
   has_pca      <- !is.null(pca_df) && "pca" %in% panels
   has_plot     <- !is.null(qc_payload) && "plot" %in% panels
-
-  # Preprocess view: enabled when preprocess is in panels AND at least one
-  # of feature_df or preprocess_meta was provided (non-null payload)
-  has_preprocess <- "preprocess" %in% panels &&
-    !is.null(feature_payload) &&
-    (isTRUE(feature_payload$has_feature_data) ||
-     isTRUE(feature_payload$has_meta))
 
   # ---- Sidebar: Cluster section ----
   cluster_html <- lapply(clusters, function(cl) {
@@ -3790,44 +3446,27 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
     sidebar_contents
   )
 
-  # ---- View tabs (standalone, between header and main-layout, v0.3.1) ----
-  # Determine initial view: plot > preprocess > pca > umap
-  initial_view <- if (has_plot) {
-    "plot"
-  } else if (has_preprocess) {
-    "preprocess"
-  } else if (has_pca) {
-    "pca"
-  } else {
-    "umap"
-  }
-
-  # Build tab entries in fixed order: Plot | Preprocess | PCA | UMAP
-  build_view_tab <- function(id, label, active) {
+  # ---- View tabs (standalone, between header and main-layout, v0.3.0) ----
+  view_tabs_html <- if (has_plot) {
+    # Plot view exists → Plot | PCA | UMAP (Plot active by default)
     tags$div(
-      class = paste("view-tab", if (active) "active" else ""),
-      id    = paste0("view-tab-", id),
-      onclick = paste0("switchView('", id, "')"),
-      label
+      class = "view-tabs",
+      tags$div(class = "view-tab active", id = "view-tab-plot",
+               onclick = "switchView('plot')", "Plot"),
+      if (has_pca) tags$div(class = "view-tab", id = "view-tab-pca",
+               onclick = "switchView('pca')", "PCA"),
+      tags$div(class = "view-tab", id = "view-tab-umap",
+               onclick = "switchView('umap')", "UMAP")
     )
-  }
-
-  tab_entries <- list()
-  if (has_plot)
-    tab_entries <- c(tab_entries,
-      list(build_view_tab("plot", "Plot", initial_view == "plot")))
-  if (has_preprocess)
-    tab_entries <- c(tab_entries,
-      list(build_view_tab("preprocess", "Preprocess", initial_view == "preprocess")))
-  if (has_pca)
-    tab_entries <- c(tab_entries,
-      list(build_view_tab("pca", "PCA", initial_view == "pca")))
-  # UMAP is always present
-  tab_entries <- c(tab_entries,
-    list(build_view_tab("umap", "UMAP", initial_view == "umap")))
-
-  view_tabs_html <- if (length(tab_entries) > 1) {
-    tags$div(class = "view-tabs", tab_entries)
+  } else if (has_pca) {
+    # Only PCA → PCA | UMAP (UMAP active by default, old behaviour)
+    tags$div(
+      class = "view-tabs",
+      tags$div(class = "view-tab", id = "view-tab-pca",
+               onclick = "switchView('pca')", "PCA"),
+      tags$div(class = "view-tab active", id = "view-tab-umap",
+               onclick = "switchView('umap')", "UMAP")
+    )
   }
 
   # ---- Build per-sample composition data (for JS-driven chart) ----
@@ -3936,52 +3575,6 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
               # Right: dynamic controls (v0.3.0 — registry-driven)
               tags$div(class = "plot-params", id = "plot-params",
                 tags$div(id = "plot-controls-dynamic")
-              )
-            )
-          ),
-
-          # ---- Preprocess view container (v0.3.1) ----
-          if (has_preprocess) tags$div(
-            id    = "sr-view-preprocess",
-            class = "sr-view-preprocess",
-            style = "display:none;",
-            tags$div(class = "preprocess-layout",
-              # Left: navigator
-              tags$div(class = "preprocess-nav",
-                tags$div(class = "preprocess-nav-label", "Sections"),
-                tags$div(class = "preprocess-nav-item active",
-                         `data-preprocess-nav` = "summary",
-                         onclick = "switchPreprocessSubView('summary')",
-                  tags$span(class = "preprocess-nav-dot"), "Summary"),
-                tags$div(class = "preprocess-nav-item",
-                         `data-preprocess-nav` = "variable_features",
-                         onclick = "switchPreprocessSubView('variable_features')",
-                  tags$span(class = "preprocess-nav-dot"), "Variable features"),
-                tags$div(class = "preprocess-nav-item",
-                         `data-preprocess-nav` = "top_features",
-                         onclick = "switchPreprocessSubView('top_features')",
-                  tags$span(class = "preprocess-nav-dot"), "Top features")
-              ),
-              # Right: main area
-              tags$div(class = "preprocess-main",
-                tags$div(class = "preprocess-card", id = "preprocess-summary-section",
-                  tags$div(class = "section-title", "Preprocessing Summary"),
-                  tags$div(id = "preprocess-summary-content",
-                    tags$p(class = "no-data", "Loading..."))
-                ),
-                tags$div(class = "preprocess-card", id = "preprocess-scatter-section",
-                         style = "display:none;",
-                  tags$div(class = "section-title", "Variable Features"),
-                  tags$div(class = "preprocess-container",
-                           id = "preprocess-scatter-container")
-                ),
-                tags$div(class = "preprocess-card", id = "preprocess-table-section",
-                         style = "display:none;",
-                  tags$div(class = "section-title", "Top Variable Features"),
-                  tags$div(id = "preprocess-table-content",
-                           style = "max-height:500px;overflow-y:auto;",
-                    tags$p(class = "no-data", "Loading..."))
-                )
               )
             )
           ),
@@ -4116,11 +3709,6 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
       if (has_plot) tags$script(htmltools::HTML(paste0(
         "window._QC_DATA = ", jsonlite::toJSON(qc_payload, auto_unbox = TRUE, digits = 6), ";"
       ))),
-      if (has_preprocess) tags$script(htmltools::HTML(paste0(
-        "window._PREPROCESS_DATA = ",
-        jsonlite::toJSON(feature_payload, auto_unbox = TRUE, digits = 6, na = "null"),
-        ";"
-      ))),
       if (has_pca) list(
         tags$script(htmltools::HTML(paste0("window._PCA_DATA = ", pca_data_json, ";"))),
         tags$script(htmltools::HTML(paste0(
@@ -4135,7 +3723,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
       ),
       tags$script(htmltools::HTML(sprintf(
         "window._SR_INITIAL_VIEW = '%s';",
-        initial_view
+        if (has_plot) "plot" else if (has_pca) "pca" else "umap"
       ))),
       tags$script(htmltools::HTML(paste(report_js(), panel_js_extra, sep = "\n"))),
       if (has_pca) tags$script(htmltools::HTML(
@@ -4200,17 +3788,6 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 #'   UMAP plot), \code{"marker_table"} (marker gene table). Additional
 #'   registered panels (e.g. \code{"cluster_size"}) can be added.
 #'   Default: \code{c("umap", "marker_table")}.
-#' @param feature_df Optional data frame of variable feature / feature selection
-#'   results. Must contain columns: \code{gene}, \code{mean}, \code{variance},
-#'   \code{variance_standardized}, \code{is_variable}, \code{rank}.
-#'   When provided with \code{"preprocess"} in \code{panels}, enables the
-#'   Preprocess view. Default: \code{NULL}.
-#' @param preprocess_meta Optional named list with preprocessing workflow
-#'   metadata (e.g. \code{list(normalization = "LogNormalize", scale_factor = 10000,
-#'   variable_feature_method = "vst", n_variable_features = 2000, ...)}).
-#'   Display-only; no analysis is performed. Default: \code{NULL}.
-#' @param feature_top_n Number of top variable features to display in the
-#'   Preprocess view table. Default: \code{20}.
 #' @param use_webgl Use plotly WebGL (scattergl) rendering instead of SVG
 #'   (scatter). Recommended for datasets with >10k cells to avoid
 #'   browser slowdown. Default: \code{TRUE}.
@@ -4248,9 +3825,6 @@ sc_report <- function(umap_df,
                        pca_loading_df = NULL,
                        pca_loading_top_n = 10,
                        qc_df         = NULL,
-                       feature_df    = NULL,
-                       preprocess_meta = NULL,
-                       feature_top_n = 20,
                        output        = "sc_report.html",
                        title         = "scRNA-seq Report",
                        point_size    = 3,
@@ -4305,12 +3879,6 @@ sc_report <- function(umap_df,
             call. = FALSE)
   }
 
-  # ---- Validate preprocess / feature selection data (v0.3.1) ----
-  if ("preprocess" %in% panels && is.null(feature_df) && is.null(preprocess_meta)) {
-    warning("Preprocess panel requested but both feature_df and preprocess_meta are NULL. Skipping Preprocess view.",
-            call. = FALSE)
-  }
-
   if (!is.character(output) || length(output) != 1) {
     stop("output must be a single file path string", call. = FALSE)
   }
@@ -4328,7 +3896,7 @@ sc_report <- function(umap_df,
     stop("panels must be a character vector with at least one element",
          call. = FALSE)
   }
-  known_panels  <- c("umap", "marker_table", "pca", "plot", "preprocess", list_panels())
+  known_panels  <- c("umap", "marker_table", "pca", "plot", list_panels())
   unknown_panels <- setdiff(panels, known_panels)
   if (length(unknown_panels) > 0) {
     warning("Unknown panel(s) in 'panels': ",
@@ -4360,17 +3928,6 @@ sc_report <- function(umap_df,
       cluster_col = cluster_col,
       cell_col    = cell_col,
       sample_col  = qc_sample_col
-    )
-  }
-
-  # ---- Build preprocess / feature selection payload (v0.3.1) ----
-  feature_payload <- NULL
-  if ("preprocess" %in% panels && (!is.null(feature_df) || !is.null(preprocess_meta))) {
-    message("scReportLite: building preprocess / feature selection payload...")
-    feature_payload <- build_preprocess_payload(
-      feature_df      = feature_df,
-      preprocess_meta = preprocess_meta,
-      top_n           = feature_top_n
     )
   }
 
@@ -4454,7 +4011,6 @@ sc_report <- function(umap_df,
     gene_expr_df  = gene_expr_df,
     pca_df        = pca_df,
     qc_payload    = qc_payload,
-    feature_payload = feature_payload,
     pca_data_json  = pca_data_json,
     pca_has_sample = pca_has_sample,
     pca_color_by   = pca_color_by,
