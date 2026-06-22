@@ -29,13 +29,13 @@ scReportLite brings these outputs together into one interactive HTML report.
 The current report structure is organized around three top-level views:
 
 ```text
-Plot | PCA | UMAP
+QC | PCA | UMAP
 ```
 
 Each view has a clear role:
 
 ```text
-Plot: QC diagnostics and preprocessing-level visualization
+QC: QC diagnostics and preprocessing-level visualization
 PCA: linear structure and principal component exploration
 UMAP: cell embedding, cluster selection, marker table, and gene expression exploration
 ```
@@ -46,9 +46,9 @@ The generated report can be opened directly in a web browser and shared without 
 
 ## Features
 
-### Plot / QC diagnostics
+### QC diagnostics
 
-- Dedicated **Plot** view for QC diagnostics
+- Dedicated **QC** view for QC diagnostics
     
 - Interactive violin plots for:
     
@@ -304,9 +304,9 @@ sc_report(
   gene_expr_df = gene_expr_df,
   sample_col = "sample",
   output = "sc_report_v030.html",
-  title = "scReportLite v0.3.0 report",
+  title = "scReportLite v0.4.0 report",
   panels = c(
-    "plot",
+    "qc",
     "pca",
     "umap",
     "marker_table",
@@ -323,11 +323,11 @@ sc_report(
 
 ## Recommended Panels
 
-For a complete v0.3.0 report, use:
+For a complete v0.4.0 report, use:
 
 ```r
 panels = c(
-  "plot",
+  "qc",
   "pca",
   "umap",
   "marker_table",
@@ -340,7 +340,7 @@ Panel roles:
 
 |Panel|Purpose|
 |---|---|
-|`plot`|QC diagnostics|
+|`qc`|QC diagnostics|
 |`pca`|PCA exploration|
 |`umap`|UMAP visualization|
 |`marker_table`|Marker genes linked to cluster selection|
@@ -353,7 +353,7 @@ Panel roles:
 
 The generated report includes:
 
-- Plot / PCA / UMAP top-level navigation
+- QC / PCA / UMAP top-level navigation
     
 - QC violin plots and QC scatter diagnostics
     
@@ -455,11 +455,22 @@ Planned directions:
 
 ## Changelog
 
+### v0.4.0 — QC view rename and backward-compatible panel aliasing
+
+v0.4.0 renames the former Plot/QC view to QC. The old `"plot"` panel key is kept
+as a backward-compatible alias.
+
+- Renamed public panel key `"plot"` to `"qc"`
+- `"plot"` remains accepted as a backward-compatible alias
+- View tab now displays QC | PCA | UMAP
+- Warning messages updated to reflect the QC nomenclature
+- Internal DOM ids and JS variable names are unchanged
+
 ### v0.3.0 — Plot/QC diagnostics and multi-view report foundation
 
-- Added top-level `Plot | PCA | UMAP` report structure
+- Added top-level `QC | PCA | UMAP` report structure
     
-- Added Plot view for QC diagnostics
+- Added QC view for QC diagnostics
     
 - Added data-driven QC rendering through `build_qc_payload()`
     

@@ -1,5 +1,5 @@
 # scReportLite: Main entry point + HTML assembly + embedded CSS/JS ----------------
-# v0.3.0 — Plot view with QC diagnostic plots
+# v0.4.0 — QC diagnostic view (formerly "Plot")
 
 
 # ---- CSS template --------------------------------------------------------------
@@ -3318,7 +3318,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   n_total      <- nrow(umap_df)
   has_samples  <- !is.null(sample_col)
   has_pca      <- !is.null(pca_df) && "pca" %in% panels
-  has_plot     <- !is.null(qc_payload) && "plot" %in% panels
+  has_plot     <- !is.null(qc_payload) && "qc" %in% panels
 
   # ---- Sidebar: Cluster section ----
   cluster_html <- lapply(clusters, function(cl) {
@@ -3448,11 +3448,11 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
   # ---- View tabs (standalone, between header and main-layout, v0.3.0) ----
   view_tabs_html <- if (has_plot) {
-    # Plot view exists → Plot | PCA | UMAP (Plot active by default)
+    # QC view exists → QC | PCA | UMAP (QC active by default)
     tags$div(
       class = "view-tabs",
       tags$div(class = "view-tab active", id = "view-tab-plot",
-               onclick = "switchView('plot')", "Plot"),
+               onclick = "switchView('plot')", "QC"),
       if (has_pca) tags$div(class = "view-tab", id = "view-tab-pca",
                onclick = "switchView('pca')", "PCA"),
       tags$div(class = "view-tab", id = "view-tab-umap",
@@ -3859,7 +3859,7 @@ sc_report <- function(umap_df,
   }
 
   # Validate QC data if provided (v0.3.0)
-  if (!is.null(qc_df) && "plot" %in% panels) {
+  if (!is.null(qc_df) && "qc" %in% panels) {
     if (!is.data.frame(qc_df)) {
       stop("qc_df must be a data.frame or NULL", call. = FALSE)
     }
@@ -3867,15 +3867,15 @@ sc_report <- function(umap_df,
     qc_required <- c(cell_col, qc_sample_default, "nCount_RNA", "nFeature_RNA", "percent.mt")
     qc_missing <- setdiff(qc_required, colnames(qc_df))
     if (length(qc_missing) > 0) {
-      warning("Plot panel requested but qc_df is missing required columns: ",
+      warning("QC panel requested but qc_df is missing required columns: ",
               paste(qc_missing, collapse = ", "),
               ".  Need at least: ", cell_col, ", sample, nCount_RNA, nFeature_RNA, percent.mt.",
               "  Skipping Plot view.",
               call. = FALSE)
       qc_df <- NULL
     }
-  } else if (is.null(qc_df) && "plot" %in% panels) {
-    warning("Plot panel requested but qc_df is NULL. Skipping Plot view.",
+  } else if (is.null(qc_df) && "qc" %in% panels) {
+    warning("QC panel requested but qc_df is NULL. Skipping QC view.",
             call. = FALSE)
   }
 
@@ -3896,13 +3896,17 @@ sc_report <- function(umap_df,
     stop("panels must be a character vector with at least one element",
          call. = FALSE)
   }
-  known_panels  <- c("umap", "marker_table", "pca", "plot", list_panels())
+  known_panels  <- c("umap", "marker_table", "pca", "plot", "qc", list_panels())
   unknown_panels <- setdiff(panels, known_panels)
   if (length(unknown_panels) > 0) {
     warning("Unknown panel(s) in 'panels': ",
             paste(unknown_panels, collapse = ", "),
             ". They will be skipped.", call. = FALSE)
   }
+
+  # v0.4.0: "plot" is a backward-compatible alias for "qc"
+  panels <- ifelse(panels == "plot", "qc", panels)
+  panels <- unique(panels)
 
   # ---- Build plots ----
   message("scReportLite: building interactive UMAP plot...")
@@ -3913,7 +3917,7 @@ sc_report <- function(umap_df,
 
   # ---- Build QC plots (v0.3.0) ----
   qc_payload <- NULL
-  if (!is.null(qc_df) && "plot" %in% panels) {
+  if (!is.null(qc_df) && "qc" %in% panels) {
     qc_sample_col <- if (!is.null(sample_col) && sample_col %in% colnames(qc_df)) {
       sample_col
     } else if ("sample" %in% colnames(qc_df)) {
