@@ -3464,7 +3464,7 @@ function renderPreprocessSummary() {
   var d = _PREPROCESS_DATA;
 
   if (!d.has_meta) {
-    container.innerHTML = "<p class=\"no-data\">No preprocessing metadata provided.</p>";
+    container.innerHTML = `<p class="no-data">No preprocessing metadata provided.</p>`;
     return;
   }
 
@@ -3479,22 +3479,22 @@ function renderPreprocessSummary() {
     { key: "regress_vars",            label: "Regressed Variables" }
   ];
 
-  var html = "<table class=\"preprocess-table\"><tbody>";
+  var html = `<table class="preprocess-table"><tbody>`;
   for (var fi = 0; fi < fields.length; fi++) {
     var f = fields[fi];
     var val = meta[f.key];
     var display;
     if (val === undefined || val === null) {
-      display = "<span style=\"color:#b2bec3;font-style:italic;\">Not provided</span>";
+      display = `<span style="color:#b2bec3;font-style:italic;">Not provided</span>`;
     } else if (Array.isArray(val)) {
       display = escHtml(val.join(", "));
     } else {
       display = escHtml(String(val));
     }
-    html += "<tr><td class=\"preprocess-meta-label\">" + f.label + "</td>";
-    html += "<td class=\"preprocess-meta-value\">" + display + "</td></tr>";
+    html += `<tr><td class="preprocess-meta-label">${f.label}</td>`;
+    html += `<td class="preprocess-meta-value">${display}</td></tr>`;
   }
-  html += "</tbody></table>";
+  html += `</tbody></table>`;
 
   container.innerHTML = html;
 }
@@ -3506,7 +3506,7 @@ function renderVariableFeaturePlot() {
   var d = _PREPROCESS_DATA;
 
   if (!d.has_feature_data || !d.features || !d.features.gene || !d.features.gene.length) {
-    container.innerHTML = "<p class=\"no-data\">No feature data provided.</p>";
+    container.innerHTML = `<p class="no-data">No feature data provided.</p>`;
     return;
   }
 
@@ -3571,30 +3571,30 @@ function renderTopFeatureTable() {
   var d = _PREPROCESS_DATA;
 
   if (!d.top_features || !d.top_features.length) {
-    container.innerHTML = "<p class=\"no-data\">No top variable features available.</p>";
+    container.innerHTML = `<p class="no-data">No top variable features available.</p>`;
     return;
   }
 
   var rows = d.top_features;
 
-  var html = "<table class=\"preprocess-table\"><thead><tr>" +
-    "<th>#</th><th>Gene</th><th>Mean</th><th>Variance</th>" +
-    "<th>Std. Variance</th><th>Rank</th>" +
-    "</tr></thead><tbody>";
+  var html = `<table class="preprocess-table"><thead><tr>
+    <th>#</th><th>Gene</th><th>Mean</th><th>Variance</th>
+    <th>Std. Variance</th><th>Rank</th>
+    </tr></thead><tbody>`;
 
   for (var i = 0; i < rows.length; i++) {
     var r = rows[i];
-    html += "<tr>" +
-      "<td style=\"color:#b2bec3;font-size:0.8em;\">" + (i + 1) + "</td>" +
-      "<td style=\"font-family:monospace;font-style:italic;\">" + escHtml(r.gene) + "</td>" +
-      "<td>" + (r.mean != null ? r.mean.toFixed(4) : "NA") + "</td>" +
-      "<td>" + (r.variance != null ? r.variance.toFixed(4) : "NA") + "</td>" +
-      "<td>" + (r.variance_standardized != null ? r.variance_standardized.toFixed(4) : "NA") + "</td>" +
-      "<td>" + r.rank + "</td>" +
-      "</tr>";
+    html += `<tr>
+      <td style="color:#b2bec3;font-size:0.8em;">${i + 1}</td>
+      <td style="font-family:monospace;font-style:italic;">${escHtml(r.gene)}</td>
+      <td>${r.mean != null ? r.mean.toFixed(4) : "NA"}</td>
+      <td>${r.variance != null ? r.variance.toFixed(4) : "NA"}</td>
+      <td>${r.variance_standardized != null ? r.variance_standardized.toFixed(4) : "NA"}</td>
+      <td>${r.rank}</td>
+      </tr>`;
   }
 
-  html += "</tbody></table>";
+  html += `</tbody></table>`;
   container.innerHTML = html;
 }
 
