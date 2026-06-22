@@ -3418,18 +3418,20 @@ onPlotlyReady(function(gd) {
 // Preprocess / Feature Selection view (v0.3.1)
 // =========================================================================
 
-var _PREPROCESS_DATA = null;
 var _PREPROCESS_STATE = { subView: "summary" };
 var _PREPROCESS_INITIALIZED = false;
 
 function initPreprocessView() {
   if (_PREPROCESS_INITIALIZED) return;
   _PREPROCESS_INITIALIZED = true;
-  _PREPROCESS_DATA = window._PREPROCESS_DATA || { has_feature_data: false, has_meta: false };
 
   renderPreprocessSummary();
   renderVariableFeaturePlot();
   renderTopFeatureTable();
+}
+
+function _SR_preprocessData() {
+  return window._PREPROCESS_DATA || { has_feature_data: false, has_meta: false };
 }
 
 function switchPreprocessSubView(view) {
@@ -3461,7 +3463,7 @@ function switchPreprocessSubView(view) {
 function renderPreprocessSummary() {
   var container = document.getElementById("preprocess-summary-content");
   if (!container) return;
-  var d = _PREPROCESS_DATA;
+  var d = _SR_preprocessData();
 
   if (!d.has_meta) {
     container.innerHTML = `<p class="no-data">No preprocessing metadata provided.</p>`;
@@ -3503,7 +3505,7 @@ function renderVariableFeaturePlot() {
   if (!_SR_isActiveView("preprocess")) return;
   var container = document.getElementById("preprocess-scatter-container");
   if (!container) return;
-  var d = _PREPROCESS_DATA;
+  var d = _SR_preprocessData();
 
   if (!d.has_feature_data || !d.features || !d.features.gene || !d.features.gene.length) {
     container.innerHTML = `<p class="no-data">No feature data provided.</p>`;
@@ -3568,7 +3570,7 @@ function renderVariableFeaturePlot() {
 function renderTopFeatureTable() {
   var container = document.getElementById("preprocess-table-content");
   if (!container) return;
-  var d = _PREPROCESS_DATA;
+  var d = _SR_preprocessData();
 
   if (!d.top_features || !d.top_features.length) {
     container.innerHTML = `<p class="no-data">No top variable features available.</p>`;
