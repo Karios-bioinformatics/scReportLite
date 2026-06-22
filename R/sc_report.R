@@ -3487,7 +3487,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
   # ---- Build panel sections for content area ----
   has_umap         <- "umap" %in% panels
-  non_umap_panels  <- setdiff(panels, c("umap", "pca", "plot"))
+  non_umap_panels  <- setdiff(panels, c("umap", "pca", "plot", "qc"))
 
   # Prepare shared panel params
   panel_params <- list(
