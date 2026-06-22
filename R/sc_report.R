@@ -3313,7 +3313,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                              output, title, dim_opacity, marker_n_top,
                              panels = c("umap", "marker_table")) {
 
-  clusters     <- sort(unique(umap_df[[cluster_col]]))
+  clusters     <- natural_sort(unique(umap_df[[cluster_col]]))
   cluster_cols <- cluster_color_map(clusters)
   n_total      <- nrow(umap_df)
   has_samples  <- !is.null(sample_col)
