@@ -3487,7 +3487,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
   # ---- Build panel sections for content area ----
   has_umap         <- "umap" %in% panels
-  non_umap_panels  <- setdiff(panels, c("umap", "pca", "plot", "qc"))
+  non_umap_panels  <- setdiff(panels, c("umap", "pca", "qc"))
 
   # Prepare shared panel params
   panel_params <- list(
@@ -3896,17 +3896,13 @@ sc_report <- function(umap_df,
     stop("panels must be a character vector with at least one element",
          call. = FALSE)
   }
-  known_panels  <- c("umap", "marker_table", "pca", "plot", "qc", list_panels())
+  known_panels  <- c("umap", "marker_table", "pca", "qc", list_panels())
   unknown_panels <- setdiff(panels, known_panels)
   if (length(unknown_panels) > 0) {
     warning("Unknown panel(s) in 'panels': ",
             paste(unknown_panels, collapse = ", "),
             ". They will be skipped.", call. = FALSE)
   }
-
-  # v0.4.0: "plot" is a backward-compatible alias for "qc"
-  panels <- ifelse(panels == "plot", "qc", panels)
-  panels <- unique(panels)
 
   # ---- Build plots ----
   message("scReportLite: building interactive UMAP plot...")

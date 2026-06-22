@@ -455,13 +455,12 @@ Planned directions:
 
 ## Changelog
 
-### v0.4.0 — QC view rename and backward-compatible panel aliasing
+### v0.4.0 — QC view rename
 
-v0.4.0 renames the former Plot/QC view to QC. The old `"plot"` panel key is kept
-as a backward-compatible alias.
+v0.4.0 renames the former Plot/QC view to QC, releasing `"plot"` as a panel
+key reserved for a future dedicated Plot stage.
 
-- Renamed public panel key `"plot"` to `"qc"`
-- `"plot"` remains accepted as a backward-compatible alias
+- Renamed public panel key from `"plot"` to `"qc"`
 - View tab now displays QC | PCA | UMAP
 - Warning messages updated to reflect the QC nomenclature
 - Internal DOM ids and JS variable names are unchanged
