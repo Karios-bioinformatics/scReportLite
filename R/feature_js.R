@@ -244,7 +244,7 @@ var _FEATURE_CONTROL_REGISTRY = {
           };
           var check = document.createElement("span");
           check.className = "pca-pc-check";
-          if (isSel) check.textContent = "\u2713";
+          if (isSel) check.textContent = String.fromCharCode(10003);
           item.appendChild(check);
           var label = document.createElement("span");
           label.textContent = fn;
