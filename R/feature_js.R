@@ -165,6 +165,24 @@ function _FEATURE_makePlotDiv(parent) {
   return div;
 }
 
+// Natural sort: "Cluster 2" < "Cluster 10"
+function _FEATURE_naturalSort(a, b) {
+  var re = /(\d+)|(\D+)/g;
+  var aa = String(a).match(re) || [];
+  var bb = String(b).match(re) || [];
+  for (var i = 0; i < Math.min(aa.length, bb.length); i++) {
+    var ca = aa[i], cb = bb[i];
+    var na = parseInt(ca, 10), nb = parseInt(cb, 10);
+    if (!isNaN(na) && !isNaN(nb)) {
+      if (na !== nb) return na - nb;
+    } else {
+      if (ca < cb) return -1;
+      if (ca > cb) return 1;
+    }
+  }
+  return aa.length - bb.length;
+}
+
 // =========================================================================
 // Controls Registry
 // =========================================================================
@@ -227,22 +245,39 @@ var _FEATURE_CONTROL_REGISTRY = {
       var d = _FEATURE_getData();
       if (!d || !d.feature_scatter || !d.feature_scatter.data) return;
       var cols = d.feature_scatter.data[0];
-      var options = ["none"];
-      if ("cluster" in cols) options.push("cluster");
-      if ("sample" in cols) options.push("sample");
-      var g = _FEATURE_mkGroup("Color by");
-      var sel = _FEATURE_mkSelect(_FEATURE_STATE.scatter.colorBy, function(v) {
-        _FEATURE_STATE.scatter.colorBy = v;
-        _FEATURE_STATE.scatter.highlightGroup = null;
-        _FEATURE_scheduleRender();
-      });
-      for (var i = 0; i < options.length; i++) {
-        var opt = document.createElement("option");
-        opt.value = options[i]; opt.textContent = options[i];
-        if (options[i] === _FEATURE_STATE.scatter.colorBy) opt.selected = true;
-        sel.appendChild(opt);
+      var hasCluster = ("cluster" in cols);
+      var hasSample  = ("sample" in cols);
+
+      if (!hasCluster && !hasSample) {
+        var g = _FEATURE_mkGroup("Color by");
+        var p = document.createElement("p");
+        p.style.cssText = "font-size:0.78em;color:#b2bec3;font-style:italic;padding:4px 0;";
+        p.textContent = "No grouping available.";
+        g.appendChild(p);
+        container.appendChild(g);
+        return;
       }
-      g.appendChild(sel); container.appendChild(g);
+
+      var g = _FEATURE_mkGroup("Color by");
+      var btns = [];
+      if (hasCluster) {
+        btns.push(_FEATURE_mkToggleBtn("Cluster", _FEATURE_STATE.scatter.colorBy === "cluster", function() {
+          _FEATURE_STATE.scatter.colorBy = "cluster";
+          _FEATURE_STATE.scatter.highlightGroup = null;
+          _FEATURE_renderControls();
+          _FEATURE_scheduleRender();
+        }));
+      }
+      if (hasSample) {
+        btns.push(_FEATURE_mkToggleBtn("Sample", _FEATURE_STATE.scatter.colorBy === "sample", function() {
+          _FEATURE_STATE.scatter.colorBy = "sample";
+          _FEATURE_STATE.scatter.highlightGroup = null;
+          _FEATURE_renderControls();
+          _FEATURE_scheduleRender();
+        }));
+      }
+      g.appendChild(_FEATURE_mkToggleRow(btns));
+      container.appendChild(g);
     }
   },
 
@@ -260,7 +295,7 @@ var _FEATURE_CONTROL_REGISTRY = {
         var v = rows[i][cBy];
         if (v != null) groupSet[String(v)] = true;
       }
-      var groupNames = Object.keys(groupSet).sort();
+      var groupNames = Object.keys(groupSet).sort(_FEATURE_naturalSort);
 
       var g = _FEATURE_mkGroup((cBy === "sample" ? "Sample" : "Cluster") + " highlight");
       var list = document.createElement("div");
@@ -867,7 +902,18 @@ function _FEATURE_init() {
   if (d.feature_scatter) {
     _FEATURE_STATE.scatter.x = d.feature_scatter.default_x || "nCount_RNA";
     _FEATURE_STATE.scatter.y = d.feature_scatter.default_y || "nFeature_RNA";
-    _FEATURE_STATE.scatter.colorBy = d.feature_scatter.default_color_by || "none";
+    // Default colorBy: use data hint, fallback cluster > sample > none
+    var hint = d.feature_scatter.default_color_by;
+    var hasCols = d.feature_scatter.data && d.feature_scatter.data.length > 0 ? d.feature_scatter.data[0] : null;
+    if (hint && hasCols && (hint in hasCols)) {
+      _FEATURE_STATE.scatter.colorBy = hint;
+    } else if (hasCols && ("cluster" in hasCols)) {
+      _FEATURE_STATE.scatter.colorBy = "cluster";
+    } else if (hasCols && ("sample" in hasCols)) {
+      _FEATURE_STATE.scatter.colorBy = "sample";
+    } else {
+      _FEATURE_STATE.scatter.colorBy = "none";
+    }
   }
 
   if (d.variable_features && d.variable_features.length > 0) {
