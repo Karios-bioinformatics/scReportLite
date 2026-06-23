@@ -69,12 +69,12 @@ function _FEATURE_showError(message, error) {
   box.style.whiteSpace = "pre-wrap";
   box.style.fontFamily = "monospace";
   box.style.fontSize = "0.82em";
-  var text = message;
+  var parts = [message];
   if (error) {
-    if (error.message) text += "\n\n" + error.message;
-    if (error.stack) text += "\n\n" + error.stack;
+    if (error.message) parts.push(error.message);
+    if (error.stack) parts.push(error.stack);
   }
-  box.textContent = text;
+  box.textContent = parts.join(String.fromCharCode(10, 10));
   canvas.appendChild(box);
   if (window.console && console.error) console.error(message, error);
 }
