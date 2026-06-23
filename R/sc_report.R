@@ -1103,8 +1103,13 @@ body {
 
 /* Marker section (panel variant — adds scroll constraints) */
 .marker-section {
-  max-height: 320px;
+  min-height: 220px;
+  max-height: 360px;
   overflow-y: auto;
+}
+
+#marker-table-container {
+  min-height: 140px;
 }
 
 .marker-table {
@@ -1265,7 +1270,7 @@ function switchView(view) {
     activeViewEl = featureView;
     featureView.style.display = "";
     if (tabFeature) tabFeature.classList.add("active");
-    try { _FEATURE_ensureInit(); } catch(e) {}
+    try { _FEATURE_ensureInit(); } catch(e) { console.error("Feature view init failed:", e); }
   } else if (view === "pca" && pcaView) {
     activeViewEl = pcaView;
     pcaView.style.display = "";

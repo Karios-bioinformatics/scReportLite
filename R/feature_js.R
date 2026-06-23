@@ -3,6 +3,10 @@
 #
 # Returns the JS string for the Feature view: state machine, controls registry,
 # render functions, and navigation.
+#
+# NOTE: This JS lives inside an R single-quoted string (feature_js <- function() { '...' }).
+# All JS strings use double quotes only.  HTML markup is built via DOM API,
+# never innerHTML with string templates, to avoid R/JS string escaping issues.
 
 feature_js <- function() {
 '
@@ -34,6 +38,46 @@ var _FEATURE_STATE = {
   renderTimer: null,
   isRendering: false
 };
+
+// === Error / no-data display helpers (pure DOM API — no innerHTML strings) ===
+
+var _FEATURE_NO_DATA_MSGS = {
+  scatter: "No FeatureScatter data available.",
+  varfeat: "No variable feature data available.",
+  topexp:  "No top expressed genes data available.",
+  elbow:   "No PCA elbow data available."
+};
+
+function _FEATURE_showNoData(msg) {
+  var canvas = document.getElementById("feature-active-canvas");
+  if (!canvas) return;
+  while (canvas.firstChild) canvas.removeChild(canvas.firstChild);
+  var p = document.createElement("p");
+  p.className = "no-data";
+  p.textContent = msg || "No data available for this view.";
+  canvas.appendChild(p);
+}
+
+function _FEATURE_showError(message, error) {
+  var canvas = document.getElementById("feature-active-canvas");
+  if (!canvas) return;
+  while (canvas.firstChild) canvas.removeChild(canvas.firstChild);
+  var box = document.createElement("div");
+  box.className = "no-data";
+  box.style.color = "#d63031";
+  box.style.padding = "16px";
+  box.style.whiteSpace = "pre-wrap";
+  box.style.fontFamily = "monospace";
+  box.style.fontSize = "0.82em";
+  var text = message;
+  if (error) {
+    if (error.message) text += "\n\n" + error.message;
+    if (error.stack) text += "\n\n" + error.stack;
+  }
+  box.textContent = text;
+  canvas.appendChild(box);
+  if (window.console && console.error) console.error(message, error);
+}
 
 // === Slice helpers ===
 
@@ -107,6 +151,23 @@ var _FEATURE_PALETTE = [
 ];
 
 function _FEATURE_getColor(i) { return _FEATURE_PALETTE[i % _FEATURE_PALETTE.length]; }
+
+// === Helpers: clear canvas and prep a fresh plot div ===
+
+function _FEATURE_clearCanvas() {
+  var canvas = document.getElementById("feature-active-canvas");
+  if (!canvas) return null;
+  canvas.scrollTop = 0;
+  while (canvas.firstChild) canvas.removeChild(canvas.firstChild);
+  return canvas;
+}
+
+function _FEATURE_makePlotDiv(parent) {
+  var div = document.createElement("div");
+  div.style.cssText = "flex:1;min-height:0;width:100%;height:100%;";
+  parent.appendChild(div);
+  return div;
+}
 
 // =========================================================================
 // Controls Registry (same pattern as _PLOT_CONTROL_REGISTRY)
@@ -333,7 +394,7 @@ var _FEATURE_CONTROL_REGISTRY = {
   }
 };
 
-// === Module → control mapping ===
+// === Module -> control mapping ===
 
 var _FEATURE_MODULES = {
   scatter: { controls: ["fsX","fsY","fsColorBy"] },
@@ -347,7 +408,7 @@ var _FEATURE_MODULES = {
 function _FEATURE_renderControls() {
   var container = document.getElementById("feature-controls-dynamic");
   if (!container) return;
-  container.innerHTML = "";
+  while (container.firstChild) container.removeChild(container.firstChild);
 
   var mod = _FEATURE_STATE.activeModule;
   var cfg = _FEATURE_MODULES[mod];
@@ -367,23 +428,28 @@ function _FEATURE_renderControls() {
 
 function _FEATURE_renderScatter() {
   var d = _FEATURE_getData();
-  if (!d || !d.feature_scatter || !d.feature_scatter.data) return;
+  if (!d || !d.feature_scatter || !d.feature_scatter.data) {
+    _FEATURE_showNoData(_FEATURE_NO_DATA_MSGS.scatter);
+    return;
+  }
 
-  var canvas = document.getElementById("feature-active-canvas");
+  var canvas = _FEATURE_clearCanvas();
   if (!canvas) return;
-  canvas.scrollTop = 0;
 
   var fs = d.feature_scatter;
   var rows = fs.data;
-  // rows is a list of row objects (JSON array of objects)
 
-  // Determine x/y defaults
   var xCol = _FEATURE_STATE.scatter.x || fs.default_x || "nCount_RNA";
   var yCol = _FEATURE_STATE.scatter.y || fs.default_y || "nFeature_RNA";
   var cBy = _FEATURE_STATE.scatter.colorBy || fs.default_color_by || "none";
   _FEATURE_STATE.scatter.x = xCol;
   _FEATURE_STATE.scatter.y = yCol;
   _FEATURE_STATE.scatter.colorBy = cBy;
+
+  if (rows.length === 0) {
+    _FEATURE_showNoData("FeatureScatter data is empty.");
+    return;
+  }
 
   // Build trace(s)
   var traces = [];
@@ -444,15 +510,12 @@ function _FEATURE_renderScatter() {
     corrText = "Pearson r = " + rVal.toFixed(4) + " (n = " + nPairs + ")";
   }
 
-  canvas.innerHTML = "";
   var info = document.createElement("div");
   info.style.cssText = "font-size:0.78em;color:#636e72;text-align:center;padding:4px 0;flex-shrink:0;";
   info.textContent = corrText;
   canvas.appendChild(info);
 
-  var plotDiv = document.createElement("div");
-  plotDiv.style.cssText = "flex:1;min-height:0;";
-  canvas.appendChild(plotDiv);
+  var plotDiv = _FEATURE_makePlotDiv(canvas);
 
   Plotly.newPlot(plotDiv, traces, {
     title: "",
@@ -464,25 +527,25 @@ function _FEATURE_renderScatter() {
 }
 
 // =========================================================================
-// RENDER: VariableFeaturePlot — mean vs variance_standardized
+// RENDER: VariableFeaturePlot
 // =========================================================================
 
 function _FEATURE_renderVarFeatures() {
   var d = _FEATURE_getData();
-  if (!d || !d.variable_features) return;
+  if (!d || !d.variable_features || d.variable_features.length === 0) {
+    _FEATURE_showNoData(_FEATURE_NO_DATA_MSGS.varfeat);
+    return;
+  }
 
-  var canvas = document.getElementById("feature-active-canvas");
+  var canvas = _FEATURE_clearCanvas();
   if (!canvas) return;
-  canvas.scrollTop = 0;
-  canvas.innerHTML = "";
 
-  var vf = d.variable_features;  // array of row objects
+  var vf = d.variable_features;
   var yMetric = _FEATURE_STATE.varfeat.yMetric;
   var labelN = _FEATURE_STATE.varfeat.labelTopN;
   var showLabels = _FEATURE_STATE.varfeat.showLabels;
 
-  // Split into variable and non-variable
-  var varXs = [], varYs = [], varTexts = [], varLabels = [], varLabelTexts = [];
+  var varXs = [], varYs = [], varTexts = [], varLabels = [];
   var nonXs = [], nonYs = [], nonTexts = [];
 
   for (var i = 0; i < vf.length; i++) {
@@ -494,10 +557,7 @@ function _FEATURE_renderVarFeatures() {
 
     if (row.variable) {
       varXs.push(mx); varYs.push(my); varTexts.push(ht);
-      if (row.label) {
-        varLabels.push({x: mx, y: my, text: row.gene});
-        varLabelTexts.push({x: mx, y: my, text: row.gene, ht: ht});
-      }
+      if (row.label) varLabels.push({x: mx, y: my, text: row.gene});
     } else {
       nonXs.push(mx); nonYs.push(my); nonTexts.push(ht);
     }
@@ -505,7 +565,6 @@ function _FEATURE_renderVarFeatures() {
 
   var traces = [];
 
-  // Non-variable (grey)
   if (nonXs.length > 0) {
     traces.push({
       x: nonXs, y: nonYs, text: nonTexts,
@@ -515,7 +574,6 @@ function _FEATURE_renderVarFeatures() {
     });
   }
 
-  // Variable (coloured)
   if (varXs.length > 0) {
     traces.push({
       x: varXs, y: varYs, text: varTexts,
@@ -525,7 +583,11 @@ function _FEATURE_renderVarFeatures() {
     });
   }
 
-  // Labels (top N) as text annotations
+  if (traces.length === 0) {
+    _FEATURE_showNoData("No plottable points in Variable Features data.");
+    return;
+  }
+
   var annotations = [];
   if (showLabels && varLabels.length > 0) {
     var topLabels = varLabels.slice(0, labelN);
@@ -540,9 +602,7 @@ function _FEATURE_renderVarFeatures() {
     }
   }
 
-  var plotDiv = document.createElement("div");
-  plotDiv.style.cssText = "flex:1;min-height:0;width:100%;height:100%;";
-  canvas.appendChild(plotDiv);
+  var plotDiv = _FEATURE_makePlotDiv(canvas);
 
   Plotly.newPlot(plotDiv, traces, {
     title: "",
@@ -558,37 +618,34 @@ function _FEATURE_renderVarFeatures() {
 }
 
 // =========================================================================
-// RENDER: Top Expressed Genes — horizontal boxplot (gene on y, % on x)
+// RENDER: Top Expressed Genes
 // =========================================================================
 
 function _FEATURE_renderTopExpressed() {
   var d = _FEATURE_getData();
-  if (!d || !d.top_expressed || !d.top_expressed.summary) return;
+  if (!d || !d.top_expressed || !d.top_expressed.summary || d.top_expressed.summary.length === 0) {
+    _FEATURE_showNoData(_FEATURE_NO_DATA_MSGS.topexp);
+    return;
+  }
 
-  var canvas = document.getElementById("feature-active-canvas");
+  var canvas = _FEATURE_clearCanvas();
   if (!canvas) return;
-  canvas.scrollTop = 0;
-  canvas.innerHTML = "";
 
   var te = d.top_expressed;
-  var sm = te.summary;       // array of row objects
-  var pts = te.points || []; // array of row objects
+  var sm = te.summary;
+  var pts = te.points || [];
 
   var maxG = _FEATURE_STATE.topexp.maxGenes;
   var sortBy = _FEATURE_STATE.topexp.sortBy;
   var showPts = _FEATURE_STATE.topexp.showPoints;
 
-  // Sort
   var sorted = sm.slice();
   sorted.sort(function(a, b) {
     if (sortBy === "mean_percent") return b.mean_percent - a.mean_percent;
     return a.rank - b.rank;
   });
   sorted = sorted.slice(0, maxG);
-  var geneSet = {};
-  for (var i = 0; i < sorted.length; i++) geneSet[sorted[i].gene] = true;
 
-  // Build traces: each gene = 1 box trace
   var traces = [];
   var geneNames = [];
   for (var gi = 0; gi < sorted.length; gi++) {
@@ -619,14 +676,11 @@ function _FEATURE_renderTopExpressed() {
   }
 
   if (traces.length === 0) {
-    canvas.innerHTML = "<p class=\"no-data\">No Top Expressed Genes data available.</p>";
+    _FEATURE_showNoData("No Top Expressed Genes data available.");
     return;
   }
 
-  var plotDiv = document.createElement("div");
-  plotDiv.style.cssText = "flex:1;min-height:0;width:100%;height:100%;";
-  canvas.appendChild(plotDiv);
-
+  var plotDiv = _FEATURE_makePlotDiv(canvas);
   var layoutHeight = Math.max(400, maxG * 18);
 
   Plotly.newPlot(plotDiv, traces, {
@@ -642,23 +696,28 @@ function _FEATURE_renderTopExpressed() {
 }
 
 // =========================================================================
-// RENDER: ElbowPlot — PC vs stdev/variance/cumulative
+// RENDER: ElbowPlot
 // =========================================================================
 
 function _FEATURE_renderElbow() {
   var d = _FEATURE_getData();
-  if (!d || !d.elbow) return;
+  if (!d || !d.elbow || d.elbow.length === 0) {
+    _FEATURE_showNoData(_FEATURE_NO_DATA_MSGS.elbow);
+    return;
+  }
 
-  var canvas = document.getElementById("feature-active-canvas");
+  var canvas = _FEATURE_clearCanvas();
   if (!canvas) return;
-  canvas.scrollTop = 0;
-  canvas.innerHTML = "";
 
-  var el = d.elbow;  // array of row objects
+  var el = d.elbow;
   var yMetric = _FEATURE_STATE.elbow.yMetric;
   var maxDims = _FEATURE_STATE.elbow.maxDims;
-
   var rows = el.slice(0, maxDims);
+
+  if (rows.length === 0) {
+    _FEATURE_showNoData(_FEATURE_NO_DATA_MSGS.elbow);
+    return;
+  }
 
   var xs = [], ys = [], hovers = [];
   for (var i = 0; i < rows.length; i++) {
@@ -674,9 +733,7 @@ function _FEATURE_renderElbow() {
     cumulative_variance: "Cumulative Variance (%)"
   };
 
-  var plotDiv = document.createElement("div");
-  plotDiv.style.cssText = "flex:1;min-height:0;width:100%;height:100%;";
-  canvas.appendChild(plotDiv);
+  var plotDiv = _FEATURE_makePlotDiv(canvas);
 
   Plotly.newPlot(plotDiv, [{
     x: xs, y: ys, text: hovers,
@@ -695,13 +752,16 @@ function _FEATURE_renderElbow() {
 }
 
 // =========================================================================
-// Unified render dispatcher
+// Unified render dispatcher (with error display)
 // =========================================================================
 
 function _FEATURE_renderCurrentState() {
   if (!_SR_isActiveView("feature")) return;
   var d = _FEATURE_getData();
-  if (!d) return;
+  if (!d) {
+    _FEATURE_showError("Feature Diagnostics: window._FEATURE_DIAG_DATA is not set.");
+    return;
+  }
 
   _FEATURE_renderControls();
   _FEATURE_STATE.isRendering = true;
@@ -711,6 +771,9 @@ function _FEATURE_renderCurrentState() {
     else if (m === "varfeat") _FEATURE_renderVarFeatures();
     else if (m === "topexp") _FEATURE_renderTopExpressed();
     else if (m === "elbow") _FEATURE_renderElbow();
+    else _FEATURE_showNoData("Unknown Feature sub-module: " + m);
+  } catch(e) {
+    _FEATURE_showError("Feature Diagnostics render failed", e);
   } finally {
     _FEATURE_STATE.isRendering = false;
   }
@@ -747,7 +810,10 @@ function _FEATURE_init() {
   _FEATURE_STATE.initialized = true;
 
   var d = _FEATURE_getData();
-  if (!d) return;
+  if (!d) {
+    _FEATURE_showError("Feature Diagnostics: window._FEATURE_DIAG_DATA is not set.");
+    return;
+  }
 
   // Set defaults from data
   if (d.feature_scatter) {
@@ -756,23 +822,29 @@ function _FEATURE_init() {
     _FEATURE_STATE.scatter.colorBy = d.feature_scatter.default_color_by || "none";
   }
 
-  // Adjust yMetric for varfeat
   if (d.variable_features && d.variable_features.length > 0) {
     var row0 = d.variable_features[0];
     if ("variance_standardized" in row0) _FEATURE_STATE.varfeat.yMetric = "variance_standardized";
     else if ("variance" in row0) _FEATURE_STATE.varfeat.yMetric = "variance";
   }
 
-  // Adjust elbow maxDims based on data length
   if (d.elbow && d.elbow.length > 0) {
     _FEATURE_STATE.elbow.maxDims = Math.min(_FEATURE_STATE.elbow.maxDims, d.elbow.length);
   }
 
   _FEATURE_scheduleRender();
+  // Also render immediately on first init so the user sees FeatureScatter
+  // without waiting for the 60 ms debounce timer.
+  _FEATURE_renderCurrentState();
 }
 
 function _FEATURE_ensureInit() {
-  if (!_FEATURE_STATE.initialized) _FEATURE_init();
+  if (_FEATURE_STATE.initialized) return;
+  try {
+    _FEATURE_init();
+  } catch(e) {
+    _FEATURE_showError("Feature Diagnostics failed to initialise", e);
+  }
 }
 '
 }
