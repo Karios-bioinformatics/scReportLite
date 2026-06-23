@@ -16,7 +16,7 @@ var _FEATURE_STATE = {
   initialized: false,
 
   scatter: {
-    x: null, y: null, colorBy: "none", highlightGroup: null
+    selectedFeatures: [], colorBy: "none", highlightGroup: null
   },
 
   varfeat: {
@@ -190,53 +190,72 @@ function _FEATURE_naturalSort(a, b) {
 var _FEATURE_CONTROL_REGISTRY = {
 
   // ---- FeatureScatter controls ----
-  fsX: {
+  fsFeatures: {
     render: function(container) {
       var d = _FEATURE_getData();
       if (!d || !d.feature_scatter || !d.feature_scatter.data) return;
       var cols = d.feature_scatter.data[0];
-      var numericCols = [];
-      for (var k in cols) {
-        if (k === "cell" || k === "cluster" || k === "sample") continue;
-        if (typeof cols[k] === "number") numericCols.push(k);
-      }
-      if (!numericCols.length) return;
-      var g = _FEATURE_mkGroup("X axis");
-      var sel = _FEATURE_mkSelect(_FEATURE_STATE.scatter.x, function(v) {
-        _FEATURE_STATE.scatter.x = v; _FEATURE_scheduleRender();
-      });
-      for (var i = 0; i < numericCols.length; i++) {
-        var opt = document.createElement("option");
-        opt.value = numericCols[i]; opt.textContent = numericCols[i];
-        if (numericCols[i] === _FEATURE_STATE.scatter.x) opt.selected = true;
-        sel.appendChild(opt);
-      }
-      g.appendChild(sel); container.appendChild(g);
-    }
-  },
 
-  fsY: {
-    render: function(container) {
-      var d = _FEATURE_getData();
-      if (!d || !d.feature_scatter || !d.feature_scatter.data) return;
-      var cols = d.feature_scatter.data[0];
-      var numericCols = [];
+      // Collect numeric columns, exclude metadata
+      var allFeatures = [];
       for (var k in cols) {
         if (k === "cell" || k === "cluster" || k === "sample") continue;
-        if (typeof cols[k] === "number") numericCols.push(k);
+        if (typeof cols[k] === "number") allFeatures.push(k);
       }
-      if (!numericCols.length) return;
-      var g = _FEATURE_mkGroup("Y axis");
-      var sel = _FEATURE_mkSelect(_FEATURE_STATE.scatter.y, function(v) {
-        _FEATURE_STATE.scatter.y = v; _FEATURE_scheduleRender();
-      });
-      for (var i = 0; i < numericCols.length; i++) {
-        var opt = document.createElement("option");
-        opt.value = numericCols[i]; opt.textContent = numericCols[i];
-        if (numericCols[i] === _FEATURE_STATE.scatter.y) opt.selected = true;
-        sel.appendChild(opt);
+      if (!allFeatures.length) return;
+
+      // Priority prefix: common QC metrics first, then natural sort the rest
+      var PRIORITY = ["nCount_RNA","nFeature_RNA","percent.mt","percent_mt"];
+      var priority = [];
+      var rest = [];
+      for (var i = 0; i < allFeatures.length; i++) {
+        if (PRIORITY.indexOf(allFeatures[i]) >= 0) priority.push(allFeatures[i]);
+        else rest.push(allFeatures[i]);
       }
-      g.appendChild(sel); container.appendChild(g);
+      // Sort priority in defined order
+      priority.sort(function(a, b) { return PRIORITY.indexOf(a) - PRIORITY.indexOf(b); });
+      // Natural sort the rest
+      rest.sort(_FEATURE_naturalSort);
+      var features = priority.concat(rest);
+
+      var g = _FEATURE_mkGroup("Features");
+      var list = document.createElement("div");
+      list.className = "pca-pc-list";
+      list.style.maxHeight = "360px";
+
+      var sel = _FEATURE_STATE.scatter.selectedFeatures;
+      for (var fi = 0; fi < features.length; fi++) {
+        (function(fn) {
+          var isSel = (sel.indexOf(fn) >= 0);
+          var item = document.createElement("div");
+          item.className = "pca-pc-item" + (isSel ? " active" : "");
+          item.onclick = function() {
+            var idx = _FEATURE_STATE.scatter.selectedFeatures.indexOf(fn);
+            if (idx >= 0) {
+              // Deselect
+              _FEATURE_STATE.scatter.selectedFeatures.splice(idx, 1);
+            } else {
+              // Select — cap at 2
+              var cur = _FEATURE_STATE.scatter.selectedFeatures;
+              if (cur.length >= 2) cur.shift(); // remove oldest
+              cur.push(fn);
+            }
+            _FEATURE_renderControls();
+            _FEATURE_renderCurrentState();
+          };
+          var check = document.createElement("span");
+          check.className = "pca-pc-check";
+          if (isSel) check.textContent = "\u2713";
+          item.appendChild(check);
+          var label = document.createElement("span");
+          label.textContent = fn;
+          item.appendChild(label);
+          list.appendChild(item);
+        })(features[fi]);
+      }
+
+      g.appendChild(list);
+      container.appendChild(g);
     }
   },
 
@@ -461,7 +480,7 @@ var _FEATURE_CONTROL_REGISTRY = {
 // === Module -> control mapping ===
 
 var _FEATURE_MODULES = {
-  scatter: { controls: ["fsX","fsY","fsColorBy","fsGroupHighlight"] },
+  scatter: { controls: ["fsFeatures","fsColorBy","fsGroupHighlight"] },
   varfeat: { controls: ["vfLabelTop","vfShowLabels","vfYMetric"] },
   topexp:  { controls: ["teMaxGenes"] },
   elbow:   { controls: ["elYMetric","elMaxDims"] }
@@ -503,11 +522,18 @@ function _FEATURE_renderScatter() {
   var fs = d.feature_scatter;
   var rows = fs.data;
 
-  var xCol = _FEATURE_STATE.scatter.x || fs.default_x || "nCount_RNA";
-  var yCol = _FEATURE_STATE.scatter.y || fs.default_y || "nFeature_RNA";
-  var cBy = _FEATURE_STATE.scatter.colorBy || fs.default_color_by || "none";
-  _FEATURE_STATE.scatter.x = xCol;
-  _FEATURE_STATE.scatter.y = yCol;
+  var sel = _FEATURE_STATE.scatter.selectedFeatures;
+  if (!sel || sel.length < 2) {
+    var p = document.createElement("p");
+    p.className = "no-data";
+    p.textContent = "Select two features to draw FeatureScatter.";
+    canvas.appendChild(p);
+    return;
+  }
+
+  var xCol = sel[0];
+  var yCol = sel[1];
+  var cBy = _FEATURE_STATE.scatter.colorBy;
   _FEATURE_STATE.scatter.colorBy = cBy;
 
   var hlGroup = _FEATURE_STATE.scatter.highlightGroup;
@@ -589,7 +615,7 @@ function _FEATURE_renderScatter() {
 
   var info = document.createElement("div");
   info.style.cssText = "font-size:0.78em;color:#636e72;text-align:center;padding:4px 0;flex-shrink:0;";
-  info.textContent = corrText;
+  info.textContent = xCol + " vs " + yCol + (corrText ? "  |  " + corrText : "");
   canvas.appendChild(info);
 
   var plotDiv = _FEATURE_makePlotDiv(canvas);
@@ -900,11 +926,43 @@ function _FEATURE_init() {
   }
 
   if (d.feature_scatter) {
-    _FEATURE_STATE.scatter.x = d.feature_scatter.default_x || "nCount_RNA";
-    _FEATURE_STATE.scatter.y = d.feature_scatter.default_y || "nFeature_RNA";
+    var fs = d.feature_scatter;
+    // Build selectedFeatures from defaults / data
+    var allF = [];
+    if (fs.data && fs.data.length > 0) {
+      var c0 = fs.data[0];
+      for (var k in c0) {
+        if (k === "cell" || k === "cluster" || k === "sample") continue;
+        if (typeof c0[k] === "number") allF.push(k);
+      }
+    }
+    var PRI = ["nCount_RNA","nFeature_RNA","percent.mt","percent_mt"];
+    var priority = [];
+    var rest = [];
+    for (var i = 0; i < allF.length; i++) {
+      if (PRI.indexOf(allF[i]) >= 0) priority.push(allF[i]);
+      else rest.push(allF[i]);
+    }
+    priority.sort(function(a, b) { return PRI.indexOf(a) - PRI.indexOf(b); });
+    rest.sort(_FEATURE_naturalSort);
+    var ordered = priority.concat(rest);
+
+    var defX = fs.default_x;
+    var defY = fs.default_y;
+    var sel = [];
+    if (defX && ordered.indexOf(defX) >= 0) sel.push(defX);
+    else if (ordered.length > 0) sel.push(ordered[0]);
+    if (defY && ordered.indexOf(defY) >= 0 && defY !== sel[0]) sel.push(defY);
+    else if (ordered.length > 1) {
+      for (var j = 0; j < ordered.length; j++) {
+        if (ordered[j] !== sel[0]) { sel.push(ordered[j]); break; }
+      }
+    }
+    _FEATURE_STATE.scatter.selectedFeatures = sel;
+
     // Default colorBy: use data hint, fallback cluster > sample > none
-    var hint = d.feature_scatter.default_color_by;
-    var hasCols = d.feature_scatter.data && d.feature_scatter.data.length > 0 ? d.feature_scatter.data[0] : null;
+    var hint = fs.default_color_by;
+    var hasCols = fs.data && fs.data.length > 0 ? fs.data[0] : null;
     if (hint && hasCols && (hint in hasCols)) {
       _FEATURE_STATE.scatter.colorBy = hint;
     } else if (hasCols && ("cluster" in hasCols)) {
