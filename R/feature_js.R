@@ -166,7 +166,7 @@ function _FEATURE_makePlotDiv(parent) {
 
 // Natural sort: "Cluster 2" < "Cluster 10"
 function _FEATURE_naturalSort(a, b) {
-  var re = /(\d+)|(\D+)/g;
+  var re = /([0-9]+)|([^0-9]+)/g;
   var aa = String(a).match(re) || [];
   var bb = String(b).match(re) || [];
   for (var i = 0; i < Math.min(aa.length, bb.length); i++) {
