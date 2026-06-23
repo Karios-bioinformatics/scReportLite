@@ -24,7 +24,6 @@ var _FEATURE_STATE = {
   },
 
   topexp: {
-    maxGenes: 20
   },
 
   elbow: {
@@ -419,21 +418,15 @@ var _FEATURE_CONTROL_REGISTRY = {
     }
   },
 
-  // ---- Top Expressed Genes controls (simplified) ----
-  teMaxGenes: {
+  // ---- Top Expressed Genes (no interactive controls) ----
+  teInfo: {
     render: function(container) {
-      var g = _FEATURE_mkGroup("Max genes");
-      var opts = [10, 20, 30, 50];
-      var sel = _FEATURE_mkSelect(String(_FEATURE_STATE.topexp.maxGenes), function(v) {
-        _FEATURE_STATE.topexp.maxGenes = parseInt(v); _FEATURE_scheduleRender();
-      });
-      for (var i = 0; i < opts.length; i++) {
-        var opt = document.createElement("option");
-        opt.value = String(opts[i]); opt.textContent = String(opts[i]);
-        if (opts[i] === _FEATURE_STATE.topexp.maxGenes) opt.selected = true;
-        sel.appendChild(opt);
-      }
-      g.appendChild(sel); container.appendChild(g);
+      var g = _FEATURE_mkGroup("Top Expressed Genes");
+      var p = document.createElement("p");
+      p.style.cssText = "font-size:0.78em;color:#636e72;line-height:1.5;";
+      p.textContent = "Ranked by mean % total counts per cell.";
+      g.appendChild(p);
+      container.appendChild(g);
     }
   },
 
@@ -478,7 +471,7 @@ var _FEATURE_CONTROL_REGISTRY = {
 var _FEATURE_MODULES = {
   scatter: { controls: ["fsFeatures","fsColorBy","fsGroupHighlight"] },
   varfeat: { controls: ["vfLabelTop","vfShowLabels","vfYMetric"] },
-  topexp:  { controls: ["teMaxGenes"] },
+  topexp:  { controls: ["teInfo"] },
   elbow:   { controls: ["elYMetric"] }
 };
 
@@ -717,7 +710,7 @@ function _FEATURE_renderVarFeatures() {
 }
 
 // =========================================================================
-// RENDER: Top Expressed Genes — horizontal boxplot, simplified
+// RENDER: Top Expressed Genes — horizontal boxplot, all genes, fixed row height
 // =========================================================================
 
 function _FEATURE_renderTopExpressed() {
@@ -733,12 +726,14 @@ function _FEATURE_renderTopExpressed() {
   var te = d.top_expressed;
   var sm = te.summary;
   var pts = te.points || [];
-  var maxG = _FEATURE_STATE.topexp.maxGenes;
 
-  // Sort by rank
+  // Sort by rank ascending (rank 1 at top of y-axis → reversed in Plotly)
   var sorted = sm.slice();
   sorted.sort(function(a, b) { return a.rank - b.rank; });
-  sorted = sorted.slice(0, maxG);
+
+  var geneCount = sorted.length;
+  var ROW_H = 22;
+  var plotHeight = Math.max(400, geneCount * ROW_H + 80);
 
   // Build gene -> points index
   var ptIndex = {};
@@ -750,35 +745,50 @@ function _FEATURE_renderTopExpressed() {
     }
   }
 
-  // Description line
+  // Description
   var desc = document.createElement("div");
   desc.style.cssText = "font-size:0.78em;color:#636e72;padding:4px 8px;flex-shrink:0;";
   desc.textContent = "Genes ranked by mean percentage of total counts per cell.";
   canvas.appendChild(desc);
 
-  // Horizontal box: one trace per gene, orientation="h"
-  // We use y=gene name (categorical), x=percent values
+  var scrollWrap = document.createElement("div");
+  scrollWrap.style.cssText = "flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;";
+  var plotDiv = document.createElement("div");
+  plotDiv.style.cssText = "width:100%;";
+  plotDiv.style.height = plotHeight + "px";
+  scrollWrap.appendChild(plotDiv);
+  canvas.appendChild(scrollWrap);
+
+  // Build one horizontal box trace per gene, coloured differently
   var traces = [];
   var geneNames = [];
-  for (var gi = 0; gi < sorted.length; gi++) {
+  for (var gi = 0; gi < geneCount; gi++) {
     var row = sorted[gi];
     geneNames.push(row.gene);
     var gPts = ptIndex[row.gene] || [];
-    if (gPts.length === 0) gPts = [row.median];
+    var color = _FEATURE_getColor(gi);
+
     traces.push({
-      x: gPts,
-      y: new Array(gPts.length).fill(row.gene),
+      x: gPts.length > 0 ? gPts : [row.median],
+      y: new Array(gPts.length > 0 ? gPts.length : 1).fill(row.gene),
       type: "box",
       orientation: "h",
       name: row.gene,
       showlegend: false,
-      marker: {color: "#00b894"},
-      fillcolor: "rgba(0,184,148,0.15)",
-      line: {color: "#00b894", width: 1},
+      marker: {color: color, size: 2},
+      fillcolor: color + "22",
+      line: {color: color, width: 1},
+      boxpoints: gPts.length > 0 ? "outliers" : false,
+      jitter: 0.2,
+      pointpos: 0,
       hoverinfo: "x+name",
-      boxpoints: false,
-      text: "Gene: " + row.gene + "<br>Mean: " + row.mean_percent.toFixed(2) + "%<br>Median: " + row.median.toFixed(2) + "%",
-      hovertext: "Gene: " + row.gene + "<br>Mean: " + row.mean_percent.toFixed(2) + "%<br>Median: " + row.median.toFixed(2) + "%<br>Q1: " + row.q1.toFixed(2) + "%<br>Q3: " + row.q3.toFixed(2) + "%"
+      text: "Gene: " + row.gene + "<br>% total: " + row.mean_percent.toFixed(2) + "%",
+      hovertext: "Gene: " + row.gene +
+        "<br>Mean: " + row.mean_percent.toFixed(2) + "%" +
+        "<br>Median: " + row.median.toFixed(2) + "%" +
+        "<br>Q1: " + row.q1.toFixed(2) + "%" +
+        "<br>Q3: " + row.q3.toFixed(2) + "%" +
+        "<br>Max: " + row.max.toFixed(2) + "%"
     });
   }
 
@@ -787,17 +797,15 @@ function _FEATURE_renderTopExpressed() {
     return;
   }
 
-  var plotDiv = _FEATURE_makePlotDiv(canvas);
-  var layoutHeight = Math.max(400, maxG * 22);
-
   Plotly.newPlot(plotDiv, traces, {
     title: "",
     xaxis: {title: "% total count per cell", showgrid: true, zeroline: true},
     yaxis: {title: "", showgrid: false, zeroline: false, automargin: true,
-            categoryorder: "array", categoryarray: geneNames.slice().reverse()},
+            categoryorder: "array", categoryarray: geneNames.slice().reverse(),
+            tickfont: {size: 10}},
     hovermode: "closest", dragmode: "pan",
-    height: layoutHeight,
-    margin: {l: 140, r: 30, b: 50, t: 10},
+    height: plotHeight,
+    margin: {l: 130, r: 30, b: 50, t: 10},
     boxmode: "group"
   }, _SR_featureModebarConfig());
 }
