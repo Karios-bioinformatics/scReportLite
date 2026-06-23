@@ -995,7 +995,7 @@ body {
 
 /* --- UMAP plot --- */
 .umap-section {
-  min-height: 500px;
+  min-height: 760px;
   flex-shrink: 0;
   padding: 16px;
   background: #fff;
@@ -1014,15 +1014,19 @@ body {
 }
 .umap-container {
   flex: 1;
-  min-height: 400px;
+  min-height: 680px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
-/* Force all htmlwidget / plotly child divs to fill container */
+/* Force plot container to a near-square region so UMAP clusters fill the view */
 .umap-container > *,
 .umap-container .html-widget,
 .umap-container .plotly,
 .umap-container .js-plotly-plot {
-  width: 100% !important;
-  height: 100% !important;
+  width: min(760px, 100%) !important;
+  height: 680px !important;
+  max-width: 760px;
 }
 
 /* --- Cell Info Panel --- */

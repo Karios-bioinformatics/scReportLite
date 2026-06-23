@@ -103,7 +103,7 @@ build_umap_plotly <- function(umap_df, cluster_col, cell_col,
       scaleratio  = 1
     ),
     hovermode  = "closest",
-    margin     = list(l = 60, r = 30, b = 60, t = 30),
+    margin     = list(l = 50, r = 15, b = 50, t = 15),
     dragmode   = "pan"
   )
 
