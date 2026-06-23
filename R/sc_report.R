@@ -648,20 +648,17 @@ body {
 }
 
 .feature-layout {
-  display: grid;
-  grid-template-columns: 170px minmax(0, 1fr) 220px;
   height: 100%;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) 240px;
   overflow: hidden;
 }
 
 .feature-nav {
-  width: 170px;
-  min-width: 170px;
-  min-height: 0;
-  flex-shrink: 0;
+  height: 100%;
+  overflow-y: auto;
   background: #fff;
   border-right: 1px solid #dfe6e9;
-  overflow-y: auto;
   padding: 12px 8px;
   display: flex;
   flex-direction: column;
@@ -713,22 +710,59 @@ body {
 .feature-nav-item.active .feature-nav-dot { opacity: 1; }
 
 .feature-main {
-  flex: 1;
-  min-width: 0;
   min-height: 0;
-  padding: 8px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  padding: 8px;
+}
+
+#feature-active-canvas {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .feature-params {
-  width: 220px;
-  min-width: 220px;
+  height: 100%;
+  overflow-y: auto;
   background: #fff;
   border-left: 1px solid #dfe6e9;
-  overflow-y: auto;
   padding: 12px;
+}
+
+/* Feature group highlight list */
+.feature-group-list {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.feature-group-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 0.82em;
+  gap: 6px;
+  transition: background 0.1s;
+  user-select: none;
+  border-left: 3px solid transparent;
+}
+.feature-group-item:hover { background: #f0f1f5; }
+.feature-group-item.active {
+  background: #e8ecf8;
+  border-left-color: #00b894;
+  font-weight: 600;
+}
+
+.feature-group-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 /* --- Header --- */
@@ -4254,8 +4288,23 @@ sc_report <- function(umap_df,
     # variable_features: data.frame → rows
     if (!is.null(feature_diag$variable_features) &&
         is.data.frame(feature_diag$variable_features)) {
+      vf <- feature_diag$variable_features
+      if (nrow(vf) == 0) {
+        message("feature_diag$variable_features has 0 rows. Variable Features will show no data.")
+      } else {
+        expected_cols <- c("gene", "mean", "variance", "variance_standardized", "variable", "rank")
+        missing_cols <- setdiff(expected_cols, colnames(vf))
+        if (length(missing_cols) > 0) {
+          warning("feature_diag$variable_features missing expected columns: ",
+                  paste(missing_cols, collapse = ", "),
+                  ". Variable Features may not render correctly.", call. = FALSE)
+        }
+        n_var <- if ("variable" %in% colnames(vf)) sum(vf$variable, na.rm = TRUE) else NA_integer_
+        message("feature_diag$variable_features: ", nrow(vf), " rows, ",
+                if (!is.na(n_var)) paste0(n_var, " variable genes") else "'variable' column not found")
+      }
       fd_clean$variable_features <- jsonlite::toJSON(
-        feature_diag$variable_features, dataframe = "rows", auto_unbox = TRUE
+        vf, dataframe = "rows", auto_unbox = TRUE
       )
     }
 

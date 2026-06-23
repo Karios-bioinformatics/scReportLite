@@ -1,12 +1,9 @@
 # scReportLite: Feature Diagnostics view JavaScript -------------------------------
 # v0.4.0 — Feature diagnostics view JS (data-driven, single canvas)
 #
-# Returns the JS string for the Feature view: state machine, controls registry,
-# render functions, and navigation.
-#
 # NOTE: This JS lives inside an R single-quoted string (feature_js <- function() { '...' }).
-# All JS strings use double quotes only.  HTML markup is built via DOM API,
-# never innerHTML with string templates, to avoid R/JS string escaping issues.
+# All JS strings use double quotes only.  No R escape sequences (\n, \t, \", etc.)
+# in the JS body.  HTML markup is built via DOM API only.
 
 feature_js <- function() {
 '
@@ -15,11 +12,11 @@ feature_js <- function() {
 // =========================================================================
 
 var _FEATURE_STATE = {
-  activeModule: "scatter",   // "scatter" | "varfeat" | "topexp" | "elbow"
+  activeModule: "scatter",
   initialized: false,
 
   scatter: {
-    x: null, y: null, colorBy: "none"
+    x: null, y: null, colorBy: "none", highlightGroup: null
   },
 
   varfeat: {
@@ -27,7 +24,7 @@ var _FEATURE_STATE = {
   },
 
   topexp: {
-    showPoints: true, maxGenes: 20, sortBy: "rank"
+    maxGenes: 20
   },
 
   elbow: {
@@ -39,7 +36,7 @@ var _FEATURE_STATE = {
   isRendering: false
 };
 
-// === Error / no-data display helpers (pure DOM API — no innerHTML strings) ===
+// === Error / no-data display helpers (pure DOM API) ===
 
 var _FEATURE_NO_DATA_MSGS = {
   scatter: "No FeatureScatter data available.",
@@ -93,7 +90,7 @@ function _FEATURE_scheduleRender() {
   }, 60);
 }
 
-// === Control DOM builders (same pattern as _PLOT_mk* helpers) ===
+// === Control DOM builders ===
 
 function _FEATURE_mkGroup(label) {
   var g = document.createElement("div");
@@ -124,9 +121,7 @@ function _FEATURE_mkSelect(value, onchange) {
   var sel = document.createElement("select");
   sel.className = "plot-params-select";
   if (onchange) {
-    sel.addEventListener("change", function(e) {
-      onchange(e.target.value);
-    });
+    sel.addEventListener("change", function(e) { onchange(e.target.value); });
   }
   return sel;
 }
@@ -135,6 +130,7 @@ function _FEATURE_mkSelect(value, onchange) {
 
 function _SR_featureModebarConfig() {
   return {
+    displayModeBar: "hover",
     modeBarButtonsToRemove: ["sendDataToCloud","lasso2d","select2d","autoScale2d","toggleSpikelines"],
     modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
     displaylogo: false
@@ -152,7 +148,7 @@ var _FEATURE_PALETTE = [
 
 function _FEATURE_getColor(i) { return _FEATURE_PALETTE[i % _FEATURE_PALETTE.length]; }
 
-// === Helpers: clear canvas and prep a fresh plot div ===
+// === Canvas helpers ===
 
 function _FEATURE_clearCanvas() {
   var canvas = document.getElementById("feature-active-canvas");
@@ -170,7 +166,7 @@ function _FEATURE_makePlotDiv(parent) {
 }
 
 // =========================================================================
-// Controls Registry (same pattern as _PLOT_CONTROL_REGISTRY)
+// Controls Registry
 // =========================================================================
 
 var _FEATURE_CONTROL_REGISTRY = {
@@ -236,7 +232,9 @@ var _FEATURE_CONTROL_REGISTRY = {
       if ("sample" in cols) options.push("sample");
       var g = _FEATURE_mkGroup("Color by");
       var sel = _FEATURE_mkSelect(_FEATURE_STATE.scatter.colorBy, function(v) {
-        _FEATURE_STATE.scatter.colorBy = v; _FEATURE_scheduleRender();
+        _FEATURE_STATE.scatter.colorBy = v;
+        _FEATURE_STATE.scatter.highlightGroup = null;
+        _FEATURE_scheduleRender();
       });
       for (var i = 0; i < options.length; i++) {
         var opt = document.createElement("option");
@@ -245,6 +243,69 @@ var _FEATURE_CONTROL_REGISTRY = {
         sel.appendChild(opt);
       }
       g.appendChild(sel); container.appendChild(g);
+    }
+  },
+
+  fsGroupHighlight: {
+    render: function(container) {
+      var cBy = _FEATURE_STATE.scatter.colorBy;
+      if (cBy === "none") return;
+      var d = _FEATURE_getData();
+      if (!d || !d.feature_scatter || !d.feature_scatter.data) return;
+
+      // Collect unique group names
+      var rows = d.feature_scatter.data;
+      var groupSet = {};
+      for (var i = 0; i < rows.length; i++) {
+        var v = rows[i][cBy];
+        if (v != null) groupSet[String(v)] = true;
+      }
+      var groupNames = Object.keys(groupSet).sort();
+
+      var g = _FEATURE_mkGroup((cBy === "sample" ? "Sample" : "Cluster") + " highlight");
+      var list = document.createElement("div");
+      list.className = "feature-group-list";
+
+      // "None" item
+      (function() {
+        var item = document.createElement("div");
+        item.className = "feature-group-item" + (_FEATURE_STATE.scatter.highlightGroup === null ? " active" : "");
+        item.onclick = function() {
+          _FEATURE_STATE.scatter.highlightGroup = null;
+          _FEATURE_scheduleRender();
+        };
+        var dot = document.createElement("span");
+        dot.className = "feature-group-dot";
+        dot.style.background = "#b2bec3";
+        item.appendChild(dot);
+        var span = document.createElement("span");
+        span.textContent = "None (show all)";
+        item.appendChild(span);
+        list.appendChild(item);
+      })();
+
+      for (var gi = 0; gi < groupNames.length; gi++) {
+        (function(gn) {
+          var item = document.createElement("div");
+          item.className = "feature-group-item" + (_FEATURE_STATE.scatter.highlightGroup === gn ? " active" : "");
+          item.onclick = function() {
+            _FEATURE_STATE.scatter.highlightGroup =
+              (_FEATURE_STATE.scatter.highlightGroup === gn) ? null : gn;
+            _FEATURE_scheduleRender();
+          };
+          var dot = document.createElement("span");
+          dot.className = "feature-group-dot";
+          dot.style.background = _FEATURE_getColor(gi);
+          item.appendChild(dot);
+          var span = document.createElement("span");
+          span.textContent = gn;
+          item.appendChild(span);
+          list.appendChild(item);
+        })(groupNames[gi]);
+      }
+
+      g.appendChild(list);
+      container.appendChild(g);
     }
   },
 
@@ -304,22 +365,7 @@ var _FEATURE_CONTROL_REGISTRY = {
     }
   },
 
-  // ---- Top Expressed Genes controls ----
-  teShowPoints: {
-    render: function(container) {
-      var g = _FEATURE_mkGroup("Points");
-      g.appendChild(_FEATURE_mkToggleRow([
-        _FEATURE_mkToggleBtn("Show", _FEATURE_STATE.topexp.showPoints, function() {
-          _FEATURE_STATE.topexp.showPoints = true; _FEATURE_renderControls();
-        }),
-        _FEATURE_mkToggleBtn("Hide", !_FEATURE_STATE.topexp.showPoints, function() {
-          _FEATURE_STATE.topexp.showPoints = false; _FEATURE_renderControls();
-        })
-      ]));
-      container.appendChild(g);
-    }
-  },
-
+  // ---- Top Expressed Genes controls (simplified) ----
   teMaxGenes: {
     render: function(container) {
       var g = _FEATURE_mkGroup("Max genes");
@@ -331,23 +377,6 @@ var _FEATURE_CONTROL_REGISTRY = {
         var opt = document.createElement("option");
         opt.value = String(opts[i]); opt.textContent = String(opts[i]);
         if (opts[i] === _FEATURE_STATE.topexp.maxGenes) opt.selected = true;
-        sel.appendChild(opt);
-      }
-      g.appendChild(sel); container.appendChild(g);
-    }
-  },
-
-  teSortBy: {
-    render: function(container) {
-      var g = _FEATURE_mkGroup("Sort by");
-      var sel = _FEATURE_mkSelect(_FEATURE_STATE.topexp.sortBy, function(v) {
-        _FEATURE_STATE.topexp.sortBy = v; _FEATURE_scheduleRender();
-      });
-      var opts = [{v:"rank",l:"Rank"},{v:"mean_percent",l:"Mean %"}];
-      for (var i = 0; i < opts.length; i++) {
-        var opt = document.createElement("option");
-        opt.value = opts[i].v; opt.textContent = opts[i].l;
-        if (opts[i].v === _FEATURE_STATE.topexp.sortBy) opt.selected = true;
         sel.appendChild(opt);
       }
       g.appendChild(sel); container.appendChild(g);
@@ -397,9 +426,9 @@ var _FEATURE_CONTROL_REGISTRY = {
 // === Module -> control mapping ===
 
 var _FEATURE_MODULES = {
-  scatter: { controls: ["fsX","fsY","fsColorBy"] },
+  scatter: { controls: ["fsX","fsY","fsColorBy","fsGroupHighlight"] },
   varfeat: { controls: ["vfLabelTop","vfShowLabels","vfYMetric"] },
-  topexp:  { controls: ["teShowPoints","teMaxGenes","teSortBy"] },
+  topexp:  { controls: ["teMaxGenes"] },
   elbow:   { controls: ["elYMetric","elMaxDims"] }
 };
 
@@ -423,7 +452,7 @@ function _FEATURE_renderControls() {
 }
 
 // =========================================================================
-// RENDER: FeatureScatter (scattergl, x/y/color_by selectable)
+// RENDER: FeatureScatter — with colour-by and group highlight
 // =========================================================================
 
 function _FEATURE_renderScatter() {
@@ -446,14 +475,18 @@ function _FEATURE_renderScatter() {
   _FEATURE_STATE.scatter.y = yCol;
   _FEATURE_STATE.scatter.colorBy = cBy;
 
+  var hlGroup = _FEATURE_STATE.scatter.highlightGroup;
+  var DIM_COLOR = "#D0D0D0";
+  var DIM_OPACITY = 0.08;
+  var HL_OPACITY = 0.80;
+
   if (rows.length === 0) {
     _FEATURE_showNoData("FeatureScatter data is empty.");
     return;
   }
 
-  // Build trace(s)
-  var traces = [];
   var useWebGL = window._FEATURE_USE_WEBGL !== false;
+  var traces = [];
 
   if (cBy === "none") {
     var xs = [], ys = [], hovers = [];
@@ -471,25 +504,34 @@ function _FEATURE_renderScatter() {
       name: "cells", showlegend: false
     });
   } else {
+    // Build per-group traces + apply highlight dimming
     var groups = {};
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       if (typeof r[xCol] !== "number" || typeof r[yCol] !== "number") continue;
       var gKey = String(r[cBy] || "NA");
-      if (!groups[gKey]) groups[gKey] = {xs:[], ys:[], hovers:[]};
+      if (!groups[gKey]) groups[gKey] = {xs:[], ys:[], hovers:[], idx: Object.keys(groups).length};
       groups[gKey].xs.push(r[xCol]);
       groups[gKey].ys.push(r[yCol]);
       groups[gKey].hovers.push("Cell: " + (r.cell||"") + "<br>" + cBy + ": " + gKey + "<br>" + xCol + ": " + r[xCol].toFixed(2) + "<br>" + yCol + ": " + r[yCol].toFixed(2));
     }
+
     var gNames = Object.keys(groups).sort();
+    var hasHighlight = (hlGroup !== null);
+
     for (var gi = 0; gi < gNames.length; gi++) {
-      var g = groups[gNames[gi]];
+      var gn = gNames[gi];
+      var g = groups[gn];
+      var isHL = hasHighlight && (gn === hlGroup);
+      var opacity = hasHighlight ? (isHL ? HL_OPACITY : DIM_OPACITY) : 0.7;
+      var color = hasHighlight ? (isHL ? _FEATURE_getColor(gi) : DIM_COLOR) : _FEATURE_getColor(gi);
+
       traces.push({
         x: g.xs, y: g.ys, text: g.hovers,
         type: useWebGL ? "scattergl" : "scatter",
         mode: "markers", hoverinfo: "text",
-        marker: {color: _FEATURE_getColor(gi), size: 4, opacity: 0.7, line: {width: 0}},
-        name: gNames[gi], showlegend: false
+        marker: {color: color, size: 4, opacity: opacity, line: {width: 0}},
+        name: gn, showlegend: false
       });
     }
   }
@@ -618,7 +660,7 @@ function _FEATURE_renderVarFeatures() {
 }
 
 // =========================================================================
-// RENDER: Top Expressed Genes
+// RENDER: Top Expressed Genes — horizontal boxplot, simplified
 // =========================================================================
 
 function _FEATURE_renderTopExpressed() {
@@ -634,42 +676,50 @@ function _FEATURE_renderTopExpressed() {
   var te = d.top_expressed;
   var sm = te.summary;
   var pts = te.points || [];
-
   var maxG = _FEATURE_STATE.topexp.maxGenes;
-  var sortBy = _FEATURE_STATE.topexp.sortBy;
-  var showPts = _FEATURE_STATE.topexp.showPoints;
 
+  // Sort by rank
   var sorted = sm.slice();
-  sorted.sort(function(a, b) {
-    if (sortBy === "mean_percent") return b.mean_percent - a.mean_percent;
-    return a.rank - b.rank;
-  });
+  sorted.sort(function(a, b) { return a.rank - b.rank; });
   sorted = sorted.slice(0, maxG);
 
+  // Build gene -> points index
+  var ptIndex = {};
+  if (pts.length > 0) {
+    for (var pi = 0; pi < pts.length; pi++) {
+      var g = pts[pi].gene;
+      if (!ptIndex[g]) ptIndex[g] = [];
+      ptIndex[g].push(pts[pi].percent_total);
+    }
+  }
+
+  // Description line
+  var desc = document.createElement("div");
+  desc.style.cssText = "font-size:0.78em;color:#636e72;padding:4px 8px;flex-shrink:0;";
+  desc.textContent = "Genes ranked by mean percentage of total counts per cell.";
+  canvas.appendChild(desc);
+
+  // Horizontal box: one trace per gene, orientation="h"
+  // We use y=gene name (categorical), x=percent values
   var traces = [];
   var geneNames = [];
   for (var gi = 0; gi < sorted.length; gi++) {
     var row = sorted[gi];
     geneNames.push(row.gene);
-    var gPts = [];
-    if (showPts && pts.length > 0) {
-      for (var pi = 0; pi < pts.length; pi++) {
-        if (pts[pi].gene === row.gene) gPts.push(pts[pi].percent_total);
-      }
-    }
+    var gPts = ptIndex[row.gene] || [];
+    if (gPts.length === 0) gPts = [row.median];
     traces.push({
-      y: gPts.length > 0 ? gPts : [row.median],
-      x: new Array(gPts.length > 0 ? gPts.length : 1).fill(row.gene),
+      x: gPts,
+      y: new Array(gPts.length).fill(row.gene),
       type: "box",
+      orientation: "h",
       name: row.gene,
       showlegend: false,
       marker: {color: "#00b894"},
       fillcolor: "rgba(0,184,148,0.15)",
       line: {color: "#00b894", width: 1},
-      hoverinfo: "y+name",
-      boxpoints: showPts && gPts.length > 0 ? "outliers" : false,
-      jitter: 0.3,
-      pointpos: 0,
+      hoverinfo: "x+name",
+      boxpoints: false,
       text: "Gene: " + row.gene + "<br>Mean: " + row.mean_percent.toFixed(2) + "%<br>Median: " + row.median.toFixed(2) + "%",
       hovertext: "Gene: " + row.gene + "<br>Mean: " + row.mean_percent.toFixed(2) + "%<br>Median: " + row.median.toFixed(2) + "%<br>Q1: " + row.q1.toFixed(2) + "%<br>Q3: " + row.q3.toFixed(2) + "%"
     });
@@ -681,22 +731,22 @@ function _FEATURE_renderTopExpressed() {
   }
 
   var plotDiv = _FEATURE_makePlotDiv(canvas);
-  var layoutHeight = Math.max(400, maxG * 18);
+  var layoutHeight = Math.max(400, maxG * 22);
 
   Plotly.newPlot(plotDiv, traces, {
     title: "",
-    yaxis: {title: "", showgrid: true, zeroline: false, automargin: true,
+    xaxis: {title: "% total count per cell", showgrid: true, zeroline: true},
+    yaxis: {title: "", showgrid: false, zeroline: false, automargin: true,
             categoryorder: "array", categoryarray: geneNames.slice().reverse()},
-    xaxis: {title: "% Total Count per Cell", showgrid: true, zeroline: true},
     hovermode: "closest", dragmode: "pan",
     height: layoutHeight,
-    margin: {l: 120, r: 30, b: 60, t: 10},
+    margin: {l: 140, r: 30, b: 50, t: 10},
     boxmode: "group"
   }, _SR_featureModebarConfig());
 }
 
 // =========================================================================
-// RENDER: ElbowPlot
+// RENDER: ElbowPlot — markers only
 // =========================================================================
 
 function _FEATURE_renderElbow() {
@@ -737,9 +787,8 @@ function _FEATURE_renderElbow() {
 
   Plotly.newPlot(plotDiv, [{
     x: xs, y: ys, text: hovers,
-    type: "scatter", mode: "lines+markers",
+    type: "scatter", mode: "markers",
     marker: {color: "#00b894", size: 6},
-    line: {color: "#00b894", width: 2},
     hoverinfo: "text", name: yLabels[yMetric] || yMetric,
     showlegend: false
   }], {
@@ -802,7 +851,7 @@ function _FEATURE_updateNav(activeView) {
 }
 
 // =========================================================================
-// Initialization (called on first visit to Feature view)
+// Initialization
 // =========================================================================
 
 function _FEATURE_init() {
@@ -815,7 +864,6 @@ function _FEATURE_init() {
     return;
   }
 
-  // Set defaults from data
   if (d.feature_scatter) {
     _FEATURE_STATE.scatter.x = d.feature_scatter.default_x || "nCount_RNA";
     _FEATURE_STATE.scatter.y = d.feature_scatter.default_y || "nFeature_RNA";
@@ -833,8 +881,6 @@ function _FEATURE_init() {
   }
 
   _FEATURE_scheduleRender();
-  // Also render immediately on first init so the user sees FeatureScatter
-  // without waiting for the 60 ms debounce timer.
   _FEATURE_renderCurrentState();
 }
 
