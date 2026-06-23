@@ -149,7 +149,7 @@ sc_report(
   qc_df       = qc_df,
   output      = out1,
   title       = "v0.3.0 — Plot + UMAP",
-  panels      = c("plot", "umap", "marker_table")
+  panels      = c("qc", "umap", "marker_table")
 )
 cat("  Plot + UMAP OK →", out1, "\n")
 
@@ -171,7 +171,7 @@ sc_report(
   qc_df       = qc_df,
   output      = out2,
   title       = "v0.3.0 — Plot + PCA + UMAP",
-  panels      = c("plot", "pca", "umap", "marker_table")
+  panels      = c("qc", "pca", "umap", "marker_table")
 )
 cat("  Full triad OK →", out2, "\n")
 
@@ -200,7 +200,7 @@ cat("  Backward compat OK →", out3, "\n")
 # Test 4 — "plot" in panels but qc_df = NULL (should warn, not crash)
 # =============================================================================
 cat("\n=============================================\n")
-cat("  v0.3.0 — Test 4: Plot panel, NULL qc_df\n")
+cat("  v0.3.0 — Test 4: QC panel, NULL qc_df\n")
 cat("=============================================\n")
 
 out4 <- file.path(tempdir(), "scReportLite_v030_plot_null.html")
@@ -211,10 +211,10 @@ sc_report(
   sample_col  = "sample",
   qc_df       = NULL,
   output      = out4,
-  title       = "v0.3.0 — Plot (NULL qc_df)",
-  panels      = c("plot", "umap", "marker_table")
+  title       = "v0.3.0 — QC (NULL qc_df)",
+  panels      = c("qc", "umap", "marker_table")
 )
-cat("  Plot with NULL qc_df (warning expected) OK →", out4, "\n")
+cat("  QC with NULL qc_df (warning expected) OK →", out4, "\n")
 
 # =============================================================================
 # Summary
@@ -229,22 +229,22 @@ cat("  Test 4 (Plot NULL qc_df):     ", out4, "\n")
 
 cat("\nManual verification checklist:\n")
 cat("  Test 1:\n")
-cat("    [ ] View tabs: Plot (active) | UMAP\n")
-cat("    [ ] Plot view: QC controls (4 items) + nCount_RNA jitter plot\n")
+cat("    [ ] View tabs: QC (active) | UMAP\n")
+cat("    [ ] QC view: QC controls (4 items) + nCount_RNA jitter plot\n")
 cat("    [ ] Clicking QC items switches plots (no JS errors)\n")
 cat("    [ ] Hover on scatter: Cell, Sample, nCount_RNA, nFeature_RNA, percent.mt, Cluster\n")
 cat("    [ ] Switch to UMAP: works, sidebar + highlight + marker table intact\n")
-cat("    [ ] Switch back to Plot: QC controls state preserved\n")
+cat("    [ ] Switch back to QC: QC controls state preserved\n")
 cat("  Test 2:\n")
-cat("    [ ] View tabs: Plot (active) | PCA | UMAP\n")
+cat("    [ ] View tabs: QC (active) | PCA | UMAP\n")
 cat("    [ ] Switch to PCA: PC selector, colour by, groups all work\n")
 cat("    [ ] Switch to UMAP: all UMAP features intact\n")
-cat("    [ ] Switch to Plot: QC plots OK\n")
+cat("    [ ] Switch to QC: QC plots OK\n")
 cat("  Test 3:\n")
-cat("    [ ] View tabs: PCA | UMAP (no Plot tab)\n")
+cat("    [ ] View tabs: PCA | UMAP (no QC tab)\n")
 cat("    [ ] PCA + UMAP both work as before\n")
 cat("  Test 4:\n")
-cat("    [ ] Warning: \"Plot panel requested but qc_df is NULL\"\n")
-cat("    [ ] Report generates without Plot tab\n")
+cat("    [ ] Warning: \"QC panel requested but qc_df is NULL\"\n")
+cat("    [ ] Report generates without QC tab\n")
 cat("    [ ] UMAP works normally\n")
-cat("\n  Console check: no \"Unknown panel\" warnings for 'plot'\n")
+cat("\n  Console check: no \"Unknown panel\" warnings for 'qc'\n")

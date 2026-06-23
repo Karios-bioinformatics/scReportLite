@@ -640,6 +640,97 @@ body {
   color: #2d3436;
 }
 
+/* --- Feature diagnostics view (v0.4.0) --- */
+.sr-view-feature {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.feature-layout {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) 220px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.feature-nav {
+  width: 170px;
+  min-width: 170px;
+  min-height: 0;
+  flex-shrink: 0;
+  background: #fff;
+  border-right: 1px solid #dfe6e9;
+  overflow-y: auto;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.feature-nav-label {
+  font-size: 0.72em;
+  font-weight: 700;
+  color: #b2bec3;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 4px 8px;
+  margin-top: 8px;
+  margin-bottom: 2px;
+}
+.feature-nav-label:first-child { margin-top: 0; }
+
+.feature-nav-item {
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.80em;
+  color: #636e72;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  user-select: none;
+  border-left: 3px solid transparent;
+  gap: 6px;
+}
+.feature-nav-item:hover { background: #f0f1f5; }
+.feature-nav-item.active {
+  background: #e8ecf8;
+  border-left-color: #00b894;
+  font-weight: 600;
+  color: #2d3436;
+}
+
+.feature-nav-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #00b894;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.feature-nav-item.active .feature-nav-dot { opacity: 1; }
+
+.feature-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.feature-params {
+  width: 220px;
+  min-width: 220px;
+  background: #fff;
+  border-left: 1px solid #dfe6e9;
+  overflow-y: auto;
+  padding: 12px;
+}
+
 /* --- Header --- */
 .report-header {
   background: #fff;
@@ -1144,20 +1235,24 @@ function switchView(view) {
   _ACTIVE_VIEW = view;
   _SR_ACTIVE_VIEW = view;  // canonical active view for lazy rendering
 
-  var plotView = document.getElementById("sr-view-plot");
-  var pcaView  = document.getElementById("sr-view-pca");
-  var umapView = document.getElementById("sr-view-umap");
-  var tabPlot  = document.getElementById("view-tab-plot");
-  var tabP     = document.getElementById("view-tab-pca");
-  var tabU     = document.getElementById("view-tab-umap");
+  var plotView    = document.getElementById("sr-view-plot");
+  var featureView = document.getElementById("sr-view-feature");
+  var pcaView     = document.getElementById("sr-view-pca");
+  var umapView    = document.getElementById("sr-view-umap");
+  var tabPlot     = document.getElementById("view-tab-plot");
+  var tabFeature  = document.getElementById("view-tab-feature");
+  var tabP        = document.getElementById("view-tab-pca");
+  var tabU        = document.getElementById("view-tab-umap");
 
   // Hide all views and deactivate all tabs
-  if (plotView) plotView.style.display = "none";
-  if (pcaView)  pcaView.style.display  = "none";
-  if (umapView) umapView.style.display = "none";
-  if (tabPlot)  tabPlot.classList.remove("active");
-  if (tabP)     tabP.classList.remove("active");
-  if (tabU)     tabU.classList.remove("active");
+  if (plotView)    plotView.style.display    = "none";
+  if (featureView) featureView.style.display = "none";
+  if (pcaView)     pcaView.style.display     = "none";
+  if (umapView)    umapView.style.display    = "none";
+  if (tabPlot)     tabPlot.classList.remove("active");
+  if (tabFeature)  tabFeature.classList.remove("active");
+  if (tabP)        tabP.classList.remove("active");
+  if (tabU)        tabU.classList.remove("active");
 
   // Show active view
   var activeViewEl = null;
@@ -1166,6 +1261,11 @@ function switchView(view) {
     plotView.style.display = "";
     if (tabPlot) tabPlot.classList.add("active");
     try { _PLOT_ensureInit(); } catch(e) {}
+  } else if (view === "feature" && featureView) {
+    activeViewEl = featureView;
+    featureView.style.display = "";
+    if (tabFeature) tabFeature.classList.add("active");
+    try { _FEATURE_ensureInit(); } catch(e) {}
   } else if (view === "pca" && pcaView) {
     activeViewEl = pcaView;
     pcaView.style.display = "";
@@ -3309,6 +3409,8 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                              pca_loading_json = "[]",
                              pca_loading_top_n = 10,
                              qc_payload = NULL,
+                             feature_diag = NULL,
+                             feature_diag_json = "null",
                              use_webgl = TRUE,
                              output, title, dim_opacity, marker_n_top,
                              panels = c("umap", "marker_table")) {
@@ -3319,6 +3421,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   has_samples  <- !is.null(sample_col)
   has_pca      <- !is.null(pca_df) && "pca" %in% panels
   has_plot     <- !is.null(qc_payload) && "qc" %in% panels
+  has_feature  <- !is.null(feature_diag) && "feature" %in% panels
 
   # ---- Sidebar: Cluster section ----
   cluster_html <- lapply(clusters, function(cl) {
@@ -3447,26 +3550,33 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   )
 
   # ---- View tabs (standalone, between header and main-layout, v0.3.0) ----
-  view_tabs_html <- if (has_plot) {
-    # QC view exists → QC | PCA | UMAP (QC active by default)
-    tags$div(
-      class = "view-tabs",
-      tags$div(class = "view-tab active", id = "view-tab-plot",
-               onclick = "switchView('plot')", "QC"),
-      if (has_pca) tags$div(class = "view-tab", id = "view-tab-pca",
-               onclick = "switchView('pca')", "PCA"),
-      tags$div(class = "view-tab", id = "view-tab-umap",
-               onclick = "switchView('umap')", "UMAP")
-    )
-  } else if (has_pca) {
-    # Only PCA → PCA | UMAP (UMAP active by default, old behaviour)
-    tags$div(
-      class = "view-tabs",
-      tags$div(class = "view-tab", id = "view-tab-pca",
-               onclick = "switchView('pca')", "PCA"),
-      tags$div(class = "view-tab active", id = "view-tab-umap",
-               onclick = "switchView('umap')", "UMAP")
-    )
+  view_tabs <- list()
+  first_view <- if (has_plot) "plot" else if (has_feature) "feature" else if (has_pca) "pca" else "umap"
+
+  if (has_plot) {
+    view_tabs <- c(view_tabs, list(
+      tags$div(class = paste0("view-tab", if (first_view == "plot") " active" else ""),
+               id = "view-tab-plot", onclick = "switchView('plot')", "QC")
+    ))
+  }
+  if (has_feature) {
+    view_tabs <- c(view_tabs, list(
+      tags$div(class = paste0("view-tab", if (first_view == "feature") " active" else ""),
+               id = "view-tab-feature", onclick = "switchView('feature')", "Feature")
+    ))
+  }
+  if (has_pca) {
+    view_tabs <- c(view_tabs, list(
+      tags$div(class = paste0("view-tab", if (first_view == "pca") " active" else ""),
+               id = "view-tab-pca", onclick = "switchView('pca')", "PCA")
+    ))
+  }
+  view_tabs <- c(view_tabs, list(
+    tags$div(class = paste0("view-tab", if (first_view == "umap") " active" else ""),
+             id = "view-tab-umap", onclick = "switchView('umap')", "UMAP")
+  ))
+  view_tabs_html <- if (length(view_tabs) > 0) {
+    tags$div(class = "view-tabs", view_tabs)
   }
 
   # ---- Build per-sample composition data (for JS-driven chart) ----
@@ -3487,7 +3597,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
   # ---- Build panel sections for content area ----
   has_umap         <- "umap" %in% panels
-  non_umap_panels  <- setdiff(panels, c("umap", "pca", "qc"))
+  non_umap_panels  <- setdiff(panels, c("umap", "pca", "qc", "feature"))
 
   # Prepare shared panel params
   panel_params <- list(
@@ -3579,11 +3689,45 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
             )
           ),
 
+          # ---- Feature view container (v0.4.0) ----
+          if (has_feature) tags$div(
+            id    = "sr-view-feature",
+            class = "sr-view-feature",
+            style = if (first_view != "feature") "display:none;" else "",
+            tags$div(class = "feature-layout",
+              # Left: navigator
+              tags$div(class = "feature-nav", id = "feature-nav",
+                tags$div(class = "feature-nav-label", "Feature Diagnostics"),
+                tags$div(class = "feature-nav-item active", `data-feature-nav` = "scatter",
+                  onclick = "_FEATURE_selectView('scatter')",
+                  tags$span(class = "feature-nav-dot"), "FeatureScatter"),
+                tags$div(class = "feature-nav-item", `data-feature-nav` = "varfeat",
+                  onclick = "_FEATURE_selectView('varfeat')",
+                  tags$span(class = "feature-nav-dot"), "Variable Features"),
+                tags$div(class = "feature-nav-item", `data-feature-nav` = "topexp",
+                  onclick = "_FEATURE_selectView('topexp')",
+                  tags$span(class = "feature-nav-dot"), "Top Expressed Genes"),
+                tags$div(class = "feature-nav-item", `data-feature-nav` = "elbow",
+                  onclick = "_FEATURE_selectView('elbow')",
+                  tags$span(class = "feature-nav-dot"), "Elbow Plot")
+              ),
+              # Center: single active canvas
+              tags$div(class = "feature-main", id = "feature-main",
+                tags$div(id = "feature-active-canvas",
+                  style = "flex:1;min-height:0;display:flex;flex-direction:column;")
+              ),
+              # Right: dynamic controls
+              tags$div(class = "feature-params", id = "feature-params",
+                tags$div(id = "feature-controls-dynamic")
+              )
+            )
+          ),
+
           # ---- UMAP view container ----
           tags$div(
             id    = "sr-view-umap",
             class = "sr-view-umap",
-            style = if (has_plot) "display:none;" else "",
+            style = if (has_plot || has_feature) "display:none;" else "",
 
             # ---- Sidebar ----
             tags$div(class = "sidebar", sidebar_html),
@@ -3709,6 +3853,14 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
       if (has_plot) tags$script(htmltools::HTML(paste0(
         "window._QC_DATA = ", jsonlite::toJSON(qc_payload, auto_unbox = TRUE, digits = 6), ";"
       ))),
+      if (has_feature) list(
+        tags$script(htmltools::HTML(paste0(
+          "window._FEATURE_DIAG_DATA = ", feature_diag_json, ";"
+        ))),
+        tags$script(htmltools::HTML(paste0(
+          "window._FEATURE_USE_WEBGL = ", if (use_webgl) "true" else "false", ";"
+        )))
+      ),
       if (has_pca) list(
         tags$script(htmltools::HTML(paste0("window._PCA_DATA = ", pca_data_json, ";"))),
         tags$script(htmltools::HTML(paste0(
@@ -3723,9 +3875,10 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
       ),
       tags$script(htmltools::HTML(sprintf(
         "window._SR_INITIAL_VIEW = '%s';",
-        if (has_plot) "plot" else if (has_pca) "pca" else "umap"
+        first_view
       ))),
       tags$script(htmltools::HTML(paste(report_js(), panel_js_extra, sep = "\n"))),
+      if (has_feature) tags$script(htmltools::HTML(feature_js())),
       if (has_pca) tags$script(htmltools::HTML(
         "window._PCA_COLORS = window._PCA_COLORS || {};"
       ))
@@ -3739,6 +3892,49 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   message("  Dependencies: ", normalizePath(libdir, mustWork = FALSE))
 
   invisible(output)
+}
+
+
+# ---- Feature diagnostics JSON builder (internal) -------------------------------
+
+#' Build the feature diagnostics JSON string from cleaned data
+#'
+#' Merges pre-serialized sub-module JSON fragments into a single JS object literal.
+#'
+#' @param fd_clean A list of pre-serialized JSON strings for each sub-module
+#' @return A JSON string representing the full feature_diag object
+#' @keywords internal
+.build_feature_diag_json <- function(fd_clean) {
+  parts <- character()
+  if (!is.null(fd_clean$feature_scatter)) {
+    fs <- fd_clean$feature_scatter
+    parts <- c(parts, sprintf(
+      '"feature_scatter":{"default_x":%s,"default_y":%s,"default_color_by":%s,"data":%s}',
+      jsonlite::toJSON(fs$default_x, auto_unbox = TRUE),
+      jsonlite::toJSON(fs$default_y, auto_unbox = TRUE),
+      jsonlite::toJSON(fs$default_color_by, auto_unbox = TRUE),
+      fs$data
+    ))
+  }
+  if (!is.null(fd_clean$variable_features)) {
+    parts <- c(parts, sprintf('"variable_features":%s', fd_clean$variable_features))
+  }
+  if (!is.null(fd_clean$top_expressed)) {
+    te_parts <- character()
+    if (!is.null(fd_clean$top_expressed$summary)) {
+      te_parts <- c(te_parts, sprintf('"summary":%s', fd_clean$top_expressed$summary))
+    }
+    if (!is.null(fd_clean$top_expressed$points)) {
+      te_parts <- c(te_parts, sprintf('"points":%s', fd_clean$top_expressed$points))
+    }
+    if (length(te_parts) > 0) {
+      parts <- c(parts, sprintf('"top_expressed":{%s}', paste(te_parts, collapse = ",")))
+    }
+  }
+  if (!is.null(fd_clean$elbow)) {
+    parts <- c(parts, sprintf('"elbow":%s', fd_clean$elbow))
+  }
+  paste0("{", paste(parts, collapse = ","), "}")
 }
 
 
@@ -3825,6 +4021,7 @@ sc_report <- function(umap_df,
                        pca_loading_df = NULL,
                        pca_loading_top_n = 10,
                        qc_df         = NULL,
+                       feature_diag  = NULL,
                        output        = "sc_report.html",
                        title         = "scRNA-seq Report",
                        point_size    = 3,
@@ -3879,6 +4076,31 @@ sc_report <- function(umap_df,
             call. = FALSE)
   }
 
+  # Validate feature diagnostics data if provided (v0.4.0)
+  if (!is.null(feature_diag) && "feature" %in% panels) {
+    if (!is.list(feature_diag)) {
+      warning("feature_diag must be a list. Skipping Feature view.",
+              call. = FALSE)
+      feature_diag <- NULL
+    } else {
+      # Validate sub-modules exist but allow partial data
+      known_modules <- c("feature_scatter", "variable_features", "top_expressed", "elbow")
+      missing_modules <- setdiff(known_modules, names(feature_diag))
+      if (length(missing_modules) == length(known_modules)) {
+        warning("feature_diag has no recognised sub-modules. Skipping Feature view.",
+                call. = FALSE)
+        feature_diag <- NULL
+      } else if (length(missing_modules) > 0) {
+        message("feature_diag is missing sub-modules: ",
+                paste(missing_modules, collapse = ", "),
+                ". Corresponding Feature sub-views will show no data.")
+      }
+    }
+  } else if (is.null(feature_diag) && "feature" %in% panels) {
+    warning("Feature panel requested but feature_diag is NULL. Skipping Feature view.",
+            call. = FALSE)
+  }
+
   if (!is.character(output) || length(output) != 1) {
     stop("output must be a single file path string", call. = FALSE)
   }
@@ -3896,7 +4118,7 @@ sc_report <- function(umap_df,
     stop("panels must be a character vector with at least one element",
          call. = FALSE)
   }
-  known_panels  <- c("umap", "marker_table", "pca", "qc", list_panels())
+  known_panels  <- c("umap", "marker_table", "pca", "qc", "feature", list_panels())
   unknown_panels <- setdiff(panels, known_panels)
   if (length(unknown_panels) > 0) {
     warning("Unknown panel(s) in 'panels': ",
@@ -3999,6 +4221,65 @@ sc_report <- function(umap_df,
             call. = FALSE)
   }
 
+  # ---- Serialize feature diagnostics data (v0.4.0) ----
+  feature_diag_json <- "null"
+  if (!is.null(feature_diag) && "feature" %in% panels) {
+    message("scReportLite: serializing feature diagnostics data...")
+    # Wrap 'data' fields as row-list format for JS consumption
+    fd_clean <- list()
+
+    # feature_scatter: convert data.frame to list of rows
+    if (!is.null(feature_diag$feature_scatter)) {
+      fs <- feature_diag$feature_scatter
+      fd_clean$feature_scatter <- list(
+        default_x        = fs$default_x,
+        default_y        = fs$default_y,
+        default_color_by = fs$default_color_by
+      )
+      if (!is.null(fs$data) && is.data.frame(fs$data)) {
+        fd_clean$feature_scatter$data <- jsonlite::toJSON(
+          fs$data, dataframe = "rows", auto_unbox = TRUE
+        )
+        # actual data will be inlined below
+      } else {
+        fd_clean$feature_scatter$data <- "[]"
+      }
+    }
+
+    # variable_features: data.frame → rows
+    if (!is.null(feature_diag$variable_features) &&
+        is.data.frame(feature_diag$variable_features)) {
+      fd_clean$variable_features <- jsonlite::toJSON(
+        feature_diag$variable_features, dataframe = "rows", auto_unbox = TRUE
+      )
+    }
+
+    # top_expressed: summary + points
+    if (!is.null(feature_diag$top_expressed)) {
+      te <- feature_diag$top_expressed
+      fd_clean$top_expressed <- list()
+      if (!is.null(te$summary) && is.data.frame(te$summary)) {
+        fd_clean$top_expressed$summary <- jsonlite::toJSON(
+          te$summary, dataframe = "rows", auto_unbox = TRUE
+        )
+      }
+      if (!is.null(te$points) && is.data.frame(te$points)) {
+        fd_clean$top_expressed$points <- jsonlite::toJSON(
+          te$points, dataframe = "rows", auto_unbox = TRUE
+        )
+      }
+    }
+
+    # elbow: data.frame → rows
+    if (!is.null(feature_diag$elbow) && is.data.frame(feature_diag$elbow)) {
+      fd_clean$elbow <- jsonlite::toJSON(
+        feature_diag$elbow, dataframe = "rows", auto_unbox = TRUE
+      )
+    }
+
+    feature_diag_json <- .build_feature_diag_json(fd_clean)
+  }
+
   # ---- Assemble and write HTML ----
   message("scReportLite: assembling HTML report...")
   assemble_report(
@@ -4011,6 +4292,8 @@ sc_report <- function(umap_df,
     gene_expr_df  = gene_expr_df,
     pca_df        = pca_df,
     qc_payload    = qc_payload,
+    feature_diag      = feature_diag,
+    feature_diag_json = feature_diag_json,
     pca_data_json  = pca_data_json,
     pca_has_sample = pca_has_sample,
     pca_color_by   = pca_color_by,
