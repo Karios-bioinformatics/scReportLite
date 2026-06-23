@@ -619,7 +619,7 @@ function _FEATURE_renderTopExpressed() {
   }
 
   if (traces.length === 0) {
-    canvas.innerHTML = '<p class="no-data">No Top Expressed Genes data available.</p>';
+    canvas.innerHTML = "<p class=\"no-data\">No Top Expressed Genes data available.</p>";
     return;
   }
 
