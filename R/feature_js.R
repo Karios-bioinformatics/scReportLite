@@ -28,7 +28,7 @@ var _FEATURE_STATE = {
   },
 
   elbow: {
-    yMetric: "stdev", maxDims: 30
+    yMetric: "stdev"
   },
 
   renderToken: 0,
@@ -441,40 +441,36 @@ var _FEATURE_CONTROL_REGISTRY = {
   elYMetric: {
     render: function(container) {
       var g = _FEATURE_mkGroup("Y metric");
-      var sel = _FEATURE_mkSelect(_FEATURE_STATE.elbow.yMetric, function(v) {
-        _FEATURE_STATE.elbow.yMetric = v; _FEATURE_scheduleRender();
-      });
+
+      var btnRow = document.createElement("div");
+      btnRow.className = "plot-params-btn-row";
+      btnRow.style.flexDirection = "column";
+
       var opts = [
-        {v:"stdev",l:"Standard Deviation"},
-        {v:"variance_percent",l:"Variance %"},
-        {v:"cumulative_variance",l:"Cumulative Variance %"}
+        {v:"stdev",               l:"Standard deviation"},
+        {v:"variance_percent",    l:"Variance explained (%)"},
+        {v:"cumulative_variance", l:"Cumulative variance (%)"}
       ];
+      var cur = _FEATURE_STATE.elbow.yMetric;
       for (var i = 0; i < opts.length; i++) {
-        var opt = document.createElement("option");
-        opt.value = opts[i].v; opt.textContent = opts[i].l;
-        if (opts[i].v === _FEATURE_STATE.elbow.yMetric) opt.selected = true;
-        sel.appendChild(opt);
+        (function(o) {
+          btnRow.appendChild(_FEATURE_mkToggleBtn(o.l, cur === o.v, function() {
+            _FEATURE_STATE.elbow.yMetric = o.v;
+            _FEATURE_renderControls();
+            _FEATURE_scheduleRender();
+          }));
+        })(opts[i]);
       }
-      g.appendChild(sel); container.appendChild(g);
+      g.appendChild(btnRow);
+      container.appendChild(g);
+
+      // Short hint
+      var hint = document.createElement("p");
+      hint.style.cssText = "font-size:0.68em;color:#b2bec3;font-style:italic;padding:6px 0 0 0;line-height:1.4;";
+      hint.textContent = "Standard deviation: Seurat-style elbow. Variance %: variance explained by each PC. Cumulative %: cumulative variance explained.";
+      container.appendChild(hint);
     }
   },
-
-  elMaxDims: {
-    render: function(container) {
-      var g = _FEATURE_mkGroup("Max PCs");
-      var opts = [10, 20, 30, 50];
-      var sel = _FEATURE_mkSelect(String(_FEATURE_STATE.elbow.maxDims), function(v) {
-        _FEATURE_STATE.elbow.maxDims = parseInt(v); _FEATURE_scheduleRender();
-      });
-      for (var i = 0; i < opts.length; i++) {
-        var opt = document.createElement("option");
-        opt.value = String(opts[i]); opt.textContent = String(opts[i]);
-        if (opts[i] === _FEATURE_STATE.elbow.maxDims) opt.selected = true;
-        sel.appendChild(opt);
-      }
-      g.appendChild(sel); container.appendChild(g);
-    }
-  }
 };
 
 // === Module -> control mapping ===
@@ -483,7 +479,7 @@ var _FEATURE_MODULES = {
   scatter: { controls: ["fsFeatures","fsColorBy","fsGroupHighlight"] },
   varfeat: { controls: ["vfLabelTop","vfShowLabels","vfYMetric"] },
   topexp:  { controls: ["teMaxGenes"] },
-  elbow:   { controls: ["elYMetric","elMaxDims"] }
+  elbow:   { controls: ["elYMetric"] }
 };
 
 // === Render controls pane ===
@@ -822,8 +818,7 @@ function _FEATURE_renderElbow() {
 
   var el = d.elbow;
   var yMetric = _FEATURE_STATE.elbow.yMetric;
-  var maxDims = _FEATURE_STATE.elbow.maxDims;
-  var rows = el.slice(0, maxDims);
+  var rows = el.slice();
 
   if (rows.length === 0) {
     _FEATURE_showNoData(_FEATURE_NO_DATA_MSGS.elbow);
@@ -981,7 +976,7 @@ function _FEATURE_init() {
   }
 
   if (d.elbow && d.elbow.length > 0) {
-    _FEATURE_STATE.elbow.maxDims = Math.min(_FEATURE_STATE.elbow.maxDims, d.elbow.length);
+    // All PCs shown by default — no UI truncation needed
   }
 
   _FEATURE_scheduleRender();
