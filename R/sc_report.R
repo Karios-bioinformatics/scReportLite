@@ -765,6 +765,38 @@ body {
   flex-shrink: 0;
 }
 
+/* --- plot-params-btn generic (Feature view controls) --- */
+.plot-params-btn {
+  border: 1px solid #dfe6e9;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #2d3436;
+  padding: 7px 10px;
+  font-size: 0.82em;
+  line-height: 1.2;
+  cursor: pointer;
+  outline: none;
+}
+.plot-params-btn:hover {
+  background: #eef2f7;
+}
+.plot-params-btn.active {
+  background: #00b894;
+  border-color: #00b894;
+  color: #fff;
+  font-weight: 600;
+}
+
+.plot-params-btn-row.vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.plot-params-btn-row.vertical .plot-params-btn {
+  width: 100%;
+  text-align: left;
+}
+
 /* --- Header --- */
 .report-header {
   background: #fff;

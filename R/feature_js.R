@@ -436,8 +436,7 @@ var _FEATURE_CONTROL_REGISTRY = {
       var g = _FEATURE_mkGroup("Y metric");
 
       var btnRow = document.createElement("div");
-      btnRow.className = "plot-params-btn-row";
-      btnRow.style.flexDirection = "column";
+      btnRow.className = "plot-params-btn-row vertical";
 
       var opts = [
         {v:"stdev",               l:"Standard deviation"},
@@ -459,7 +458,7 @@ var _FEATURE_CONTROL_REGISTRY = {
 
       // Short hint
       var hint = document.createElement("p");
-      hint.style.cssText = "font-size:0.68em;color:#b2bec3;font-style:italic;padding:6px 0 0 0;line-height:1.4;";
+      hint.style.cssText = "font-size:0.76em;color:#95a5a6;line-height:1.45;margin-top:8px;";
       hint.textContent = "Standard deviation: Seurat-style elbow. Variance %: variance explained by each PC. Cumulative %: cumulative variance explained.";
       container.appendChild(hint);
     }
@@ -857,7 +856,7 @@ function _FEATURE_renderElbow() {
     showlegend: false
   }], {
     title: "",
-    xaxis: {title: "PC", dtick: Math.max(1, Math.floor(maxDims / 10)), showgrid: true, zeroline: false},
+    xaxis: {title: "PC", dtick: Math.max(1, Math.floor(rows.length / 10)), showgrid: true, zeroline: false},
     yaxis: {title: yLabels[yMetric] || yMetric, showgrid: true, zeroline: false},
     hovermode: "closest", dragmode: "pan",
     margin: {l: 80, r: 30, b: 60, t: 10}
