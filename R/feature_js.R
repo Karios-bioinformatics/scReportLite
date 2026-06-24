@@ -748,20 +748,18 @@ function _FEATURE_renderTopExpressed() {
   sorted.sort(function(a, b) { return (a.rank || 0) - (b.rank || 0); });
 
   var geneCount = sorted.length;
-  var ROW_H = 26;
-  var plotHeight = Math.max(420, geneCount * ROW_H + 80);
+  var ROW_H = 24;
+  var plotHeight = Math.max(420, geneCount * ROW_H + 100);
 
   // Build data arrays
   var geneNames = [];
   var meanValues = [];
-  var colors = [];
   var hoverTexts = [];
 
   for (var gi = 0; gi < geneCount; gi++) {
     var row = sorted[gi];
     geneNames.push(row.gene);
     meanValues.push(_resolveMeanPct(row));
-    colors.push(_FEATURE_getColor(gi));
 
     // Build hover with available distribution fields
     var parts = [];
@@ -803,26 +801,39 @@ function _FEATURE_renderTopExpressed() {
   // Reverse arrays for Plotly horizontal bar (rank 1 at visual top)
   geneNames.reverse();
   meanValues.reverse();
-  colors.reverse();
   hoverTexts.reverse();
+
+  // Compute x-axis range to reduce right-side whitespace
+  var numericVals = [];
+  for (var vi = 0; vi < meanValues.length; vi++) {
+    var v = meanValues[vi];
+    if (typeof v === "number" && !isNaN(v) && v > 0) numericVals.push(v);
+  }
+  var xmax = numericVals.length > 0 ? Math.max.apply(null, numericVals) : 0;
+  var xRange = (xmax > 0) ? [0, xmax * 1.08] : undefined;
 
   Plotly.newPlot(plotDiv, [{
     type: "bar",
     orientation: "h",
     x: meanValues,
     y: geneNames,
-    text: hoverTexts,
+    hovertext: hoverTexts,
     hoverinfo: "text",
-    marker: { color: colors },
+    marker: {
+      color: "rgba(0, 184, 148, 0.72)",
+      line: { color: "rgba(0, 120, 100, 0.95)", width: 0.5 }
+    },
     showlegend: false
   }], {
+    bargap: 0.25,
     title: "",
-    xaxis: { title: "Mean % total count per cell", showgrid: true, zeroline: true },
+    xaxis: { title: "Mean % total count per cell", showgrid: true, zeroline: true,
+             range: xRange },
     yaxis: { title: "", showgrid: false, zeroline: false, automargin: true,
              tickfont: { size: 10 } },
     hovermode: "closest", dragmode: "pan",
     height: plotHeight,
-    margin: { l: 130, r: 30, b: 50, t: 10 }
+    margin: { l: 90, r: 30, t: 45, b: 55 }
   }, _SR_featureModebarConfig());
 }
 
