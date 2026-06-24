@@ -293,7 +293,7 @@ build_seurat_feature_diagnostics <- function(
 # ---- Internal: Top Expressed Genes data extraction ----
 .build_top_expressed <- function(obj, assay, top_n_expressed,
                                   max_points_per_gene) {
-  # Get counts
+  # Get raw counts (Seurat v5 layer, fallback v4 slot)
   counts <- tryCatch(
     Seurat::GetAssayData(obj, assay = assay, layer = "counts"),
     error = function(e) {
@@ -305,119 +305,126 @@ build_seurat_feature_diagnostics <- function(
   )
 
   if (is.null(counts)) {
-    warning("Could not retrieve counts for Top Expressed Genes. Skipping.",
+    warning("Could not retrieve raw counts for Top Expressed Genes. Skipping.",
             call. = FALSE)
     return(NULL)
   }
 
-  cells <- colnames(obj)
-  n_cells <- length(cells)
-
-  # Compute total counts per cell efficiently (avoid full dense matrix)
-  if (inherits(counts, "dgCMatrix") || inherits(counts, "dgTMatrix")) {
-    total_counts <- Matrix::colSums(counts)
-  } else {
-    total_counts <- colSums(as.matrix(counts))
+  # Ensure sparse dgCMatrix
+  if (!inherits(counts, "dgCMatrix")) {
+    counts <- as(counts, "dgCMatrix")
   }
 
-  # Compute % total per gene, but only for genes we need
-  # First pass: compute mean percent for all genes to find top ones
-  # Use rowSums on sparse matrix for efficiency
   n_genes_total <- nrow(counts)
-
   if (n_genes_total == 0) {
     warning("No genes found in counts. Skipping Top Expressed Genes.",
             call. = FALSE)
     return(NULL)
   }
 
-  # For large matrices, compute row means in chunks
-  chunk_size <- 5000
-  n_chunks <- ceiling(n_genes_total / chunk_size)
-  all_means <- numeric(n_genes_total)
+  # Compute total counts per cell
+  cell_total <- Matrix::colSums(counts)
 
-  for (ch in seq_len(n_chunks)) {
-    start_idx <- (ch - 1) * chunk_size + 1
-    end_idx <- min(ch * chunk_size, n_genes_total)
-    sub <- counts[start_idx:end_idx, , drop = FALSE]
+  # Remove zero-count cells
+  keep_cells <- cell_total > 0
+  counts <- counts[, keep_cells, drop = FALSE]
+  cell_total <- cell_total[keep_cells]
+  cell_names <- colnames(counts)
+  n_cells <- length(cell_total)
 
-    # Compute percent per cell for this chunk
-    if (inherits(sub, "dgCMatrix") || inherits(sub, "dgTMatrix")) {
-      sub_dense <- as.matrix(sub)
-    } else {
-      sub_dense <- as.matrix(sub)
-    }
-    # percent_total per cell
-    pct_mat <- sweep(sub_dense, 2, total_counts, "/") * 100
-    all_means[start_idx:end_idx] <- rowMeans(pct_mat)
+  if (n_cells == 0) {
+    warning("No cells with non-zero total counts. Skipping Top Expressed Genes.",
+            call. = FALSE)
+    return(NULL)
   }
+
+  # Sparse column scaling: pct[i,j] = counts[i,j] / cell_total[j] * 100
+  scale_factor <- 100 / cell_total
+  pct_mat <- counts %*% Matrix::Diagonal(x = scale_factor)
+
+  # Mean percent per gene (includes zero cells)
+  gene_mean_pct <- Matrix::rowMeans(pct_mat)
 
   # Select top N genes by mean percent
-  top_idx <- order(all_means, decreasing = TRUE)[seq_len(min(top_n_expressed,
-                                                              n_genes_total))]
+  n_top <- min(top_n_expressed, n_genes_total)
+  top_idx <- order(gene_mean_pct, decreasing = TRUE)[seq_len(n_top)]
   top_genes <- rownames(counts)[top_idx]
-  top_means <- all_means[top_idx]
+  top_means <- gene_mean_pct[top_idx]
 
-  # Extract data for top genes only
-  if (inherits(counts, "dgCMatrix") || inherits(counts, "dgTMatrix")) {
-    top_sub <- as.matrix(counts[top_genes, , drop = FALSE])
-  } else {
-    top_sub <- as.matrix(counts[top_genes, , drop = FALSE])
-  }
+  # Per-gene quantile / whisker / outlier computation
+  summary_list <- vector("list", n_top)
+  outlier_list <- vector("list", n_top)
 
-  # Build summary data.frame
-  summary_df <- data.frame(
-    gene         = character(top_n_expressed),
-    rank         = integer(top_n_expressed),
-    mean_percent = numeric(top_n_expressed),
-    min          = numeric(top_n_expressed),
-    q1           = numeric(top_n_expressed),
-    median       = numeric(top_n_expressed),
-    q3           = numeric(top_n_expressed),
-    max          = numeric(top_n_expressed),
-    stringsAsFactors = FALSE
-  )
-
-  # Build points (sampled)
-  points_list <- list()
-
-  for (i in seq_along(top_genes)) {
+  for (i in seq_len(n_top)) {
     g <- top_genes[i]
-    g_counts <- top_sub[g, ]
-    g_pct <- g_counts / total_counts * 100
+    v <- as.numeric(pct_mat[g, ])
 
-    quants <- quantile(g_pct, probs = c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)
-    summary_df[i, ] <- list(
-      gene         = g,
-      rank         = i,
-      mean_percent = round(top_means[i], 4),
-      min          = round(quants[1], 4),
-      q1           = round(quants[2], 4),
-      median       = round(quants[3], 4),
-      q3           = round(quants[4], 4),
-      max          = round(quants[5], 4)
-    )
+    # Detection rate
+    nz <- sum(v > 0)
+    detection_rate <- round(nz / n_cells * 100, 2)
 
-    # Sampled points
-    n_points <- length(g_pct)
-    if (n_points > max_points_per_gene) {
-      set.seed(42)
-      keep <- sort(sample(seq_len(n_points), max_points_per_gene))
-      g_pct <- g_pct[keep]
-    }
-    points_list[[i]] <- data.frame(
-      gene          = rep(g, length(g_pct)),
-      percent_total = round(g_pct, 4),
+    # Quartiles
+    qs <- quantile(v, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
+    q1 <- qs[[1]]
+    med <- qs[[2]]
+    q3 <- qs[[3]]
+    iqr <- q3 - q1
+
+    # Boxplot-standard whisker limits (Tukey)
+    lower_limit <- q1 - 1.5 * iqr
+    upper_limit <- q3 + 1.5 * iqr
+
+    lower_whisker <- if (any(v >= lower_limit))
+      min(v[v >= lower_limit]) else q1
+    upper_whisker <- if (any(v <= upper_limit))
+      max(v[v <= upper_limit]) else q3
+
+    summary_list[[i]] <- data.frame(
+      gene                     = g,
+      rank                     = i,
+      mean_percent             = round(top_means[i], 4),
+      q1_percent               = round(q1, 4),
+      median_percent           = round(med, 4),
+      q3_percent               = round(q3, 4),
+      lower_whisker_percent    = round(lower_whisker, 4),
+      upper_whisker_percent    = round(upper_whisker, 4),
+      max_percent              = round(max(v), 4),
+      detection_rate           = detection_rate,
       stringsAsFactors = FALSE
     )
+
+    # Outlier sampling (> upper_whisker; percent can't be < 0)
+    is_outlier <- v > upper_limit
+    if (any(is_outlier)) {
+      out_idx <- which(is_outlier)
+      n_out <- length(out_idx)
+      if (n_out > max_points_per_gene) {
+        set.seed(42)
+        out_idx <- sort(sample(out_idx, max_points_per_gene))
+      }
+      outlier_list[[i]] <- data.frame(
+        gene    = rep(g, length(out_idx)),
+        percent = round(v[out_idx], 4),
+        cell    = cell_names[out_idx],
+        stringsAsFactors = FALSE
+      )
+    }
   }
 
-  points_df <- do.call(rbind, points_list)
-  rownames(points_df) <- NULL
+  summary_df <- do.call(rbind, summary_list)
+  rownames(summary_df) <- NULL
+
+  outlier_df <- do.call(rbind, outlier_list)
+  if (!is.null(outlier_df)) rownames(outlier_df) <- NULL
 
   list(
-    summary = summary_df,
-    points  = points_df
+    summary   = summary_df,
+    outliers  = outlier_df,
+    top_genes = top_genes,
+    n_top     = n_top,
+    source    = "raw_counts",
+    assay     = assay,
+    plot_type = "interactive_boxplot"
   )
 }
 

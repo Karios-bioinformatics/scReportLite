@@ -40,7 +40,7 @@ var _FEATURE_STATE = {
 var _FEATURE_NO_DATA_MSGS = {
   scatter: "No FeatureScatter data available.",
   varfeat: "No variable feature data available.",
-  topexp:  "No top expressed genes data available.",
+  topexp:  "No highest expressed genes data available.",
   elbow:   "No PCA elbow data available."
 };
 
@@ -422,10 +422,14 @@ var _FEATURE_CONTROL_REGISTRY = {
   teInfo: {
     render: function(container) {
       var g = _FEATURE_mkGroup("TOP EXPRESSED GENES");
-      var p = document.createElement("p");
-      p.style.cssText = "font-size:0.78em;color:#636e72;line-height:1.5;";
-      p.textContent = "Ranked by mean % total counts per cell.";
-      g.appendChild(p);
+      var p1 = document.createElement("p");
+      p1.style.cssText = "font-size:0.78em;color:#636e72;line-height:1.5;";
+      p1.textContent = "Interactive boxplot of each gene's percentage of total counts per cell.";
+      g.appendChild(p1);
+      var p2 = document.createElement("p");
+      p2.style.cssText = "font-size:0.72em;color:#95a5a6;line-height:1.4;margin-top:4px;font-style:italic;";
+      p2.textContent = "Source: raw counts.";
+      g.appendChild(p2);
       container.appendChild(g);
     }
   },
@@ -709,7 +713,7 @@ function _FEATURE_renderVarFeatures() {
 }
 
 // =========================================================================
-// RENDER: Top Expressed Genes — horizontal boxplot, all genes, fixed row height
+// RENDER: Top Expressed Genes — interactive horizontal boxplot (shapes + scatter outliers)
 // =========================================================================
 
 function _FEATURE_renderTopExpressed() {
@@ -723,27 +727,9 @@ function _FEATURE_renderTopExpressed() {
   if (!canvas) return;
 
   var sm = d.top_expressed.summary;
+  var outliers = d.top_expressed.outliers || [];
 
-  // Resolve mean-percent field (priority: mean_percent > mean_pct > avg_percent > mean)
-  function _resolveMeanPct(row) {
-    if (typeof row.mean_percent === "number") return row.mean_percent;
-    if (typeof row.mean_pct === "number") return row.mean_pct;
-    if (typeof row.avg_percent === "number") return row.avg_percent;
-    if (typeof row.mean === "number") return row.mean;
-    return null;
-  }
-
-  // Check at least one row has a usable mean column
-  var hasMean = false;
-  for (var i = 0; i < sm.length; i++) {
-    if (_resolveMeanPct(sm[i]) !== null) { hasMean = true; break; }
-  }
-  if (!hasMean) {
-    _FEATURE_showNoData("Top expressed gene summary is missing mean percent column.");
-    return;
-  }
-
-  // Sort by rank ascending (rank 1 at top)
+  // Sort by rank ascending (rank 1 = highest mean %)
   var sorted = sm.slice();
   sorted.sort(function(a, b) { return (a.rank || 0) - (b.rank || 0); });
 
@@ -751,43 +737,106 @@ function _FEATURE_renderTopExpressed() {
   var ROW_H = 24;
   var plotHeight = Math.max(420, geneCount * ROW_H + 100);
 
-  // Build data arrays
+  // Build outlier index: gene -> [{percent, cell}]
+  var outlierIdx = {};
+  for (var oi = 0; oi < outliers.length; oi++) {
+    var o = outliers[oi];
+    if (!outlierIdx[o.gene]) outlierIdx[o.gene] = [];
+    outlierIdx[o.gene].push(o);
+  }
+
+  // Shapes, hover targets, outlier points
+  var shapes = [];
   var geneNames = [];
-  var meanValues = [];
-  var hoverTexts = [];
+  var hoverX = [], hoverY = [], hoverTexts = [];
+  var oX = [], oY = [], oHover = [];
+
+  var BOX_H = 0.28;
+  var CAP_H = 0.14;
 
   for (var gi = 0; gi < geneCount; gi++) {
     var row = sorted[gi];
+    var y = gi;
     geneNames.push(row.gene);
-    meanValues.push(_resolveMeanPct(row));
 
-    // Build hover with available distribution fields
+    var q1 = (row.q1_percent != null) ? row.q1_percent : 0;
+    var med = (row.median_percent != null) ? row.median_percent : 0;
+    var q3 = (row.q3_percent != null) ? row.q3_percent : 0;
+    var lw = (row.lower_whisker_percent != null) ? row.lower_whisker_percent : q1;
+    var uw = (row.upper_whisker_percent != null) ? row.upper_whisker_percent : q3;
+
+    // Whisker line
+    shapes.push({
+      type: "line", x0: lw, y0: y, x1: uw, y1: y,
+      line: { color: "#666", width: 1 }
+    });
+
+    // Box rectangle
+    shapes.push({
+      type: "rect", x0: q1, y0: y - BOX_H, x1: q3, y1: y + BOX_H,
+      fillcolor: "rgba(100, 180, 220, 0.32)",
+      line: { color: "#4580a0", width: 0.8 }
+    });
+
+    // Median line
+    shapes.push({
+      type: "line", x0: med, y0: y - BOX_H, x1: med, y1: y + BOX_H,
+      line: { color: "#222", width: 1.4 }
+    });
+
+    // Whisker caps
+    shapes.push({
+      type: "line", x0: lw, y0: y - CAP_H, x1: lw, y1: y + CAP_H,
+      line: { color: "#666", width: 1 }
+    });
+    shapes.push({
+      type: "line", x0: uw, y0: y - CAP_H, x1: uw, y1: y + CAP_H,
+      line: { color: "#666", width: 1 }
+    });
+
+    // Invisible hover target at median
+    hoverX.push(med);
+    hoverY.push(y);
+
+    // Build hover text
     var parts = [];
     parts.push("Gene: " + row.gene);
     if (row.mean_percent != null) parts.push("Mean: " + row.mean_percent.toFixed(2) + "%");
     else if (row.mean_pct != null) parts.push("Mean: " + row.mean_pct.toFixed(2) + "%");
-    else if (row.avg_percent != null) parts.push("Mean: " + row.avg_percent.toFixed(2) + "%");
-    else if (row.mean != null) parts.push("Mean: " + row.mean.toFixed(2));
-    if (row.median != null) parts.push("Median: " + row.median.toFixed(2) + "%");
-    if (row.q1 != null && row.q3 != null) {
-      parts.push("Q1-Q3: " + row.q1.toFixed(2) + "% - " + row.q3.toFixed(2) + "%");
-    } else if (row.q1 != null) {
-      parts.push("Q1: " + row.q1.toFixed(2) + "%");
-    } else if (row.q3 != null) {
-      parts.push("Q3: " + row.q3.toFixed(2) + "%");
+    if (row.median_percent != null) parts.push("Median: " + row.median_percent.toFixed(2) + "%");
+    if (q1 > 0 || q3 > 0) {
+      parts.push("Q1-Q3: " + q1.toFixed(2) + "% - " + q3.toFixed(2) + "%");
     }
-    if (row.max != null) parts.push("Max: " + row.max.toFixed(2) + "%");
-    var dr = row.detection_rate || row.pct_detected || row.detected_percent;
-    if (dr != null) {
-      parts.push("Detected: " + (typeof dr === "number" ? dr.toFixed(1) + "%" : dr));
+    var gotW = (row.lower_whisker_percent != null && row.upper_whisker_percent != null);
+    if (gotW && (lw !== q1 || uw !== q3)) {
+      parts.push("Whisker: " + lw.toFixed(2) + "% - " + uw.toFixed(2) + "%");
+    }
+    if (row.max_percent != null) parts.push("Max: " + row.max_percent.toFixed(2) + "%");
+    var dr2 = row.detection_rate || row.pct_detected || row.detected_percent;
+    if (dr2 != null) {
+      parts.push("Detected: " + (typeof dr2 === "number" ? dr2.toFixed(1) + "%" : dr2));
     }
     hoverTexts.push(parts.join("<br>"));
+
+    // Outlier points
+    var geneOutliers = outlierIdx[row.gene];
+    if (geneOutliers) {
+      for (var oj = 0; oj < geneOutliers.length; oj++) {
+        oX.push(geneOutliers[oj].percent);
+        oY.push(y);
+        oHover.push(
+          "Gene: " + row.gene +
+          "<br>Cell: " + (geneOutliers[oj].cell || "?") +
+          "<br>% total count: " + geneOutliers[oj].percent.toFixed(2) + "%"
+        );
+      }
+    }
   }
 
   // Description
   var desc = document.createElement("div");
   desc.style.cssText = "font-size:0.78em;color:#636e72;padding:4px 8px;flex-shrink:0;";
-  desc.textContent = "Genes ranked by mean percentage of total counts per cell.";
+  desc.textContent = "Highest expressed genes. Distribution of each gene's percentage of total counts per cell. Source: raw counts.";
   canvas.appendChild(desc);
 
   var scrollWrap = document.createElement("div");
@@ -798,39 +847,57 @@ function _FEATURE_renderTopExpressed() {
   scrollWrap.appendChild(plotDiv);
   canvas.appendChild(scrollWrap);
 
-  // Reverse arrays for Plotly horizontal bar (rank 1 at visual top)
-  geneNames.reverse();
-  meanValues.reverse();
-  hoverTexts.reverse();
-
-  // Compute x-axis range to reduce right-side whitespace
-  var numericVals = [];
-  for (var vi = 0; vi < meanValues.length; vi++) {
-    var v = meanValues[vi];
-    if (typeof v === "number" && !isNaN(v) && v > 0) numericVals.push(v);
+  // Compute x-axis range
+  var xmax = 0;
+  for (var xi = 0; xi < oX.length; xi++) {
+    if (oX[xi] > xmax) xmax = oX[xi];
   }
-  var xmax = numericVals.length > 0 ? Math.max.apply(null, numericVals) : 0;
-  var xRange = (xmax > 0) ? [0, xmax * 1.08] : undefined;
+  for (var gi2 = 0; gi2 < geneCount; gi2++) {
+    var uw2 = sorted[gi2].upper_whisker_percent || sorted[gi2].q3_percent || 0;
+    if (uw2 > xmax) xmax = uw2;
+  }
+  var xRange = xmax > 0 ? [0, xmax * 1.08] : undefined;
 
-  Plotly.newPlot(plotDiv, [{
-    type: "bar",
-    orientation: "h",
-    x: meanValues,
-    y: geneNames,
+  // Build traces
+  var traces = [];
+
+  // Trace 1: invisible hover targets at median
+  traces.push({
+    type: "scatter",
+    mode: "markers",
+    x: hoverX, y: hoverY,
     hovertext: hoverTexts,
     hoverinfo: "text",
-    marker: {
-      color: "rgba(0, 184, 148, 0.72)",
-      line: { color: "rgba(0, 120, 100, 0.95)", width: 0.5 }
-    },
+    marker: { size: 20, opacity: 0 },
     showlegend: false
-  }], {
-    bargap: 0.25,
+  });
+
+  // Trace 2: outlier points
+  if (oX.length > 0) {
+    traces.push({
+      type: "scattergl",
+      mode: "markers",
+      x: oX, y: oY,
+      hovertext: oHover,
+      hoverinfo: "text",
+      marker: { size: 3, color: "#444", opacity: 0.45, line: { width: 0 } },
+      showlegend: false
+    });
+  }
+
+  // Y tick positions: gene 0 at y=0 is rank 1 (top via reversed autorange)
+  var tickVals = [];
+  for (var ti = 0; ti < geneCount; ti++) tickVals.push(ti);
+
+  Plotly.newPlot(plotDiv, traces, {
+    shapes: shapes,
     title: "",
-    xaxis: { title: "Mean % total count per cell", showgrid: true, zeroline: true,
+    xaxis: { title: "% total count per cell", showgrid: true, zeroline: true,
              range: xRange },
-    yaxis: { title: "", showgrid: false, zeroline: false, automargin: true,
-             tickfont: { size: 10 } },
+    yaxis: { title: "", showgrid: false, zeroline: false,
+             tickvals: tickVals, ticktext: geneNames,
+             tickfont: { size: 10 },
+             autorange: "reversed" },
     hovermode: "closest", dragmode: "pan",
     height: plotHeight,
     margin: { l: 90, r: 30, t: 45, b: 55 }
