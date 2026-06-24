@@ -424,7 +424,7 @@ var _FEATURE_CONTROL_REGISTRY = {
       var g = _FEATURE_mkGroup("TOP EXPRESSED GENES");
       var p1 = document.createElement("p");
       p1.style.cssText = "font-size:0.78em;color:#636e72;line-height:1.5;";
-      p1.textContent = "Interactive boxplot of each gene's percentage of total counts per cell.";
+      p1.textContent = "Interactive boxplot of per-gene percentage of total counts per cell.";
       g.appendChild(p1);
       var p2 = document.createElement("p");
       p2.style.cssText = "font-size:0.72em;color:#95a5a6;line-height:1.4;margin-top:4px;font-style:italic;";
@@ -836,7 +836,7 @@ function _FEATURE_renderTopExpressed() {
   // Description
   var desc = document.createElement("div");
   desc.style.cssText = "font-size:0.78em;color:#636e72;padding:4px 8px;flex-shrink:0;";
-  desc.textContent = "Highest expressed genes. Distribution of each gene's percentage of total counts per cell. Source: raw counts.";
+  desc.textContent = "Highest expressed genes. Distribution of per-gene percentage of total counts per cell. Source: raw counts.";
   canvas.appendChild(desc);
 
   var scrollWrap = document.createElement("div");
