@@ -421,7 +421,7 @@ var _FEATURE_CONTROL_REGISTRY = {
   // ---- Top Expressed Genes (no interactive controls) ----
   teInfo: {
     render: function(container) {
-      var g = _FEATURE_mkGroup("Top Expressed Genes");
+      var g = _FEATURE_mkGroup("TOP EXPRESSED GENES");
       var p = document.createElement("p");
       p.style.cssText = "font-size:0.78em;color:#636e72;line-height:1.5;";
       p.textContent = "Ranked by mean % total counts per cell.";
@@ -722,26 +722,68 @@ function _FEATURE_renderTopExpressed() {
   var canvas = _FEATURE_clearCanvas();
   if (!canvas) return;
 
-  var te = d.top_expressed;
-  var sm = te.summary;
-  var pts = te.points || [];
+  var sm = d.top_expressed.summary;
 
-  // Sort by rank ascending (rank 1 at top of y-axis → reversed in Plotly)
+  // Resolve mean-percent field (priority: mean_percent > mean_pct > avg_percent > mean)
+  function _resolveMeanPct(row) {
+    if (typeof row.mean_percent === "number") return row.mean_percent;
+    if (typeof row.mean_pct === "number") return row.mean_pct;
+    if (typeof row.avg_percent === "number") return row.avg_percent;
+    if (typeof row.mean === "number") return row.mean;
+    return null;
+  }
+
+  // Check at least one row has a usable mean column
+  var hasMean = false;
+  for (var i = 0; i < sm.length; i++) {
+    if (_resolveMeanPct(sm[i]) !== null) { hasMean = true; break; }
+  }
+  if (!hasMean) {
+    _FEATURE_showNoData("Top expressed gene summary is missing mean percent column.");
+    return;
+  }
+
+  // Sort by rank ascending (rank 1 at top)
   var sorted = sm.slice();
-  sorted.sort(function(a, b) { return a.rank - b.rank; });
+  sorted.sort(function(a, b) { return (a.rank || 0) - (b.rank || 0); });
 
   var geneCount = sorted.length;
-  var ROW_H = 22;
-  var plotHeight = Math.max(400, geneCount * ROW_H + 80);
+  var ROW_H = 26;
+  var plotHeight = Math.max(420, geneCount * ROW_H + 80);
 
-  // Build gene -> points index
-  var ptIndex = {};
-  if (pts.length > 0) {
-    for (var pi = 0; pi < pts.length; pi++) {
-      var g = pts[pi].gene;
-      if (!ptIndex[g]) ptIndex[g] = [];
-      ptIndex[g].push(pts[pi].percent_total);
+  // Build data arrays
+  var geneNames = [];
+  var meanValues = [];
+  var colors = [];
+  var hoverTexts = [];
+
+  for (var gi = 0; gi < geneCount; gi++) {
+    var row = sorted[gi];
+    geneNames.push(row.gene);
+    meanValues.push(_resolveMeanPct(row));
+    colors.push(_FEATURE_getColor(gi));
+
+    // Build hover with available distribution fields
+    var parts = [];
+    parts.push("Gene: " + row.gene);
+    if (row.mean_percent != null) parts.push("Mean: " + row.mean_percent.toFixed(2) + "%");
+    else if (row.mean_pct != null) parts.push("Mean: " + row.mean_pct.toFixed(2) + "%");
+    else if (row.avg_percent != null) parts.push("Mean: " + row.avg_percent.toFixed(2) + "%");
+    else if (row.mean != null) parts.push("Mean: " + row.mean.toFixed(2));
+    if (row.median != null) parts.push("Median: " + row.median.toFixed(2) + "%");
+    if (row.q1 != null && row.q3 != null) {
+      parts.push("Q1-Q3: " + row.q1.toFixed(2) + "% - " + row.q3.toFixed(2) + "%");
+    } else if (row.q1 != null) {
+      parts.push("Q1: " + row.q1.toFixed(2) + "%");
+    } else if (row.q3 != null) {
+      parts.push("Q3: " + row.q3.toFixed(2) + "%");
     }
+    if (row.max != null) parts.push("Max: " + row.max.toFixed(2) + "%");
+    var dr = row.detection_rate || row.pct_detected || row.detected_percent;
+    if (dr != null) {
+      parts.push("Detected: " + (typeof dr === "number" ? dr.toFixed(1) + "%" : dr));
+    }
+    hoverTexts.push(parts.join("<br>"));
   }
 
   // Description
@@ -758,54 +800,29 @@ function _FEATURE_renderTopExpressed() {
   scrollWrap.appendChild(plotDiv);
   canvas.appendChild(scrollWrap);
 
-  // Build one horizontal box trace per gene, coloured differently
-  var traces = [];
-  var geneNames = [];
-  for (var gi = 0; gi < geneCount; gi++) {
-    var row = sorted[gi];
-    geneNames.push(row.gene);
-    var gPts = ptIndex[row.gene] || [];
-    var color = _FEATURE_getColor(gi);
+  // Reverse arrays for Plotly horizontal bar (rank 1 at visual top)
+  geneNames.reverse();
+  meanValues.reverse();
+  colors.reverse();
+  hoverTexts.reverse();
 
-    traces.push({
-      x: gPts.length > 0 ? gPts : [row.median],
-      y: new Array(gPts.length > 0 ? gPts.length : 1).fill(row.gene),
-      type: "box",
-      orientation: "h",
-      name: row.gene,
-      showlegend: false,
-      marker: {color: color, size: 2},
-      fillcolor: color + "22",
-      line: {color: color, width: 1},
-      boxpoints: gPts.length > 0 ? "outliers" : false,
-      jitter: 0.2,
-      pointpos: 0,
-      hoverinfo: "x+name",
-      text: "Gene: " + row.gene + "<br>% total: " + row.mean_percent.toFixed(2) + "%",
-      hovertext: "Gene: " + row.gene +
-        "<br>Mean: " + row.mean_percent.toFixed(2) + "%" +
-        "<br>Median: " + row.median.toFixed(2) + "%" +
-        "<br>Q1: " + row.q1.toFixed(2) + "%" +
-        "<br>Q3: " + row.q3.toFixed(2) + "%" +
-        "<br>Max: " + row.max.toFixed(2) + "%"
-    });
-  }
-
-  if (traces.length === 0) {
-    _FEATURE_showNoData("No Top Expressed Genes data available.");
-    return;
-  }
-
-  Plotly.newPlot(plotDiv, traces, {
+  Plotly.newPlot(plotDiv, [{
+    type: "bar",
+    orientation: "h",
+    x: meanValues,
+    y: geneNames,
+    text: hoverTexts,
+    hoverinfo: "text",
+    marker: { color: colors },
+    showlegend: false
+  }], {
     title: "",
-    xaxis: {title: "% total count per cell", showgrid: true, zeroline: true},
-    yaxis: {title: "", showgrid: false, zeroline: false, automargin: true,
-            categoryorder: "array", categoryarray: geneNames.slice().reverse(),
-            tickfont: {size: 10}},
+    xaxis: { title: "Mean % total count per cell", showgrid: true, zeroline: true },
+    yaxis: { title: "", showgrid: false, zeroline: false, automargin: true,
+             tickfont: { size: 10 } },
     hovermode: "closest", dragmode: "pan",
     height: plotHeight,
-    margin: {l: 130, r: 30, b: 50, t: 10},
-    boxmode: "group"
+    margin: { l: 130, r: 30, b: 50, t: 10 }
   }, _SR_featureModebarConfig());
 }
 
