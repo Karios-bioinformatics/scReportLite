@@ -63,8 +63,7 @@ UMAP     → embedding exploration, cluster/sample highlighting, marker linkage,
 More specialized downstream analyses are intentionally kept outside the core scope of scReportLite. Differential expression reports, volcano plots, enrichment plots, cell-cell communication, trajectory inference, spatial omics, and multi-omics modules are expected to belong to the broader **scReport ecosystem**, rather than being added directly into scReportLite.
 
 ---
-
-## Overview
+## Report input layers
 
 Single-cell RNA-seq analysis produces many different result layers:
 
