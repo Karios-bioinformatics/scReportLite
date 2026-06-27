@@ -1,14 +1,47 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20828069.svg)](https://doi.org/10.5281/zenodo.20828069)
-
 # scReportLite
 
-**scReportLite** is a lightweight R package for generating interactive HTML reports from single-cell RNA-seq analysis results.
+<p align="center">
+  <strong>A lightweight interactive HTML reporting layer for single-cell RNA-seq analysis results.</strong>
+</p>
 
-It is designed as the **Lite layer of the scReport ecosystem**: a focused, shareable, browser-based report framework for the core structure of single-cell analysis results.
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-v0.4.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/Status-Active%20Development-green" alt="Status">
+  <img src="https://img.shields.io/badge/Layer-scReport%20Lite-lightgrey" alt="Layer">
+  <img src="https://img.shields.io/badge/Focus-Single--cell%20Reporting-purple" alt="Focus">
+  <a href="https://doi.org/10.5281/zenodo.20828069">
+    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.20828069.svg" alt="DOI">
+  </a>
+  <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
+</p>
 
-scReportLite does **not** replace Seurat, Scanpy, or upstream analysis workflows. Instead, it converts pre-computed single-cell outputs into a standalone interactive HTML report for exploration, presentation, and sharing.
+## Overview
 
----
+**scReportLite** is a lightweight R package for generating interactive standalone HTML reports from single-cell RNA-seq analysis results.
+
+It is designed as the **Lite layer of the scReport ecosystem**: a focused, browser-based report framework for the core structure of single-cell analysis results.
+
+scReportLite does **not** replace Seurat, Scanpy, or upstream analysis workflows. Instead, it converts pre-computed single-cell outputs into a shareable interactive report for exploration, presentation, and communication.
+
+## Current release
+
+The current release is:
+
+```text
+scReportLite v0.4.0
+```
+
+This version defines the current four-axis architecture of scReportLite:
+
+```text
+QC | FEATURE | PCA | UMAP
+```
+
+The corresponding Zenodo DOI is:
+
+```text
+10.5281/zenodo.20828069
+```
 
 ## Project Scope
 
@@ -145,8 +178,10 @@ panels = c(
 | `pca` | PCA exploration |
 | `umap` | UMAP embedding exploration |
 | `marker_table` | Marker genes linked to cluster selection |
-| `sample_composition` | Sample composition panel |
+| `sample_composition` | Lightweight sample composition context panel |
 | `gene_expression` | Gene expression summary / selected gene mode |
+
+Note: the `sample_composition` panel in scReportLite is a lightweight contextual panel. Dedicated sample-level and group-level composition reporting is expected to be handled by **scReportComposition** in the broader scReport ecosystem.
 
 ---
 
@@ -499,6 +534,22 @@ Current features include:
 
 ---
 
+## Relationship to scReportComposition
+
+scReportLite and scReportComposition are designed to address different layers of the single-cell reporting workflow.
+
+```text
+scReportLite
+  → cell-level views
+  → QC / FEATURE / PCA / UMAP / marker linkage / selected gene expression
+
+scReportComposition
+  → sample-level and group-level composition
+  → cell type proportions, cell counts, composition tables, and group comparison
+```
+
+In the future scReport ecosystem, these modules may be connected through a shared `cell_id`-based schema. This would allow a selected cell or cluster in scReportLite to be linked to its corresponding sample, cell type, and composition context in scReportComposition.
+
 ## UI Design
 
 v0.4.0 introduces a more unified interaction style across the report.
@@ -510,6 +561,16 @@ v0.4.0 introduces a more unified interaction style across the report.
 - Natural sorting for numeric labels such as clusters and PCs
 
 ---
+
+## Cell-centric design direction
+
+The long-term scReport ecosystem is intended to support **cell-centric global tracking** across modules.
+
+A guiding principle is:
+
+> A cell should not lose its identity when the user moves across analysis modules.
+
+For scReportLite, this means that `cell` / `cell_id` should remain a stable key across UMAP, PCA, QC, marker linkage, gene expression views, and future module-level integrations.
 
 ## Performance Notes
 
@@ -615,9 +676,10 @@ After v0.4.0, scReportLite development will focus on improving the four core dir
 Specialized downstream analyses are expected to be developed as separate scReport ecosystem modules or packages, such as:
 
 ```text
+scReportComposition → cell composition reports and group-level composition summaries
 scReportDE          → differential expression reports, volcano plots, MA plots
 scReportEnrich      → enrichment reports, GO/KEGG/GSEA dotplots and barplots
-scReportCellChat    → cell-cell communication reports
+scReportCommunication → cell-cell communication reports
 scReportTrajectory  → pseudotime and trajectory reports
 scReportSpatial     → spatial transcriptomics reports
 scReportCore        → shared schemas, plugin protocol, and reusable UI components
