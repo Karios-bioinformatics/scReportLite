@@ -1031,6 +1031,72 @@ body {
   font-weight: 600;
 }
 
+/* --- Gene source switches --- */
+.gene-source-switches {
+  display: flex;
+  padding: 8px 12px 0;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.gene-source-btn {
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid var(--sr-border);
+  border-radius: var(--sr-radius-sm);
+  background: #fff;
+  font-size: 0.72em;
+  color: #636e72;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  user-select: none;
+}
+.gene-source-btn:hover { background: var(--sr-accent-soft); }
+.gene-source-btn.active {
+  background: var(--sr-accent);
+  color: #fff;
+  border-color: var(--sr-accent);
+}
+
+/* --- Gene cluster filter (marker only) --- */
+.gene-cluster-filter {
+  padding: 6px 12px 0;
+  flex-shrink: 0;
+}
+.gene-cluster-filter.hidden { display: none; }
+.gene-cluster-filter select {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--sr-border);
+  border-radius: var(--sr-radius-sm);
+  font-size: 0.78em;
+  color: #2d3436;
+  outline: none;
+  background: #fff;
+}
+.gene-cluster-filter select:focus { border-color: var(--sr-accent); }
+
+/* --- Gene cluster badge --- */
+.gene-cluster-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.68em;
+  font-weight: 600;
+  color: #fff;
+  background: var(--sr-accent);
+  font-style: normal;
+  font-family: inherit;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+.gene-cluster-badges {
+  display: flex;
+  gap: 2px;
+  margin-right: 5px;
+  flex-shrink: 0;
+}
+
 /* --- Content area --- */
 .content-area {
   flex: 1;
@@ -2995,12 +3061,69 @@ function updateGeneListUI() {
   });
 }
 
+// ---- Gene source state ----
+_ACTIVE_GENE_SOURCE = "all";
+_ACTIVE_GENE_CLUSTER = "all";
+_GENE_SEARCH_QUERY = "";
+
+function switchGeneSource(source) {
+  _ACTIVE_GENE_SOURCE = source;
+
+  // Update source button states
+  var btns = document.querySelectorAll(".gene-source-btn");
+  btns.forEach(function(btn) {
+    if (btn.getAttribute("data-source") === source) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+
+  // Show/hide cluster filter (marker source only)
+  var cf = document.getElementById("gene-cluster-filter");
+  if (cf) {
+    if (source === "marker") {
+      cf.classList.remove("hidden");
+    } else {
+      cf.classList.add("hidden");
+      _ACTIVE_GENE_CLUSTER = "all";
+      var sel = document.getElementById("gene-cluster-select");
+      if (sel) sel.value = "all";
+    }
+  }
+
+  applyGeneFilters();
+}
+
+function filterGenesByCluster(clusterId) {
+  _ACTIVE_GENE_CLUSTER = clusterId;
+  applyGeneFilters();
+}
+
 function filterGenes(query) {
+  _GENE_SEARCH_QUERY = (query || "").toLowerCase().trim();
+  applyGeneFilters();
+}
+
+function applyGeneFilters() {
   var items = document.querySelectorAll(".gene-item");
-  query = (query || "").toLowerCase().trim();
+  var q   = _GENE_SEARCH_QUERY || "";
+  var src = _ACTIVE_GENE_SOURCE || "all";
+  var cl  = _ACTIVE_GENE_CLUSTER || "all";
+
   items.forEach(function(item) {
-    var name = (item.getAttribute("data-gene") || "").toLowerCase();
-    item.style.display = (!query || name.indexOf(query) >= 0) ? "" : "none";
+    var name    = (item.getAttribute("data-gene") || "").toLowerCase();
+    var sources = (item.getAttribute("data-source") || "");
+    var clusters = (item.getAttribute("data-clusters") || "");
+
+    var nameMatch    = !q || name.indexOf(q) >= 0;
+    var sourceMatch  = (src === "all") || (sources.indexOf(src) >= 0);
+    var clusterMatch = true;
+    if (cl !== "all" && src === "marker") {
+      clusterMatch = ("," + clusters + ",").indexOf("," + cl + ",") >= 0;
+    }
+
+    item.style.display = (nameMatch && sourceMatch && clusterMatch) ? "" : "none";
   });
 }
 
@@ -3640,30 +3763,209 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   # ---- Gene tab & list (only when gene_expr_df is provided) ----
   has_genes <- !is.null(gene_expr_df)
   gene_expr_json <- "{}"
+  marker_gene_clusters_json <- "{}"
+  all_gene_sources_json <- "{}"
+
   if (has_genes) {
     gene_names <- setdiff(colnames(gene_expr_df), "cell")
     sidebar_tabs <- c(sidebar_tabs, list(
       tags$div(class = "sidebar-tab", id = "tab-genes",
                onclick = "switchTab('gene')", "Genes")
     ))
+
+    # ---- Determine which gene sources are available ----
+    has_marker_src  <- !is.null(marker_df) && nrow(marker_df) > 0
+    has_variable_src <- !is.null(feature_diag) &&
+                        !is.null(feature_diag$variable_features) &&
+                        nrow(feature_diag$variable_features) > 0
+    has_top_src      <- !is.null(feature_diag) &&
+                        !is.null(feature_diag$top_expressed) &&
+                        !is.null(feature_diag$top_expressed$top_genes) &&
+                        length(feature_diag$top_expressed$top_genes) > 0
+
+    multi_source <- has_marker_src || has_variable_src || has_top_src
+
+    # ---- Build per-source gene sets (intersect with gene_expr_df) ----
+    marker_gene_clusters <- list()  # gene → [cluster1, cluster2, ...]
+    if (has_marker_src) {
+      mg_genes <- unique(as.character(marker_df[["gene"]]))
+      mg_genes <- intersect(mg_genes, gene_names)
+      for (g in mg_genes) {
+        clusters <- unique(as.character(
+          marker_df[["cluster"]][marker_df[["gene"]] == g]
+        ))
+        marker_gene_clusters[[g]] <- as.list(clusters)
+      }
+      marker_gene_clusters_json <- jsonlite::toJSON(
+        marker_gene_clusters, auto_unbox = TRUE
+      )
+    }
+
+    variable_genes <- character(0)
+    if (has_variable_src) {
+      vf <- feature_diag$variable_features
+      vf_genes <- as.character(vf[["gene"]])
+      if ("variable" %in% colnames(vf)) {
+        vf_genes <- vf_genes[vf[["variable"]] == TRUE]
+      }
+      variable_genes <- intersect(vf_genes, gene_names)
+    }
+
+    top_genes <- character(0)
+    if (has_top_src) {
+      top_genes <- intersect(
+        as.character(feature_diag$top_expressed$top_genes),
+        gene_names
+      )
+    }
+
+    # ---- Build gene source map (gene → ["marker","variable","top"]) ----
+    all_gene_sources <- list()
+    for (g in gene_names) {
+      srcs <- character(0)
+      if (g %in% names(marker_gene_clusters)) srcs <- c(srcs, "marker")
+      if (g %in% variable_genes)               srcs <- c(srcs, "variable")
+      if (g %in% top_genes)                     srcs <- c(srcs, "top")
+      if (length(srcs) > 0) {
+        all_gene_sources[[g]] <- as.list(srcs)
+      }
+    }
+    all_gene_sources_json <- jsonlite::toJSON(all_gene_sources, auto_unbox = TRUE)
+
+    # ---- Build marker cluster list for filter dropdown ----
+    marker_clusters <- character(0)
+    if (has_marker_src) {
+      marker_clusters <- natural_sort(unique(as.character(marker_df[["cluster"]])))
+    }
+
+    # ---- Build gene items ----
     gene_html <- lapply(gene_names, function(g) {
       g_esc <- gsub("'", "\\\\'", g)
-      tags$div(
-        class = "gene-item",
-        `data-gene` = g,
-        onclick = sprintf("selectGene('%s')", g_esc),
-        g
+      clusters <- marker_gene_clusters[[g]]
+
+      # Build source data attribute
+      srcs <- character(0)
+      if (g %in% names(marker_gene_clusters)) srcs <- c(srcs, "marker")
+      if (g %in% variable_genes)              srcs <- c(srcs, "variable")
+      if (g %in% top_genes)                    srcs <- c(srcs, "top")
+      src_attr <- if (length(srcs) > 0) paste(srcs, collapse = " ") else ""
+
+      # Build cluster badges for marker genes
+      badges <- NULL
+      cluster_attr <- ""
+      if (!is.null(clusters) && length(clusters) > 0) {
+        cluster_attr <- paste(clusters, collapse = ",")
+        badges <- tags$span(
+          class = "gene-cluster-badges",
+          lapply(clusters, function(cl) {
+            # Use cluster color if available
+            cl_char <- as.character(cl)
+            badge_color <- if (cl_char %in% names(cluster_cols)) {
+              cluster_cols[cl_char]
+            } else {
+              "#00b894"
+            }
+            tags$span(
+              class = "gene-cluster-badge",
+              style = sprintf("background-color: %s;", badge_color),
+              cl_char
+            )
+          })
+        )
+      }
+
+      # Build the div with conditional data-clusters attribute
+      div_attrs <- list(
+        class        = "gene-item",
+        `data-gene`  = g,
+        `data-source` = src_attr,
+        onclick      = sprintf("selectGene('%s')", g_esc)
       )
+      if (nzchar(cluster_attr)) {
+        div_attrs[["data-clusters"]] <- cluster_attr
+      }
+      div_children <- list(badges, g)
+      do.call(tags$div, c(div_attrs, div_children))
     })
+
+    # ---- Build source switch buttons ----
+    source_switches <- NULL
+    if (multi_source) {
+      source_btns <- list(
+        tags$div(
+          class = "gene-source-btn active", `data-source` = "all",
+          onclick = "switchGeneSource('all')", "All"
+        )
+      )
+      if (has_marker_src) {
+        source_btns <- c(source_btns, list(
+          tags$div(
+            class = "gene-source-btn", `data-source` = "marker",
+            onclick = "switchGeneSource('marker')",
+            paste0("Marker (", length(names(marker_gene_clusters)), ")")
+          )
+        ))
+      }
+      if (has_variable_src) {
+        source_btns <- c(source_btns, list(
+          tags$div(
+            class = "gene-source-btn", `data-source` = "variable",
+            onclick = "switchGeneSource('variable')",
+            paste0("Variable (", length(variable_genes), ")")
+          )
+        ))
+      }
+      if (has_top_src) {
+        source_btns <- c(source_btns, list(
+          tags$div(
+            class = "gene-source-btn", `data-source` = "top",
+            onclick = "switchGeneSource('top')",
+            paste0("Top expr (", length(top_genes), ")")
+          )
+        ))
+      }
+      source_switches <- tags$div(class = "gene-source-switches", source_btns)
+    }
+
+    # ---- Build cluster filter (marker only) ----
+    cluster_filter <- NULL
+    if (has_marker_src && length(marker_clusters) > 0) {
+      cluster_filter <- tags$div(
+        class = "gene-cluster-filter hidden",
+        id    = "gene-cluster-filter",
+        tags$select(
+          id = "gene-cluster-select",
+          onchange = "filterGenesByCluster(this.value)",
+          c(list(tags$option(value = "all", "All clusters")),
+            lapply(marker_clusters, function(cl) {
+              cl_char <- as.character(cl)
+              tags$option(value = cl_char, cl_char)
+            })
+          )
+        )
+      )
+    }
+
+    # ---- Build sidebar content ----
+    gene_sidebar_children <- list()
+    if (!is.null(source_switches)) {
+      gene_sidebar_children <- c(gene_sidebar_children, list(source_switches))
+    }
+    if (!is.null(cluster_filter)) {
+      gene_sidebar_children <- c(gene_sidebar_children, list(cluster_filter))
+    }
+    gene_sidebar_children <- c(gene_sidebar_children, list(
+      tags$div(class = "gene-search",
+        tags$input(type = "text", id = "gene-search-input",
+                   placeholder = "Filter genes...",
+                   oninput = "filterGenes(this.value)")
+      ),
+      tags$div(class = "gene-list", gene_html)
+    ))
+
     sidebar_contents <- c(sidebar_contents, list(
       tags$div(class = "sidebar-content hidden", id = "sidebar-genes",
-        tags$div(class = "gene-search",
-          tags$input(type = "text", id = "gene-search-input",
-                     placeholder = "Filter genes...",
-                     oninput = "filterGenes(this.value)")
-        ),
-        tags$div(class = "gene-list", gene_html)
-      )
+               gene_sidebar_children)
     ))
 
     # Build gene expression data for JS: {gene: {cell_id: value, ...}, ...}
@@ -3982,6 +4284,11 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
       tags$script(htmltools::HTML(sprintf(
         "window._GENE_EXPR_DATA = %s;",
         gene_expr_json
+      ))),
+      tags$script(htmltools::HTML(sprintf(
+        "window._MARKER_GENE_CLUSTERS = %s;\nwindow._ALL_GENE_SOURCES = %s;",
+        marker_gene_clusters_json,
+        all_gene_sources_json
       ))),
       if (has_plot) tags$script(htmltools::HTML(paste0(
         "window._QC_DATA = ", jsonlite::toJSON(qc_payload, auto_unbox = TRUE, digits = 6), ";"
