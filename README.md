@@ -9,9 +9,7 @@
   <img src="https://img.shields.io/badge/Status-Active%20Development-green" alt="Status">
   <img src="https://img.shields.io/badge/Layer-scReport%20Lite-lightgrey" alt="Layer">
   <img src="https://img.shields.io/badge/Focus-Single--cell%20Reporting-purple" alt="Focus">
-  <a href="https://doi.org/10.5281/zenodo.20828069">
-    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.20828069.svg" alt="DOI">
-  </a>
+  <a href="https://doi.org/10.5281/zenodo.20697745"><img src="https://zenodo.org/badge/1269804576.svg" alt="DOI"></a>
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
 </p>
 
