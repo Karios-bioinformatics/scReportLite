@@ -254,12 +254,17 @@ sc_report(
 cat("  Feature + UMAP OK →", out2, "\n")
 
 # Assert: serialized JSON contains top_expressed.outliers (not points)
+# Scoped to top_expressed JSON block to avoid false positives from Plotly/JS
 lines2 <- readLines(out2, warn = FALSE)
 topexp_json_line <- grep('"top_expressed"', lines2, fixed = TRUE)
-stopifnot(length(topexp_json_line) > 0)
-topexp_block <- paste(lines2[topexp_json_line[1]:(topexp_json_line[1]+15)], collapse = "\n")
-stopifnot(grepl('"outliers"', topexp_block, fixed = TRUE))
-stopifnot(!grepl('"points"', topexp_block, fixed = TRUE))
+if (length(topexp_json_line) == 0) stop("top_expressed key not found in HTML")
+# Extract ~15 lines around the top_expressed key as a scoped search window
+window_end <- min(topexp_json_line[1] + 15, length(lines2))
+topexp_block <- paste(lines2[topexp_json_line[1]:window_end], collapse = "\n")
+if (!grepl('"outliers"', topexp_block, fixed = TRUE))
+  stop("top_expressed.outliers missing from serialized JSON")
+if (grepl('"points"', topexp_block, fixed = TRUE))
+  stop("top_expressed still contains old 'points' key in serialized JSON")
 cat("  top_expressed.outliers serialized: OK\n")
 
 # =============================================================================

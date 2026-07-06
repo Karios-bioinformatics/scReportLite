@@ -4364,8 +4364,10 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
     if (!is.null(fd_clean$top_expressed$summary)) {
       te_parts <- c(te_parts, sprintf('"summary":%s', fd_clean$top_expressed$summary))
     }
-    if (!is.null(fd_clean$top_expressed$points)) {
-      te_parts <- c(te_parts, sprintf('"points":%s', fd_clean$top_expressed$points))
+    te_outliers <- fd_clean$top_expressed$outliers
+    if (is.null(te_outliers)) te_outliers <- fd_clean$top_expressed$points  # backward compat
+    if (!is.null(te_outliers)) {
+      te_parts <- c(te_parts, sprintf('"outliers":%s', te_outliers))
     }
     if (length(te_parts) > 0) {
       parts <- c(parts, sprintf('"top_expressed":{%s}', paste(te_parts, collapse = ",")))
@@ -4709,7 +4711,7 @@ sc_report <- function(umap_df,
       )
     }
 
-    # top_expressed: summary + points
+    # top_expressed: summary + outliers
     if (!is.null(feature_diag$top_expressed)) {
       te <- feature_diag$top_expressed
       fd_clean$top_expressed <- list()
@@ -4718,9 +4720,11 @@ sc_report <- function(umap_df,
           te$summary, dataframe = "rows", auto_unbox = TRUE
         )
       }
-      if (!is.null(te$outliers) && is.data.frame(te$outliers)) {
+      te_out <- te$outliers
+      if (is.null(te_out)) te_out <- te$points  # backward compat
+      if (!is.null(te_out) && is.data.frame(te_out)) {
         fd_clean$top_expressed$outliers <- jsonlite::toJSON(
-          te$outliers, dataframe = "rows", auto_unbox = TRUE
+          te_out, dataframe = "rows", auto_unbox = TRUE
         )
       }
     }
