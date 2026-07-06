@@ -4718,9 +4718,9 @@ sc_report <- function(umap_df,
           te$summary, dataframe = "rows", auto_unbox = TRUE
         )
       }
-      if (!is.null(te$points) && is.data.frame(te$points)) {
-        fd_clean$top_expressed$points <- jsonlite::toJSON(
-          te$points, dataframe = "rows", auto_unbox = TRUE
+      if (!is.null(te$outliers) && is.data.frame(te$outliers)) {
+        fd_clean$top_expressed$outliers <- jsonlite::toJSON(
+          te$outliers, dataframe = "rows", auto_unbox = TRUE
         )
       }
     }

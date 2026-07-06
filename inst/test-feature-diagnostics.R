@@ -190,8 +190,8 @@ feature_diag <- list(
   ),
   variable_features = vf_df,
   top_expressed = list(
-    summary = te_summary,
-    points  = te_points
+    summary  = te_summary,
+    outliers = te_points
   ),
   elbow = elbow_df
 )
@@ -252,6 +252,15 @@ sc_report(
   panels       = c("feature", "umap", "marker_table")
 )
 cat("  Feature + UMAP OK →", out2, "\n")
+
+# Assert: serialized JSON contains top_expressed.outliers (not points)
+lines2 <- readLines(out2, warn = FALSE)
+topexp_json_line <- grep('"top_expressed"', lines2, fixed = TRUE)
+stopifnot(length(topexp_json_line) > 0)
+topexp_block <- paste(lines2[topexp_json_line[1]:(topexp_json_line[1]+15)], collapse = "\n")
+stopifnot(grepl('"outliers"', topexp_block, fixed = TRUE))
+stopifnot(!grepl('"points"', topexp_block, fixed = TRUE))
+cat("  top_expressed.outliers serialized: OK\n")
 
 # =============================================================================
 # Test 3 — QC + Feature + PCA + UMAP (full quad)
