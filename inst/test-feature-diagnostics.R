@@ -160,12 +160,23 @@ te_summary <- data.frame(
 te_points <- do.call(rbind, lapply(1:50, function(i) {
   n_pts <- sample(20:100, 1)
   data.frame(
-    gene          = rep(top_genes[i], n_pts),
-    percent_total = pmax(0, rnorm(n_pts, te_summary$mean_percent[i],
-                                   te_summary$mean_percent[i] * 0.5)),
+    gene    = rep(top_genes[i], n_pts),
+    percent = pmax(0, rnorm(n_pts, te_summary$mean_percent[i],
+                             te_summary$mean_percent[i] * 0.5)),
+    cell    = paste0("cell_", sample(1:2000, n_pts)),
     stringsAsFactors = FALSE
   )
 }))
+
+# Schema assertion: outlier mock matches real builder columns
+stopifnot(
+  "outlier mock missing 'gene' column"   = "gene"    %in% colnames(te_points),
+  "outlier mock missing 'percent' column" = "percent" %in% colnames(te_points),
+  "outlier mock missing 'cell' column"    = "cell"    %in% colnames(te_points)
+)
+if ("percent_total" %in% colnames(te_points))
+  stop("outlier mock still contains legacy 'percent_total' column")
+cat("  Outlier mock schema: gene + percent + cell OK\n")
 
 # ElbowPlot data
 elbow_df <- data.frame(
