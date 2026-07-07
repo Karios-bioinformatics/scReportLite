@@ -77,7 +77,7 @@ build_qc_payload <- function(qc_df,
       point_indices <- c(point_indices, idx_s)
     } else {
       # deterministic sample: every k-th cell
-      k <- with_seed(42, ceiling(n_s / max_points_per_gene))
+      k <- ceiling(n_s / max_points_per_group)
       keep <- idx_s[seq(1, n_s, by = k)]
       point_indices <- c(point_indices, keep)
     }
