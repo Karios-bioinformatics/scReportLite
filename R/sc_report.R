@@ -3427,7 +3427,7 @@ function updateMarkerTable(clusterId) {
     titleEl.textContent = "Cluster " + clusterId + " — No markers available";
     container.innerHTML =
       "<p class=\\"no-data\\">No marker genes found for cluster " +
-      clusterId + ".</p>";
+      escHtml(clusterId) + ".</p>";
     return;
   }
 

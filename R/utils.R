@@ -110,8 +110,16 @@ validate_inputs <- function(umap_df, marker_df, cluster_col, cell_col,
     }
     # Validate numeric marker columns (used by frontend .toFixed / formatting)
     for (col in c("avg_log2FC", "p_val_adj")) {
-      if (col %in% colnames(marker_df) && !is.numeric(marker_df[[col]])) {
-        stop("marker_df column '", col, "' must be numeric", call. = FALSE)
+      if (col %in% colnames(marker_df)) {
+        vals <- marker_df[[col]]
+        if (!is.numeric(vals)) {
+          stop("marker_df column '", col, "' must be numeric", call. = FALSE)
+        }
+        bad <- is.na(vals) | is.nan(vals) | is.infinite(vals)
+        if (any(bad)) {
+          stop("marker_df column '", col, "' contains NA, NaN, or Inf values (",
+               sum(bad), " of ", length(vals), " rows)", call. = FALSE)
+        }
       }
     }
   }

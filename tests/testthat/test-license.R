@@ -1,31 +1,33 @@
-# Test: DESCRIPTION License field is MIT + file LICENSE
+# Test: DESCRIPTION License field is MIT + file LICENSE, and LICENSE is
+# the standard R-package stub (YEAR / COPYRIGHT HOLDER), while LICENSE.md
+# contains the full MIT text.
 
 test_that("DESCRIPTION License matches MIT + file LICENSE", {
-  # In package-check mode, read from installed package
-  # In dev mode, read from the source tree
-  pkg_root <- if (requireNamespace("scReportLite", quietly = TRUE)) {
-    system.file(package = "scReportLite")
-  } else {
-    normalizePath(file.path("..", ".."), winslash = "/")
-  }
-
-  desc_path <- file.path(pkg_root, "DESCRIPTION")
-  if (!file.exists(desc_path)) {
-    skip("DESCRIPTION not found at expected path")
-  }
+  desc_path <- system.file("DESCRIPTION", package = "scReportLite")
+  if (!file.exists(desc_path)) skip("DESCRIPTION not found")
 
   desc <- read.dcf(desc_path)
   expect_true("License" %in% colnames(desc))
   lic <- desc[1, "License"]
 
-  # Accept any of the standard spellings
-  ok <- grepl("MIT \\+ file LICEN[SC]E", lic) ||
-        identical(lic, "MIT + file LICENSE") ||
-        identical(lic, "MIT + file LICENCE")
+  ok <- grepl("MIT \\+ file LICEN[SC]E", lic)
   expect_true(ok, info = sprintf("License field is: '%s'", lic))
+})
 
-  # LICENSE file must also exist
-  lic_path <- file.path(pkg_root, "LICENSE")
-  expect_true(file.exists(lic_path) || file.exists(paste0(lic_path, ".md")),
-              info = "LICENSE file must exist alongside DESCRIPTION")
+test_that("LICENSE contains YEAR / COPYRIGHT HOLDER stub (R convention)", {
+  lic_path <- system.file("LICENSE", package = "scReportLite")
+  if (!file.exists(lic_path)) skip("LICENSE not found")
+
+  lines <- readLines(lic_path, warn = FALSE)
+  expect_true(any(grepl("^YEAR:", lines)))
+  expect_true(any(grepl("^COPYRIGHT HOLDER:", lines)))
+})
+
+test_that("LICENSE.md exists with full MIT text", {
+  lic_md <- system.file("LICENSE.md", package = "scReportLite")
+  if (!file.exists(lic_md)) skip("LICENSE.md not found")
+
+  full <- paste(readLines(lic_md, warn = FALSE), collapse = "\n")
+  expect_true(grepl("MIT License", full, fixed = TRUE))
+  expect_true(grepl("Permission is hereby granted", full, fixed = TRUE))
 })

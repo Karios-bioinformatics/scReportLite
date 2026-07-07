@@ -1,17 +1,6 @@
 # Test: with_seed() preserves caller's .Random.seed state
-#
-# Verifies that the internal with_seed helper does not pollute or
-# create a persistent global .Random.seed where none existed before.
 
-# Source package functions for dev-mode testing
-pkg_root <- if (requireNamespace("scReportLite", quietly = TRUE)) {
-  system.file(package = "scReportLite")
-} else {
-  normalizePath(file.path("..", ".."), winslash = "/")
-}
-if (!exists("with_seed", mode = "function")) {
-  source(file.path(pkg_root, "R", "utils.R"))
-}
+with_seed <- getFromNamespace("with_seed", "scReportLite")
 
 test_that("with_seed restores existing .Random.seed", {
   set.seed(123)
@@ -29,7 +18,6 @@ test_that("with_seed removes .Random.seed when none existed before", {
 
   result <- with_seed(42, sample(1000, 10))
 
-  # After with_seed, .Random.seed should NOT exist (was removed)
   expect_false(exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
   expect_equal(length(result), 10)
 })

@@ -47,6 +47,21 @@ build_qc_payload <- function(qc_df,
   message("build_qc_payload: ", length(samples), " samples, ",
           nrow(qc_df), " cells")
 
+  # Validate QC metric columns
+  qc_cols <- c("nCount_RNA", "nFeature_RNA", "percent.mt")
+  for (col in qc_cols) {
+    vals <- qc_df[[col]]
+    if (!is.numeric(vals)) {
+      stop("qc_df column '", col, "' must be numeric, got ", class(vals)[1],
+           call. = FALSE)
+    }
+    bad <- is.nan(vals) | is.infinite(vals)
+    if (any(bad, na.rm = TRUE)) {
+      stop("qc_df column '", col, "' contains Inf or NaN values",
+           call. = FALSE)
+    }
+  }
+
   # ---- Build per-cell record list ----
   build_cells <- function(df) {
     n <- nrow(df)
