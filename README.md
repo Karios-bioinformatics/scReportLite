@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v0.4.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/Version-v0.5.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/Status-Active%20Development-green" alt="Status">
   <img src="https://img.shields.io/badge/Layer-scReport%20Lite-lightgrey" alt="Layer">
   <img src="https://img.shields.io/badge/Focus-Single--cell%20Reporting-purple" alt="Focus">
@@ -26,7 +26,7 @@ scReportLite does **not** replace Seurat, Scanpy, or upstream analysis workflows
 The current release is:
 
 ```text
-scReportLite v0.4.0
+scReportLite v0.5.0
 ```
 
 This version defines the current four-axis architecture of scReportLite:
@@ -135,8 +135,8 @@ sc_report(
   marker_df = marker_df,
   gene_expr_df = gene_expr_df,
   sample_col = "sample",
-  output = "scReportLite_v040_report.html",
-  title = "scReportLite v0.4.0 report",
+  output = "scReportLite_v050_report.html",
+  title = "scReportLite v0.5.0 report",
   panels = c(
     "qc",
     "feature",
@@ -152,9 +152,9 @@ sc_report(
 
 ---
 
-## Recommended v0.4.0 Panels
+## Recommended v0.5.0 Panels
 
-For a complete v0.4.0 report, use:
+For a complete v0.5.0 report, use:
 
 ```r
 panels = c(
@@ -397,7 +397,7 @@ sc_report(
     "sample_composition",
     "gene_expression"
   ),
-  output = "scReportLite_v040_report.html"
+  output = "scReportLite_v050_report.html"
 )
 ```
 
@@ -686,6 +686,19 @@ scReportCore        → shared schemas, plugin protocol, and reusable UI compone
 
 ## Changelog
 
+### v0.5.0 - UMAP-optional report generation
+
+v0.5.0 improves the main report flow so QC, FEATURE, and PCA reports can be generated without requiring UMAP data.
+
+Major changes:
+
+- Allowed `sc_report()` to generate QC-only, Feature-only, and PCA-only reports with `umap_df = NULL`
+- Kept UMAP validation and Plotly rendering active only when the UMAP view is requested
+- Preserved existing full UMAP report behavior
+- Added guardrails for UMAP-dependent gene expression and marker-table paths
+- Ensured no-UMAP client-side Plotly views include the required HTML dependencies
+- Added regression tests for no-UMAP report generation
+
 ### v0.4.0 — Feature Diagnostics and Four-Axis Report Architecture
 
 v0.4.0 expands scReportLite from a QC / PCA / UMAP report into a four-axis interactive report framework:
@@ -769,7 +782,7 @@ Major changes:
 If you use scReportLite in research projects, please cite:
 
 > Park, K. K. (2026).  
-> scReportLite v0.4.0.  
+> scReportLite v0.5.0.
 > Zenodo.  
 > https://doi.org/10.5281/zenodo.20828069
 
@@ -778,7 +791,7 @@ BibTeX:
 ```bibtex
 @software{park_2026_screportlite,
   author       = {Park, K. K.},
-  title        = {scReportLite v0.4.0},
+  title        = {scReportLite v0.5.0},
   year         = {2026},
   publisher    = {Zenodo},
   doi          = {10.5281/zenodo.20828069},
