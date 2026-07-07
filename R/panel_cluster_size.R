@@ -15,7 +15,7 @@ panel_cluster_size <- list(
     umap_df      <- params$umap_df
     cluster_col  <- params$cluster_col
     colors       <- params$cluster_colors
-    n_total      <- params$n_total %||% nrow(umap_df)
+    n_total      <- if (is.null(params$n_total)) nrow(umap_df) else params$n_total
 
     # Count cells per cluster
     counts   <- table(umap_df[[cluster_col]])

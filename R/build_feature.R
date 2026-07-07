@@ -62,10 +62,11 @@ build_seurat_feature_diagnostics <- function(
     max_scatter_points    = 50000,
     dims                  = 1:50) {
 
-  if (!requireNamespace("Seurat", quietly = TRUE) &&
-      !requireNamespace("SeuratObject", quietly = TRUE)) {
+  if (!requireNamespace("Seurat", quietly = TRUE)) {
     stop(
-      "Seurat (or SeuratObject) is required to use build_seurat_feature_diagnostics().\n",
+      "Package 'Seurat' is required to use build_seurat_feature_diagnostics().\n",
+      "SeuratObject alone is insufficient — this function calls Seurat:: DefaultAssay,",
+      " Seurat::GetAssayData, Seurat::Idents, etc.\n",
       "Install with: install.packages('Seurat')",
       call. = FALSE
     )
