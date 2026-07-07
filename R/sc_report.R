@@ -3194,14 +3194,17 @@ function updateSampleComposition(sampleId) {
 // Cache the plotly graph div on first use
 var _gdCache = null;
 function getPlotDiv() {
+  if (!window._SR_HAS_UMAP) return null;
   if (_gdCache) return _gdCache;
   var container = document.getElementById("umap-container");
+  if (!container) return null;
   _gdCache = container.querySelector(".plotly.html-widget");
   return _gdCache;
 }
 
 // Wait for plotly to be ready before attaching handlers
 function onPlotlyReady(cb) {
+  if (!window._SR_HAS_UMAP) return;
   var gd = getPlotDiv();
   if (gd && gd._fullLayout) {
     cb(gd);
@@ -3654,7 +3657,7 @@ window.addEventListener("resize", function() {
 #' @return Invisibly, the path to the output file
 #'
 #' @keywords internal
-assemble_report <- function(umap_plot, umap_df, marker_df,
+assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
                              cluster_col, cell_col, sample_col,
                              gene_expr_df = NULL,
                              pca_df = NULL,
@@ -3671,16 +3674,29 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                              output, title, dim_opacity, marker_n_top,
                              panels = c("umap", "marker_table")) {
 
-  clusters     <- natural_sort(unique(umap_df[[cluster_col]]))
-  cluster_cols <- cluster_color_map(clusters)
-  n_total      <- nrow(umap_df)
-  has_samples  <- !is.null(sample_col)
+  has_umap     <- !is.null(umap_df) && "umap" %in% panels
   has_pca      <- !is.null(pca_df) && "pca" %in% panels
   has_plot     <- !is.null(qc_payload) && "qc" %in% panels
   has_feature  <- !is.null(feature_diag) && "feature" %in% panels
 
-  # ---- Sidebar: Cluster section ----
-  cluster_html <- lapply(clusters, function(cl) {
+  # ---- Compute clusters / sidebar stats (UMAP only) ----
+  if (has_umap) {
+    clusters     <- natural_sort(unique(umap_df[[cluster_col]]))
+    cluster_cols <- cluster_color_map(clusters)
+    n_total      <- nrow(umap_df)
+    has_samples  <- !is.null(sample_col)
+  } else {
+    clusters     <- character(0)
+    cluster_cols <- character(0)
+    n_total      <- 0L
+    has_samples  <- FALSE
+    if (!is.null(pca_df))  n_total <- nrow(pca_df)
+    if (!is.null(qc_df))   n_total <- nrow(qc_df)
+  }
+
+  # ---- Sidebar: Cluster section (UMAP only) ----
+  cluster_html <- if (has_umap) {
+    lapply(clusters, function(cl) {
     n_cells <- sum(umap_df[[cluster_col]] == cl)
     pct     <- round(n_cells / n_total * 100, 1)
     cl_char <- as.character(cl)
@@ -3700,11 +3716,14 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         sprintf("%d (%.1f%%)", n_cells, pct)
       )
     )
-  })
+    })
+  } else {
+    NULL
+  }
 
-  # ---- Sidebar: Sample section (optional) ----
+  # ---- Sidebar: Sample section (optional, UMAP only) ----
   sample_html <- NULL
-  if (has_samples) {
+  if (has_umap && has_samples) {
     samples <- natural_sort(unique(umap_df[[sample_col]]))
     sample_html <- lapply(samples, function(s) {
       s_char <- as.character(s)
@@ -3735,7 +3754,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   clusters_json <- jsonlite::toJSON(as.character(clusters), auto_unbox = TRUE)
 
   # ---- UMAP plot as tags ----
-  umap_tags <- htmltools::as.tags(umap_plot)
+  umap_tags <- if (!is.null(umap_plot)) htmltools::as.tags(umap_plot) else NULL
 
   # ---- Sidebar: tab-based layout ----
   sidebar_tabs <- list(
@@ -3985,7 +4004,8 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
   # ---- View tabs (standalone, between header and main-layout, v0.3.0) ----
   view_tabs <- list()
-  first_view <- if (has_plot) "plot" else if (has_feature) "feature" else if (has_pca) "pca" else "umap"
+  first_view <- if (has_plot) "plot" else if (has_feature) "feature" else if (has_pca) "pca" else if (has_umap) "umap" else ""
+  if (first_view == "") stop("No viewable panels available", call. = FALSE)
 
   if (has_plot) {
     view_tabs <- c(view_tabs, list(
@@ -4005,10 +4025,12 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
                id = "view-tab-pca", onclick = "switchView('pca')", "PCA")
     ))
   }
-  view_tabs <- c(view_tabs, list(
-    tags$div(class = paste0("view-tab", if (first_view == "umap") " active" else ""),
-             id = "view-tab-umap", onclick = "switchView('umap')", "UMAP")
-  ))
+  if (has_umap) {
+    view_tabs <- c(view_tabs, list(
+      tags$div(class = paste0("view-tab", if (first_view == "umap") " active" else ""),
+               id = "view-tab-umap", onclick = "switchView('umap')", "UMAP")
+    ))
+  }
   view_tabs_html <- if (length(view_tabs) > 0) {
     tags$div(class = "view-tabs", view_tabs)
   }
@@ -4030,7 +4052,6 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
   cluster_colors_json <- jsonlite::toJSON(as.list(cluster_cols), auto_unbox = TRUE)
 
   # ---- Build panel sections for content area ----
-  has_umap         <- "umap" %in% panels
   non_umap_panels  <- setdiff(panels, c("umap", "pca", "qc", "feature"))
 
   # Prepare shared panel params
@@ -4082,9 +4103,15 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         tags$div(class = "report-header",
           tags$span(class = "report-title", title),
           tags$span(class = "report-meta",
-            sprintf("%d cells | %d clusters | %s",
-                    n_total, length(clusters),
-                    format(Sys.time(), "%Y-%m-%d %H:%M"))
+            if (has_umap) {
+              sprintf("%d cells | %d clusters | %s",
+                      n_total, length(clusters),
+                      format(Sys.time(), "%Y-%m-%d %H:%M"))
+            } else {
+              sprintf("%d cells | %s",
+                      n_total,
+                      format(Sys.time(), "%Y-%m-%d %H:%M"))
+            }
           )
         ),
 
@@ -4158,7 +4185,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
           ),
 
           # ---- UMAP view container ----
-          tags$div(
+          if (has_umap) tags$div(
             id    = "sr-view-umap",
             class = "sr-view-umap",
             style = if (has_plot || has_feature) "display:none;" else "",
@@ -4169,7 +4196,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
             # ---- Content area (UMAP + panels) ----
             tags$div(class = "content-area",
               # UMAP section (if "umap" is in panels)
-              if (has_umap) list(
+              list(
                 tags$div(class = "umap-section", id = "umap-section",
                   tags$div(class = "section-title",
                     "UMAP — click a cell to inspect, cluster to highlight"
@@ -4313,8 +4340,10 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         )))
       ),
       tags$script(htmltools::HTML(sprintf(
-        "window._SR_INITIAL_VIEW = '%s';",
-        first_view
+        "window._SR_INITIAL_VIEW = '%s';
+        window._SR_HAS_UMAP = %s;",
+        first_view,
+        if (has_umap) "true" else "false"
       ))),
       tags$script(htmltools::HTML(paste(report_js(), panel_js_extra, sep = "\n"))),
       if (has_feature) tags$script(htmltools::HTML(feature_js())),
@@ -4451,7 +4480,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 #' marker_df <- read.csv("markers.csv")
 #' sc_report(umap_df, marker_df = marker_df, sample_col = "condition")
 #' }
-sc_report <- function(umap_df,
+sc_report <- function(umap_df = NULL,
                        cluster_col   = "cluster",
                        cell_col      = "cell",
                        sample_col    = NULL,
@@ -4473,11 +4502,34 @@ sc_report <- function(umap_df,
                        use_webgl     = TRUE) {
 
   # ---- Validate inputs ----
-  validate_inputs(umap_df, marker_df, cluster_col, cell_col, sample_col)
+  needs_umap <- "umap" %in% panels
+  umap_dependent_panels <- intersect(panels, c("marker_table", "gene_expression",
+    "sample_composition", "cluster_size"))
 
-  # Validate gene expression data if provided
+  if (needs_umap) {
+    if (is.null(umap_df)) {
+      stop("'umap' panel requested but umap_df is NULL. Provide a UMAP data frame or remove 'umap' from panels.",
+           call. = FALSE)
+    }
+    validate_inputs(umap_df, marker_df, cluster_col, cell_col, sample_col)
+  }
+
+  # Validate gene expression data — requires UMAP for highlight overlay
   if (!is.null(gene_expr_df)) {
+    if (is.null(umap_df)) {
+      stop("gene_expr_df requires umap_df for gene expression overlay on UMAP. ",
+           "Either provide umap_df or set gene_expr_df = NULL.",
+           call. = FALSE)
+    }
     validate_gene_expr_df(gene_expr_df, umap_df, cell_col)
+  }
+
+  # Handle UMAP-dependent panels when UMAP is absent
+  if (is.null(umap_df) && length(umap_dependent_panels) > 0) {
+    warning("Panels ", paste(umap_dependent_panels, collapse = ", "),
+            " require UMAP data but umap_df is NULL. They will be skipped.",
+            call. = FALSE)
+    panels <- setdiff(panels, umap_dependent_panels)
   }
 
   # Validate PCA data if provided (v0.2.2)
@@ -4568,11 +4620,14 @@ sc_report <- function(umap_df,
   }
 
   # ---- Build plots ----
-  message("scReportLite: building interactive UMAP plot...")
-  umap_plot <- build_umap_plotly(
-    umap_df, cluster_col, cell_col, sample_col,
-    point_size, point_alpha, use_webgl
-  )
+  umap_plot <- NULL
+  if (needs_umap) {
+    message("scReportLite: building interactive UMAP plot...")
+    umap_plot <- build_umap_plotly(
+      umap_df, cluster_col, cell_col, sample_col,
+      point_size, point_alpha, use_webgl
+    )
+  }
 
   # ---- Build QC plots (v0.3.0) ----
   qc_payload <- NULL
@@ -4739,6 +4794,15 @@ sc_report <- function(umap_df,
   }
 
   # ---- Assemble and write HTML ----
+  # Recompute after UMAP-dependent panels may have been removed
+  needs_umap <- "umap" %in% panels
+
+  viewable <- intersect(panels, c("umap", "pca", "qc", "feature"))
+  if (length(viewable) == 0) {
+    stop("No viewable panels selected. panels must include at least one of: ",
+         "umap, pca, qc, feature", call. = FALSE)
+  }
+
   message("scReportLite: assembling HTML report...")
   assemble_report(
     umap_plot     = umap_plot,
