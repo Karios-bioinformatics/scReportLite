@@ -36,31 +36,40 @@ make_pca <- function(n = 50) {
   )
 }
 
-test_that("QC-only report generates HTML", {
+test_that("QC-only report generates HTML and Plotly libdir", {
   qc <- make_qc(20)
   out <- file.path(tempdir(), "test_qc_only.html")
   sc_report(umap_df = NULL, qc_df = qc, panels = "qc", output = out)
   expect_true(file.exists(out))
   expect_gt(file.info(out)$size, 500)
+  libdir <- paste0(tools::file_path_sans_ext(out), "_files")
+  expect_true(dir.exists(libdir))
   unlink(out)
+  unlink(libdir, recursive = TRUE)
 })
 
-test_that("Feature-only report generates HTML", {
+test_that("Feature-only report generates HTML and Plotly libdir", {
   fd <- make_feature()
   out <- file.path(tempdir(), "test_feature_only.html")
   sc_report(umap_df = NULL, feature_diag = fd, panels = "feature", output = out)
   expect_true(file.exists(out))
   expect_gt(file.info(out)$size, 500)
+  libdir <- paste0(tools::file_path_sans_ext(out), "_files")
+  expect_true(dir.exists(libdir))
   unlink(out)
+  unlink(libdir, recursive = TRUE)
 })
 
-test_that("PCA-only report generates HTML", {
+test_that("PCA-only report generates HTML and Plotly libdir", {
   pca <- make_pca(20)
   out <- file.path(tempdir(), "test_pca_only.html")
   sc_report(umap_df = NULL, pca_df = pca, panels = "pca", output = out)
   expect_true(file.exists(out))
   expect_gt(file.info(out)$size, 500)
+  libdir <- paste0(tools::file_path_sans_ext(out), "_files")
+  expect_true(dir.exists(libdir))
   unlink(out)
+  unlink(libdir, recursive = TRUE)
 })
 
 test_that("umap panel with NULL umap_df errors clearly", {
@@ -102,7 +111,10 @@ test_that("Full UMAP report still works (backward compat)", {
   sc_report(umap, panels = c("umap", "marker_table"), output = out)
   expect_true(file.exists(out))
   expect_gt(file.info(out)$size, 1000)
+  libdir <- paste0(tools::file_path_sans_ext(out), "_files")
+  expect_true(dir.exists(libdir))
   unlink(out)
+  unlink(libdir, recursive = TRUE)
 })
 
 test_that("No viewable panels errors clearly", {

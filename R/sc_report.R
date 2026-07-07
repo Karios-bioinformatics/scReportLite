@@ -4353,6 +4353,17 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
     )
   )
 
+  # ---- Attach Plotly dependencies for client-side Plotly views ----
+  # When QC / Feature / PCA / UMAP are present, the report uses Plotly.newPlot
+  # on the client. Without an R-side plotly widget, save_html won't detect the
+  # dependency and won't generate the _files libdir.
+  needs_plotly_client <- has_plot || has_feature || has_pca || has_umap
+  if (needs_plotly_client) {
+    dummy <- plotly::plot_ly(x = 1, y = 1, type = "scatter", mode = "markers")
+    deps <- htmltools::htmlDependencies(htmltools::as.tags(dummy))
+    page <- htmltools::attachDependencies(page, deps, append = TRUE)
+  }
+
   libdir <- paste0(tools::file_path_sans_ext(output), "_files")
   htmltools::save_html(page, file = output, libdir = libdir)
 
