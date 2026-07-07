@@ -179,8 +179,7 @@ build_seurat_feature_diagnostics <- function(
 
   # Deterministic sampling for large datasets
   if (nrow(df) > max_scatter_points) {
-    set.seed(42)
-    keep <- sort(sample(seq_len(nrow(df)), max_scatter_points))
+    keep <- with_seed(42, sort(sample(seq_len(nrow(df)), max_scatter_points)))
     df <- df[keep, , drop = FALSE]
   }
 
@@ -260,17 +259,18 @@ build_seurat_feature_diagnostics <- function(
 
   # Top N variable for output
   if (nrow(df) > top_n_variable) {
-    set.seed(42)
-    var_rows <- which(df$variable)
-    nonvar_rows <- which(!df$variable)
-    if (length(var_rows) > top_n_variable) {
-      var_rows <- sort(sample(var_rows, top_n_variable))
-    }
-    nv_keep <- top_n_variable - length(var_rows)
-    if (nv_keep > 0 && length(nonvar_rows) > nv_keep) {
-      nonvar_rows <- sort(sample(nonvar_rows, nv_keep))
-    }
-    df <- df[c(var_rows, nonvar_rows), , drop = FALSE]
+    df <- with_seed(42, {
+      var_rows <- which(df$variable)
+      nonvar_rows <- which(!df$variable)
+      if (length(var_rows) > top_n_variable) {
+        var_rows <- sort(sample(var_rows, top_n_variable))
+      }
+      nv_keep <- top_n_variable - length(var_rows)
+      if (nv_keep > 0 && length(nonvar_rows) > nv_keep) {
+        nonvar_rows <- sort(sample(nonvar_rows, nv_keep))
+      }
+      df[c(var_rows, nonvar_rows), , drop = FALSE]
+    })
   }
 
   # Label top N
@@ -400,8 +400,7 @@ build_seurat_feature_diagnostics <- function(
       out_idx <- which(is_outlier)
       n_out <- length(out_idx)
       if (n_out > max_points_per_gene) {
-        set.seed(42)
-        out_idx <- sort(sample(out_idx, max_points_per_gene))
+        out_idx <- with_seed(42, sort(sample(out_idx, max_points_per_gene)))
       }
       outlier_list[[i]] <- data.frame(
         gene    = rep(g, length(out_idx)),

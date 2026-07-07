@@ -1,5 +1,34 @@
 # scReportLite: Utility functions ------------------------------------------------
 
+#' Execute expression with a local random seed
+#'
+#' Runs \code{expr} with \code{set.seed(seed)} and restores the
+#' previous \code{.Random.seed} state (or removes it if none existed)
+#' afterward.  This prevents internal sampling from polluting the
+#' caller's global RNG stream.
+#'
+#' @param seed Integer seed passed to \code{set.seed}.
+#' @param expr Expression to evaluate.
+#' @return The value of \code{expr}.
+#' @keywords internal
+with_seed <- function(seed, expr) {
+  old <- if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+    get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  } else {
+    NULL
+  }
+  on.exit({
+    if (!is.null(old)) {
+      assign(".Random.seed", old, envir = .GlobalEnv)
+    } else {
+      rm(".Random.seed", envir = .GlobalEnv)
+    }
+  })
+  set.seed(seed)
+  eval.parent(substitute(expr))
+}
+
+
 #' Validate input data frames for sc_report
 #'
 #' Checks that umap_df and optional marker_df contain required columns
@@ -33,11 +62,8 @@ validate_inputs <- function(umap_df, marker_df, cluster_col, cell_col,
   for (col in c("UMAP_1", "UMAP_2")) {
     vals <- umap_df[[col]]
     if (!is.numeric(vals)) {
-      vals <- suppressWarnings(as.numeric(vals))
-      if (anyNA(vals) && !all(is.na(umap_df[[col]]))) {
-        stop("Column '", col, "' must be numeric or coercible to numeric",
-             call. = FALSE)
-      }
+      stop("Column '", col, "' must be numeric, got ", class(vals)[1],
+           call. = FALSE)
     }
     bad <- is.na(vals) | is.nan(vals) | is.infinite(vals)
     if (any(bad)) {

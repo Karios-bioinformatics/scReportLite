@@ -10,7 +10,7 @@ Description: Generate self-contained interactive HTML reports from single-cell
     RNA-seq analysis results. Accepts UMAP coordinates, cluster assignments, and
     marker gene tables, producing a single HTML file with interactive cluster
     highlighting and marker table display.
-License: MIT
+License: MIT + file LICENSE
 Encoding: UTF-8
 Imports:
     Matrix,
@@ -19,5 +19,6 @@ Imports:
     jsonlite
 Suggests:
     Seurat,
-    SeuratObject
+    SeuratObject,
+    testthat
 RoxygenNote: 7.3.0

@@ -3840,7 +3840,6 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
 
     # ---- Build gene items ----
     gene_html <- lapply(gene_names, function(g) {
-      g_esc <- gsub("'", "\\\\'", g)
       clusters <- marker_gene_clusters[[g]]
 
       # Build source data attribute
@@ -3879,7 +3878,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
         class        = "gene-item",
         `data-gene`  = g,
         `data-source` = src_attr,
-        onclick      = sprintf("selectGene('%s')", g_esc)
+        onclick      = sprintf("selectGene(%s)", jsonlite::toJSON(g, auto_unbox = TRUE))
       )
       if (nzchar(cluster_attr)) {
         div_attrs[["data-clusters"]] <- cluster_attr
