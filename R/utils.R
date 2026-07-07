@@ -29,6 +29,23 @@ validate_inputs <- function(umap_df, marker_df, cluster_col, cell_col,
     )
   }
 
+  # Validate UMAP coordinates are numeric and free of NA/NaN/Inf
+  for (col in c("UMAP_1", "UMAP_2")) {
+    vals <- umap_df[[col]]
+    if (!is.numeric(vals)) {
+      vals <- suppressWarnings(as.numeric(vals))
+      if (anyNA(vals) && !all(is.na(umap_df[[col]]))) {
+        stop("Column '", col, "' must be numeric or coercible to numeric",
+             call. = FALSE)
+      }
+    }
+    bad <- is.na(vals) | is.nan(vals) | is.infinite(vals)
+    if (any(bad)) {
+      stop("Column '", col, "' contains NA, NaN, or Inf values (",
+           sum(bad), " of ", length(vals), " rows)", call. = FALSE)
+    }
+  }
+
   if (anyNA(umap_df[[cluster_col]])) {
     stop("cluster column '", cluster_col, "' contains NA values", call. = FALSE)
   }
@@ -64,6 +81,12 @@ validate_inputs <- function(umap_df, marker_df, cluster_col, cell_col,
         paste(missing_marker, collapse = ", "),
         call. = FALSE
       )
+    }
+    # Validate numeric marker columns (used by frontend .toFixed / formatting)
+    for (col in c("avg_log2FC", "p_val_adj")) {
+      if (col %in% colnames(marker_df) && !is.numeric(marker_df[[col]])) {
+        stop("marker_df column '", col, "' must be numeric", call. = FALSE)
+      }
     }
   }
 

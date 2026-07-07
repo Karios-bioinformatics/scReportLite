@@ -3023,7 +3023,7 @@ function updateGeneSummary(geneName) {
 
   var exprData = window._GENE_EXPR_DATA;
   if (!exprData || !exprData[geneName]) {
-    body.innerHTML = "<p class=\\"no-data\\">No expression data for " + geneName + ".</p>";
+    body.innerHTML = "<p class=\\"no-data\\">No expression data for " + escHtml(geneName) + ".</p>";
     return;
   }
 
@@ -3041,7 +3041,7 @@ function updateGeneSummary(geneName) {
     "<div style=\\"padding:4px 0;\\">" +
     "<table style=\\"width:100%;font-size:0.9em;\\">" +
     "<tr><td style=\\"color:#636e72;width:140px;\\">Gene</td>" +
-    "<td style=\\"font-weight:600;font-style:italic;font-family:monospace;\\">" + geneName + "</td></tr>" +
+    "<td style=\\"font-weight:600;font-style:italic;font-family:monospace;\\">" + escHtml(geneName) + "</td></tr>" +
     "<tr><td style=\\"color:#636e72;\\">Expressing cells</td>" +
     "<td>" + nExpr + " / " + nTotal + " (" + pct + "%)</td></tr>" +
     "<tr><td style=\\"color:#636e72;\\">Mean expression</td><td>" + mean + "</td></tr>" +
@@ -3688,7 +3688,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
     tags$div(
       class = "cluster-item",
       `data-cluster` = cl_char,
-      onclick = sprintf("toggleCluster('%s')", cl_char),
+      onclick = sprintf("toggleCluster(%s)", jsonlite::toJSON(cl_char, auto_unbox = TRUE)),
       tags$span(class = "cluster-check"),
       tags$span(
         class = "cluster-color-dot",
@@ -3713,7 +3713,7 @@ assemble_report <- function(umap_plot, umap_df, marker_df,
       tags$div(
         class = "sample-item",
         `data-sample` = s_char,
-        onclick = sprintf("selectSample('%s')", s_char),
+        onclick = sprintf("selectSample(%s)", jsonlite::toJSON(s_char, auto_unbox = TRUE)),
         tags$span(class = "sample-dot"),
         tags$span(class = "sample-name", s_char),
         tags$span(
