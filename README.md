@@ -38,7 +38,7 @@ QC | FEATURE | PCA | UMAP
 The corresponding Zenodo DOI is:
 
 ```text
-10.5281/zenodo.20828069
+10.5281/zenodo.21245542
 ```
 
 ## Project Scope
@@ -784,7 +784,7 @@ If you use scReportLite in research projects, please cite:
 > Park, K. K. (2026).  
 > scReportLite v0.5.0.
 > Zenodo.  
-> https://doi.org/10.5281/zenodo.20828069
+> https://doi.org/10.5281/zenodo.21245542
 
 BibTeX:
 
@@ -794,8 +794,8 @@ BibTeX:
   title        = {scReportLite v0.5.0},
   year         = {2026},
   publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.20828069},
-  url          = {https://doi.org/10.5281/zenodo.20828069}
+  doi          = {10.5281/zenodo.21245542},
+  url          = {https://doi.org/10.5281/zenodo.21245542}
 }
 ```
 
