@@ -3691,7 +3691,7 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
     n_total      <- 0L
     has_samples  <- FALSE
     if (!is.null(pca_df))  n_total <- nrow(pca_df)
-    if (!is.null(qc_df))   n_total <- nrow(qc_df)
+    if (!is.null(qc_payload$cells)) n_total <- length(qc_payload$cells)
   }
 
   # ---- Sidebar: Cluster section (UMAP only) ----
