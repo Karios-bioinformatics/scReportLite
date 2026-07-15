@@ -120,3 +120,16 @@ testthat::test_that("missing report assets fail explicitly", {
     fixed = TRUE
   )
 })
+
+testthat::test_that("embedded JSON cannot terminate its script element", {
+  escape_json <- getFromNamespace(".escape_json_for_script", "scReportLite")
+  original <- "</script><script>alert('x')</script>&\u2028\u2029"
+  escaped <- escape_json(jsonlite::toJSON(original, auto_unbox = TRUE))
+
+  testthat::expect_false(grepl("</script", escaped, fixed = TRUE))
+  testthat::expect_match(escaped, "\\u003c\\/script\\u003e", fixed = TRUE)
+  testthat::expect_match(escaped, "\\u0026", fixed = TRUE)
+  testthat::expect_match(escaped, "\\u2028", fixed = TRUE)
+  testthat::expect_match(escaped, "\\u2029", fixed = TRUE)
+  testthat::expect_identical(jsonlite::fromJSON(escaped), original)
+})

@@ -1,0 +1,13 @@
+^inst/check_args\.R$
+^inst/check_onclick\.R$
+^inst/debug_js\.R$
+^inst/extract_js\.R$
+^inst/quick_gene_test\.R$
+^inst/smoke_gene\.R$
+^inst/smoke_gene_source\.R$
+^inst/test-feature-diagnostics\.R$
+^inst/test-mock\.R$
+^inst/test-v030\.R$
+^inst/test_sort\.R$
+^inst/verify_args\.R$
+^inst/verify_fixes\.R$

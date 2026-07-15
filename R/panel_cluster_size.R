@@ -29,13 +29,8 @@ panel_cluster_size <- list(
       stringsAsFactors = FALSE
     )
 
-    # Sort: try numeric, fall back to character
-    cl_numeric <- suppressWarnings(as.numeric(df$cluster))
-    if (!anyNA(cl_numeric)) {
-      df <- df[order(cl_numeric), ]
-    } else {
-      df <- df[order(df$cluster), ]
-    }
+    natural_levels <- natural_sort(df$cluster)
+    df <- df[match(natural_levels, df$cluster), , drop = FALSE]
 
     # Build hover tooltip
     df$hover <- sprintf(

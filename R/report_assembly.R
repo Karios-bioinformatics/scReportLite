@@ -82,7 +82,12 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
   # ---- Build per-sample composition data (for JS-driven chart) ----
   sample_comp_json <- "{}"
   if (has_samples) {
-    comp_counts <- table(umap_df[[sample_col]], umap_df[[cluster_col]])
+    sample_levels <- natural_sort(unique(umap_df[[sample_col]]))
+    cluster_levels <- natural_sort(unique(umap_df[[cluster_col]]))
+    comp_counts <- table(
+      factor(umap_df[[sample_col]], levels = sample_levels),
+      factor(umap_df[[cluster_col]], levels = cluster_levels)
+    )
     comp_list <- lapply(rownames(comp_counts), function(s) {
       row <- as.list(as.integer(comp_counts[s, ]))
       names(row) <- colnames(comp_counts)
@@ -129,21 +134,21 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
   # Collect extra CSS and JS from panels
   panel_css_extra <- collect_panel_css(non_umap_panels)
   panel_js_extra  <- collect_panel_js(non_umap_panels)
-  # ---- Register independently composable report modules ----
-  report_modules <- list(
-    .build_qc_report_module(has_plot),
-    .build_feature_report_module(has_feature, active = FALSE),
-    .build_pca_report_module(has_pca, pca_has_sample),
-    .build_umap_report_module(
-      has_umap,
-      hidden = has_plot || has_feature,
+  # ---- Build independently composable modules in caller-requested order ----
+  report_modules <- .build_registered_report_modules(
+    panels,
+    list(
+      has_plot = has_plot,
+      has_feature = has_feature,
+      has_pca = has_pca,
+      pca_has_sample = pca_has_sample,
+      has_umap = has_umap,
       sidebar_html = sidebar_html,
       umap_tags = umap_tags,
       panel_sections_html = panel_sections_html
     )
   )
   first_view <- .first_report_module(report_modules)
-  report_modules[[2]]$style <- if (first_view != "feature") "display:none;" else ""
   view_tabs_html <- .render_report_module_tabs(report_modules, first_view)
 
   data_port_tags <- .build_report_data_ports(

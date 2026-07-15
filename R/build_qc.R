@@ -42,7 +42,7 @@ build_qc_payload <- function(qc_df,
   samples     <- natural_sort(unique(qc_df[[sample_col]]))
   sample_cols <- cluster_color_map(samples)
   # force plain character keys / values
-  sample_cols <- setNames(unname(sample_cols), names(sample_cols))
+  sample_cols <- stats::setNames(unname(sample_cols), names(sample_cols))
 
   message("build_qc_payload: ", length(samples), " samples, ",
           nrow(qc_df), " cells")
@@ -70,9 +70,9 @@ build_qc_payload <- function(qc_df,
       rec <- list(
         cell        = as.character(df[[cell_col]][i]),
         sample      = as.character(df[[sample_col]][i]),
-        nCount_RNA  = if (is.na(df[["nCount_RNA"]][i]))   0 else df[["nCount_RNA"]][i],
-        nFeature_RNA= if (is.na(df[["nFeature_RNA"]][i])) 0 else df[["nFeature_RNA"]][i],
-        percent_mt  = if (is.na(df[["percent.mt"]][i]))   0 else df[["percent.mt"]][i]
+        nCount_RNA  = df[["nCount_RNA"]][i],
+        nFeature_RNA= df[["nFeature_RNA"]][i],
+        percent_mt  = df[["percent.mt"]][i]
       )
       if (has_cluster)
         rec$cluster <- as.character(df[[cluster_col]][i])
@@ -91,9 +91,11 @@ build_qc_payload <- function(qc_df,
     if (n_s <= max_points_per_group) {
       point_indices <- c(point_indices, idx_s)
     } else {
-      # deterministic sample: every k-th cell
-      k <- ceiling(n_s / max_points_per_group)
-      keep <- idx_s[seq(1, n_s, by = k)]
+      # Deterministic, evenly spaced sample with the requested exact cap.
+      positions <- unique(as.integer(round(seq(
+        1, n_s, length.out = max_points_per_group
+      ))))
+      keep <- idx_s[positions]
       point_indices <- c(point_indices, keep)
     }
   }

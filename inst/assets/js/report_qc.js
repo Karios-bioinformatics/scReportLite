@@ -28,6 +28,14 @@ var _PLOT_STATE = {
   _activeCanvasIds: []   // set by each render fn for focus restyle
 };
 
+function _PLOT_isFiniteMetric(value) {
+  return typeof value === "number" && isFinite(value);
+}
+
+function _PLOT_formatMetric(value, digits) {
+  return _PLOT_isFiniteMetric(value) ? value.toFixed(digits || 0) : "missing";
+}
+
 // ---- Focus → opacities ----
 function _PLOT_focusOpacities(focus) {
   if (focus === "violin")   return {v:0.90, p:0.00};
@@ -399,13 +407,14 @@ function _PLOT_renderOvMetric(d) {
       var cellIds = [];
       for (var ci = 0; ci < d.cells.length; ci++) {
         if (d.cells[ci].sample !== s) continue;
+        if (!_PLOT_isFiniteMetric(d.cells[ci][metric])) continue;
         yVals.push(d.cells[ci][metric]);
         cellIds.push(d.cells[ci].cell);
         hoverTexts.push("Cell: " + d.cells[ci].cell +
           "<br>Sample: " + s +
           "<br>nCount: " + d.cells[ci].nCount_RNA +
           "<br>nFeature: " + d.cells[ci].nFeature_RNA +
-          "<br>%MT: " + d.cells[ci].percent_mt.toFixed(2));
+          "<br>%MT: " + _PLOT_formatMetric(d.cells[ci].percent_mt, 2));
       }
       if (!yVals.length) continue;
 
@@ -471,7 +480,7 @@ function _PLOT_renderOvSample(d) {
       for (var gc = 0; gc < d.cells.length; gc++) {
         if (d.cells[gc].sample !== samples[gs]) continue;
         var gv = d.cells[gc][gmName];
-        if (gv > gMax) gMax = gv;
+        if (_PLOT_isFiniteMetric(gv) && gv > gMax) gMax = gv;
       }
     }
     metricRanges[gmName] = [0, gMax * 1.05];
@@ -525,6 +534,7 @@ function _PLOT_renderOvSample(d) {
       var yVals = []; var hovers = []; var cellIds = [];
       for (var ci = 0; ci < d.cells.length; ci++) {
         if (d.cells[ci].sample !== s) continue;
+        if (!_PLOT_isFiniteMetric(d.cells[ci][metric])) continue;
         yVals.push(d.cells[ci][metric]);
         cellIds.push(d.cells[ci].cell);
         hovers.push("Cell: " + d.cells[ci].cell + "<br>" + metric + ": " + d.cells[ci][metric]);
@@ -590,6 +600,7 @@ function _PLOT_renderSmMetric(d) {
     var yVals = []; var hovers = []; var cellIds = [];
     for (var ci = 0; ci < d.cells.length; ci++) {
       if (d.cells[ci].sample !== s) continue;
+      if (!_PLOT_isFiniteMetric(d.cells[ci][metric])) continue;
       yVals.push(d.cells[ci][metric]);
       cellIds.push(d.cells[ci].cell);
       hovers.push("Cell: "+d.cells[ci].cell+"<br>Sample: "+s+"<br>"+metric+": "+d.cells[ci][metric]);
@@ -653,7 +664,7 @@ function _PLOT_renderSmSample(d) {
     for (var gc = 0; gc < d.cells.length; gc++) {
       if (d.cells[gc].sample !== sample) continue;
       var gv = d.cells[gc][gmName];
-      if (gv > gMax) gMax = gv;
+      if (_PLOT_isFiniteMetric(gv) && gv > gMax) gMax = gv;
     }
     metricRanges[gmName] = [0, gMax * 1.05];
   }
@@ -684,6 +695,7 @@ function _PLOT_renderSmSample(d) {
     var yVals = []; var hovers = []; var cellIds = [];
     for (var ci = 0; ci < d.cells.length; ci++) {
       if (d.cells[ci].sample !== sample) continue;
+      if (!_PLOT_isFiniteMetric(d.cells[ci][metric])) continue;
       yVals.push(d.cells[ci][metric]);
       cellIds.push(d.cells[ci].cell);
       hovers.push("Cell: "+d.cells[ci].cell+"<br>"+metric+": "+d.cells[ci][metric]);
@@ -747,6 +759,8 @@ function _PLOT_renderScatter(d) {
     var xVals=[]; var yVals=[]; var hovers=[];
     for (var ci = 0; ci < d.cells.length; ci++) {
       if (d.cells[ci].sample !== s) continue;
+      if (!_PLOT_isFiniteMetric(d.cells[ci].nCount_RNA) ||
+          !_PLOT_isFiniteMetric(d.cells[ci].nFeature_RNA)) continue;
       xVals.push(d.cells[ci].nCount_RNA);
       yVals.push(d.cells[ci].nFeature_RNA);
       hovers.push("Cell: "+d.cells[ci].cell+"<br>Sample: "+s+

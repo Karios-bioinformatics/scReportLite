@@ -7,7 +7,7 @@
 #' Generate an interactive single-cell HTML report
 #'
 #' Reads UMAP coordinates, cluster assignments, and optional marker gene results
-#' to produce a self-contained interactive HTML report. The report features an
+#' to produce a portable interactive HTML report bundle. The report features an
 #' interactive UMAP with per-cluster highlighting and a linked marker gene table.
 #'
 #' @param umap_df A data.frame with UMAP coordinates and cluster labels.
@@ -30,7 +30,22 @@
 #'   with numeric expression values. When provided, a "Genes" tab
 #'   appears in the sidebar for gene-level UMAP coloring.
 #'   Default: \code{NULL}.
-#' @param output Path to the output HTML file.
+#' @param pca_df Optional cell-level PCA data.frame containing the configured
+#'   cell and cluster columns plus at least two columns named \code{PC_1},
+#'   \code{PC_2}, and so on.
+#' @param pca_color_by Initial PCA grouping column. Defaults to
+#'   \code{"cluster"}; when unavailable, the cluster column is used.
+#' @param pca_loading_df Optional PCA loading data.frame with columns
+#'   \code{gene}, \code{PC}, and numeric \code{loading}.
+#' @param pca_loading_top_n Positive integer number of loading genes shown for
+#'   each selected PC. Default: \code{10}.
+#' @param qc_df Optional cell-level QC data.frame containing cell, sample,
+#'   \code{nCount_RNA}, \code{nFeature_RNA}, and \code{percent.mt} columns.
+#' @param feature_diag Optional diagnostics list produced by
+#'   \code{build_seurat_feature_diagnostics()}.
+#' @param output Path to the output HTML entry file. A sibling dependency
+#'   directory named with the same stem plus \code{_files} is also generated;
+#'   keep both together when moving or sharing the report.
 #'   Default: \code{"sc_report.html"}.
 #' @param title Title displayed in the report header.
 #'   Default: \code{"scRNA-seq Report"}.
@@ -95,6 +110,22 @@ sc_report <- function(umap_df = NULL,
                        panels        = c("umap", "marker_table"),
                        use_webgl     = TRUE) {
 
+  validate_sc_report_parameters(
+    cluster_col = cluster_col,
+    cell_col = cell_col,
+    sample_col = sample_col,
+    pca_color_by = pca_color_by,
+    pca_loading_top_n = pca_loading_top_n,
+    output = output,
+    title = title,
+    point_size = point_size,
+    point_alpha = point_alpha,
+    dim_opacity = dim_opacity,
+    marker_n_top = marker_n_top,
+    panels = panels,
+    use_webgl = use_webgl
+  )
+
   # ---- Validate inputs ----
   needs_umap <- "umap" %in% panels
   umap_dependent_panels <- intersect(panels, c("marker_table", "gene_expression",
@@ -106,6 +137,7 @@ sc_report <- function(umap_df = NULL,
            call. = FALSE)
     }
     validate_inputs(umap_df, marker_df, cluster_col, cell_col, sample_col)
+    umap_df[[cell_col]] <- as.character(umap_df[[cell_col]])
   }
 
   # Validate gene expression data — requires UMAP for highlight overlay
@@ -115,19 +147,29 @@ sc_report <- function(umap_df = NULL,
            "Either provide umap_df or set gene_expr_df = NULL.",
            call. = FALSE)
     }
+    if ("cell" %in% colnames(gene_expr_df)) {
+      gene_expr_df[["cell"]] <- as.character(gene_expr_df[["cell"]])
+    }
     validate_gene_expr_df(gene_expr_df, umap_df, cell_col)
   }
 
   # Handle UMAP-dependent panels when UMAP is absent
   if (is.null(umap_df) && length(umap_dependent_panels) > 0) {
+    remaining_panels <- setdiff(panels, umap_dependent_panels)
+    if (length(intersect(remaining_panels, c("pca", "qc", "feature"))) == 0L) {
+      stop(
+        "No viewable panels selected after removing UMAP-dependent panels",
+        call. = FALSE
+      )
+    }
     warning("Panels ", paste(umap_dependent_panels, collapse = ", "),
             " require UMAP data but umap_df is NULL. They will be skipped.",
             call. = FALSE)
-    panels <- setdiff(panels, umap_dependent_panels)
+    panels <- remaining_panels
   }
 
   # Validate PCA data if provided (v0.2.2)
-  if (!is.null(pca_df)) {
+  if (!is.null(pca_df) && "pca" %in% panels) {
     if (!is.data.frame(pca_df)) {
       stop("pca_df must be a data.frame or NULL", call. = FALSE)
     }
@@ -135,11 +177,29 @@ sc_report <- function(umap_df = NULL,
     required_pca <- c(cell_col, cluster_col)
     missing_pca <- setdiff(required_pca, colnames(pca_df))
     if (length(missing_pca) > 0 || length(pc_cols) < 2) {
-      warning("PCA panel requested but pca_df is missing required columns. ",
-              "Need at least cell, cluster, and 2 PC columns. Skipping PCA panel.",
-              call. = FALSE)
-      pca_df <- NULL
+      stop("pca_df must contain ", cell_col, ", ", cluster_col,
+           ", and at least two PC_<number> columns", call. = FALSE)
     }
+    validate_cell_ids(pca_df[[cell_col]], "pca_df", cell_col)
+    pca_df[[cell_col]] <- as.character(pca_df[[cell_col]])
+    if (anyNA(pca_df[[cluster_col]])) {
+      stop("pca_df cluster column contains NA values", call. = FALSE)
+    }
+    for (pc in pc_cols) {
+      values <- pca_df[[pc]]
+      if (!is.numeric(values) || any(!is.finite(values))) {
+        stop("pca_df column '", pc,
+             "' must be numeric and contain only finite values", call. = FALSE)
+      }
+    }
+  }
+
+  if (!is.null(umap_df) && !is.null(pca_df) &&
+      "umap" %in% panels && "pca" %in% panels) {
+    validate_cross_view_cell_ids(
+      umap_df[[cell_col]],
+      pca_df[[cell_col]]
+    )
   }
 
   # Validate QC data if provided (v0.3.0)
@@ -157,6 +217,9 @@ sc_report <- function(umap_df = NULL,
               "  Skipping Plot view.",
               call. = FALSE)
       qc_df <- NULL
+    } else {
+      validate_cell_ids(qc_df[[cell_col]], "qc_df", cell_col)
+      qc_df[[cell_col]] <- as.character(qc_df[[cell_col]])
     }
   } else if (is.null(qc_df) && "qc" %in% panels) {
     warning("QC panel requested but qc_df is NULL. Skipping QC view.",
@@ -201,10 +264,6 @@ sc_report <- function(umap_df = NULL,
   }
   if (marker_n_top < 1) stop("marker_n_top must be >= 1", call. = FALSE)
 
-  if (!is.character(panels) || length(panels) < 1) {
-    stop("panels must be a character vector with at least one element",
-         call. = FALSE)
-  }
   known_panels  <- c("umap", "marker_table", "pca", "qc", "feature", list_panels())
   unknown_panels <- setdiff(panels, known_panels)
   if (length(unknown_panels) > 0) {

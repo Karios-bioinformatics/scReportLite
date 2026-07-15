@@ -15,7 +15,7 @@
 
 ## Overview
 
-**scReportLite** is a lightweight R package for generating interactive standalone HTML reports from single-cell RNA-seq analysis results.
+**scReportLite** is a lightweight R package for generating portable interactive HTML report bundles from single-cell RNA-seq analysis results.
 
 It is designed as the **Lite layer of the scReport ecosystem**: a focused, browser-based report framework for the core structure of single-cell analysis results.
 
@@ -78,7 +78,7 @@ Marker gene tables
 Selected gene expression matrices
 ```
 
-scReportLite brings these layers together into one standalone HTML report.
+scReportLite brings these layers together into one interactive report bundle.
 
 The generated report can be opened directly in a web browser and shared without requiring R, Seurat, or a running analysis environment.
 
@@ -93,12 +93,13 @@ The generated report can be opened directly in a web browser and shared without 
 - `PCA` view for principal component exploration
 - `UMAP` view for embedding, cluster, marker, and gene expression exploration
 
-### Standalone HTML output
+### Portable HTML report bundle
 
-- Produces a single browser-readable HTML report
+- Produces one browser-readable HTML entry file and a sibling `<name>_files` dependency directory
 - Does not require R or Seurat to view the generated report
 - Supports interactive Plotly-based exploration
 - Supports WebGL rendering for large UMAP and scatter views
+- Requires the HTML file and dependency directory to remain together when copied or shared
 
 ### Seurat-first workflow
 
@@ -583,7 +584,7 @@ sc_report(
 
 Recommended for datasets containing more than 10,000 cells.
 
-For `gene_expr_df`, avoid embedding too many genes into a standalone HTML report. A focused marker-gene subset is usually more practical for sharing and browser-side interaction.
+For `gene_expr_df`, avoid embedding too many genes into the report bundle. A focused marker-gene subset is usually more practical for sharing and browser-side interaction.
 
 Recommended strategy:
 
@@ -593,7 +594,7 @@ gene_expr_df: should contain a focused gene subset for expression colouring
 feature_diag: should contain lightweight diagnostic summaries, not full expression matrices
 ```
 
-Very large reports may generate large standalone HTML files. For large datasets, prefer:
+Very large reports may generate a large HTML entry file and dependency directory. For large datasets, prefer:
 
 - WebGL rendering
 - Focused gene expression matrices

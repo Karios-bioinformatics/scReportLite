@@ -25,7 +25,7 @@
         list(
           tags$div(class = "umap-section", id = "umap-section",
             tags$div(class = "section-title",
-              "UMAP — click a cell to inspect, cluster to highlight"
+              "UMAP \u2014 click a cell to inspect, cluster to highlight"
             ),
             tags$div(class = "umap-container", id = "umap-container",
               umap_tags
@@ -36,7 +36,7 @@
             tags$div(class = "cell-info-header",
               tags$div(
                 tags$span(class = "cell-info-title", "Cell Information"),
-                tags$span(" — "),
+                tags$span(" \u2014 "),
                 tags$span(class = "cell-info-cellid", id = "cell-info-cellid", "")
               ),
               tags$button(

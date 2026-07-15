@@ -29,6 +29,66 @@ with_seed <- function(seed, expr) {
 }
 
 
+#' Validate public sc_report scalar parameters
+#' @keywords internal
+validate_sc_report_parameters <- function(
+    cluster_col, cell_col, sample_col, pca_color_by, pca_loading_top_n,
+    output, title, point_size, point_alpha, dim_opacity, marker_n_top,
+    panels, use_webgl) {
+  scalar_string <- function(value, name, nullable = FALSE) {
+    if (nullable && is.null(value)) return(invisible(TRUE))
+    if (!is.character(value) || length(value) != 1L || is.na(value) ||
+        !nzchar(trimws(value))) {
+      stop(name, " must be one non-empty string",
+           if (nullable) " or NULL" else "", call. = FALSE)
+    }
+    invisible(TRUE)
+  }
+  scalar_number <- function(value, name) {
+    if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
+        !is.finite(value)) {
+      stop(name, " must be one finite numeric value", call. = FALSE)
+    }
+  }
+  scalar_string(cluster_col, "cluster_col")
+  scalar_string(cell_col, "cell_col")
+  scalar_string(sample_col, "sample_col", nullable = TRUE)
+  scalar_string(pca_color_by, "pca_color_by", nullable = TRUE)
+  scalar_string(output, "output")
+  scalar_string(title, "title")
+  scalar_number(point_size, "point_size")
+  scalar_number(point_alpha, "point_alpha")
+  scalar_number(dim_opacity, "dim_opacity")
+  scalar_number(marker_n_top, "marker_n_top")
+  scalar_number(pca_loading_top_n, "pca_loading_top_n")
+  if (point_size <= 0) stop("point_size must be > 0", call. = FALSE)
+  if (point_alpha <= 0 || point_alpha > 1) {
+    stop("point_alpha must be in (0, 1]", call. = FALSE)
+  }
+  if (dim_opacity < 0 || dim_opacity > 1) {
+    stop("dim_opacity must be in [0, 1]", call. = FALSE)
+  }
+  for (item in c("marker_n_top", "pca_loading_top_n")) {
+    value <- get(item)
+    if (value < 1 || value != as.integer(value)) {
+      stop(item, " must be a positive integer", call. = FALSE)
+    }
+  }
+  if (!is.character(panels) || length(panels) < 1L || anyNA(panels) ||
+      any(!nzchar(trimws(panels)))) {
+    stop("panels must be a non-empty character vector without missing values",
+         call. = FALSE)
+  }
+  if (anyDuplicated(panels)) {
+    stop("panels must not contain duplicate entries", call. = FALSE)
+  }
+  if (!is.logical(use_webgl) || length(use_webgl) != 1L || is.na(use_webgl)) {
+    stop("use_webgl must be TRUE or FALSE", call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+
 #' Validate input data frames for sc_report
 #'
 #' Checks that umap_df and optional marker_df contain required columns
@@ -57,6 +117,8 @@ validate_inputs <- function(umap_df, marker_df, cluster_col, cell_col,
       call. = FALSE
     )
   }
+
+  validate_cell_ids(umap_df[[cell_col]], "umap_df", cell_col)
 
   # Validate UMAP coordinates are numeric and free of NA/NaN/Inf
   for (col in c("UMAP_1", "UMAP_2")) {
@@ -128,6 +190,60 @@ validate_inputs <- function(umap_df, marker_df, cluster_col, cell_col,
 }
 
 
+#' Validate a cell identifier vector
+#'
+#' @param ids Cell identifiers.
+#' @param source Human-readable input name used in errors.
+#' @param column Column name used in errors.
+#' @return The identifiers coerced to character, invisibly.
+#' @keywords internal
+validate_cell_ids <- function(ids, source, column) {
+  ids <- as.character(ids)
+  if (anyNA(ids)) {
+    stop(source, " cell ID column '", column, "' contains NA values",
+         call. = FALSE)
+  }
+  empty <- !nzchar(trimws(ids))
+  if (any(empty)) {
+    stop(source, " cell ID column '", column, "' contains empty values",
+         call. = FALSE)
+  }
+  duplicated_ids <- unique(ids[duplicated(ids)])
+  if (length(duplicated_ids) > 0L) {
+    examples <- paste(utils::head(duplicated_ids, 3L), collapse = ", ")
+    stop(
+      source, " cell ID column '", column, "' must be unique; duplicated: ",
+      examples,
+      call. = FALSE
+    )
+  }
+  invisible(ids)
+}
+
+
+#' Validate that UMAP and PCA describe the same cells
+#'
+#' @param umap_ids UMAP cell IDs.
+#' @param pca_ids PCA cell IDs.
+#' @return Invisibly TRUE when both sets are identical.
+#' @keywords internal
+validate_cross_view_cell_ids <- function(umap_ids, pca_ids) {
+  umap_ids <- as.character(umap_ids)
+  pca_ids <- as.character(pca_ids)
+  only_umap <- setdiff(umap_ids, pca_ids)
+  only_pca <- setdiff(pca_ids, umap_ids)
+  if (length(only_umap) > 0L || length(only_pca) > 0L) {
+    stop(
+      "umap_df and pca_df must contain the same cell IDs for a multi-view report; ",
+      length(only_umap), " only in umap_df and ",
+      length(only_pca), " only in pca_df",
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
+
 #' Natural sort for character vectors
 #'
 #' Sorts strings with trailing numbers in natural order (e.g. GSE-1, GSE-2,
@@ -140,15 +256,23 @@ validate_inputs <- function(umap_df, marker_df, cluster_col, cell_col,
 #' @keywords internal
 natural_sort <- function(x) {
   x <- as.character(x)
-  # Extract prefix (everything before trailing digits) and numeric suffix
-  m <- regexpr("\\d+$", x)
-  if (any(m < 0)) {
-    # Some entries have no trailing digits — fall back to character sort
-    return(sort(x))
+  natural_key <- function(value) {
+    if (is.na(value)) return(NA_character_)
+    parts <- regmatches(
+      value,
+      gregexpr("[0-9]+|[^0-9]+", value, perl = TRUE)
+    )[[1L]]
+    keyed <- vapply(parts, function(part) {
+      if (grepl("^[0-9]+$", part)) {
+        sprintf("%020.0f", as.numeric(part))
+      } else {
+        tolower(part)
+      }
+    }, character(1L))
+    paste(keyed, collapse = "\001")
   }
-  prefix <- substr(x, 1, m - 1)
-  suffix <- as.integer(substr(x, m, m + attr(m, "match.length") - 1))
-  x[order(prefix, suffix)]
+  keys <- vapply(x, natural_key, character(1L))
+  x[order(keys, tolower(x), x, na.last = TRUE, method = "radix")]
 }
 
 
@@ -229,6 +353,8 @@ validate_gene_expr_df <- function(gene_expr_df, umap_df, cell_col) {
   if (!"cell" %in% colnames(gene_expr_df)) {
     stop("gene_expr_df must contain a 'cell' column", call. = FALSE)
   }
+
+  validate_cell_ids(gene_expr_df[["cell"]], "gene_expr_df", "cell")
 
   gene_cols <- setdiff(colnames(gene_expr_df), "cell")
   if (length(gene_cols) == 0) {

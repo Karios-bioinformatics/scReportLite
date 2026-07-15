@@ -40,7 +40,7 @@ build_pca_plotly <- function(pca_df, cluster_col, cell_col,
     color_col <- cluster_col
   }
 
-  groups     <- sort(unique(pca_df[[color_col]]))
+  groups     <- natural_sort(unique(pca_df[[color_col]]))
   colors     <- cluster_color_map(groups)
   has_samples <- !is.null(sample_col) && sample_col %in% colnames(pca_df)
 

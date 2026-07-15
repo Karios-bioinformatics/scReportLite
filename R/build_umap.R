@@ -27,7 +27,7 @@ build_umap_plotly <- function(umap_df, cluster_col, cell_col,
                                sample_col = NULL,
                                point_size, point_alpha,
                                use_webgl = TRUE) {
-  clusters    <- sort(unique(umap_df[[cluster_col]]))
+  clusters    <- natural_sort(unique(umap_df[[cluster_col]]))
   colors      <- cluster_color_map(clusters)
   has_samples <- !is.null(sample_col)
 

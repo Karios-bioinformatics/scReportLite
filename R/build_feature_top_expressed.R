@@ -22,7 +22,7 @@
 
   # Ensure sparse dgCMatrix
   if (!inherits(counts, "dgCMatrix")) {
-    counts <- as(counts, "dgCMatrix")
+    counts <- methods::as(counts, "dgCMatrix")
   }
 
   n_genes_total <- nrow(counts)
@@ -74,7 +74,7 @@
     detection_rate <- round(nz / n_cells * 100, 2)
 
     # Quartiles
-    qs <- quantile(v, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
+    qs <- stats::quantile(v, probs = c(0.25, 0.5, 0.75), na.rm = TRUE)
     q1 <- qs[[1]]
     med <- qs[[2]]
     q3 <- qs[[3]]

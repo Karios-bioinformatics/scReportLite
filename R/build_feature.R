@@ -1,9 +1,9 @@
 # scReportLite: Seurat Feature Diagnostics builder ----------------------------------------
-# v0.4.0 — Feature Diagnostics view (Seurat-first).
+# v0.4.0 - Feature Diagnostics view (Seurat-first).
 #
 # build_seurat_feature_diagnostics() extracts lightweight diagnostic data
 # from a Seurat object so it can be passed to sc_report(..., feature_diag = ...).
-# No full expression matrices are returned — only summary statistics and
+# No full expression matrices are returned - only summary statistics and
 # sampled points suitable for interactive HTML rendering.
 
 #' Build Seurat feature diagnostics payload
@@ -65,7 +65,7 @@ build_seurat_feature_diagnostics <- function(
   if (!requireNamespace("Seurat", quietly = TRUE)) {
     stop(
       "Package 'Seurat' is required to use build_seurat_feature_diagnostics().\n",
-      "SeuratObject alone is insufficient — this function calls Seurat:: DefaultAssay,",
+      "SeuratObject alone is insufficient \u2014 this function calls Seurat::DefaultAssay,",
       " Seurat::GetAssayData, Seurat::Idents, etc.\n",
       "Install with: install.packages('Seurat')",
       call. = FALSE

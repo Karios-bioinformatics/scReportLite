@@ -43,7 +43,7 @@
         tags$div(class = "pca-single-pc-area", id = "pca-single-pc-area",
                  style = "display:none;",
           tags$div(class = "section-title", id = "pca-single-pc-title",
-                   "Single-PC score — PC_1"),
+                   "Single-PC score \u2014 PC_1"),
           tags$div(class = "pca-container", id = "pca-single-pc-container")
         ),
         tags$div(class = "pca-loading-area", id = "pca-loading-area",
@@ -53,11 +53,10 @@
         ),
         tags$div(class = "pca-pair-area", id = "pca-pair-area",
           tags$div(class = "section-title", id = "pca-pair-title",
-                   "PCA — PC_1 vs PC_2"),
+                   "PCA \u2014 PC_1 vs PC_2"),
           tags$div(class = "pca-container", id = "pca-container")
         )
       )
     )
   )
 }
-

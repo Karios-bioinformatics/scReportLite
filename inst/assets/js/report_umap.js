@@ -276,12 +276,9 @@ function updateSampleComposition(sampleId) {
   var clCounts = clNames.map(function(k) { return sampleData[k]; });
   var total = clCounts.reduce(function(a, b) { return a + b; }, 0);
 
-  // Sort clusters numerically if possible
-  var clNumeric = clNames.map(function(x) { var n = Number(x); return isNaN(n) ? null : n; });
-  var allNumeric = clNumeric.every(function(x) { return x !== null; });
-  var order = allNumeric
-    ? clNames.map(function(_, i) { return i; }).sort(function(a, b) { return clNumeric[a] - clNumeric[b]; })
-    : clNames.map(function(_, i) { return i; }).sort(function(a, b) { return clNames[a].localeCompare(clNames[b]); });
+  var order = clNames.map(function(_, i) { return i; }).sort(function(a, b) {
+    return _SR_naturalCompare(clNames[a], clNames[b]);
+  });
   clNames = order.map(function(i) { return clNames[i]; });
   clCounts = order.map(function(i) { return clCounts[i]; });
 

@@ -29,21 +29,12 @@ var _PCA_LOADING        = [];     // loading data
 var _PCA_LOADING_TOP_N  = 10;
 
 function pcaSortGroups(arr) {
-  return arr.slice().sort(function(a, b) {
-    var na = Number(a), nb = Number(b);
-    if (!isNaN(na) && !isNaN(nb)) return na - nb;
-    return String(a).localeCompare(String(b));
-  });
+  return arr.slice().sort(_SR_naturalCompare);
 }
 
 // Natural sort for PC column names: PC_1, PC_2, ..., PC_10, ...
 function pcaSortPcNames(arr) {
-  return arr.slice().sort(function(a, b) {
-    var ma = a.match(/^PC_([0-9]+)$/);
-    var mb = b.match(/^PC_([0-9]+)$/);
-    if (ma && mb) return Number(ma[1]) - Number(mb[1]);
-    return String(a).localeCompare(String(b));
-  });
+  return arr.slice().sort(_SR_naturalCompare);
 }
 
 function getPcaGroups() {

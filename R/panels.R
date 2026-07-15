@@ -17,7 +17,7 @@
 #     sc_report(..., panels = c("umap", "marker_table", "cluster_size"))
 #
 #   Architecture notes:
-#     - Panel registration is deferred to .onLoad to avoid file-ordering issues
+#     - Built-in panel registration is lazy and occurs on first registry access
 #     - "umap" and "marker_table" are special-cased in assemble_report()
 #       (they are tightly coupled to the sidebar highlight engine)
 #     - All other panels use the generic render path with card-styled sections
@@ -26,7 +26,20 @@
 # ---- Panel registry -----------------------------------------------------------
 
 .srl_panels <- new.env(parent = emptyenv())
+.srl_panel_state <- new.env(parent = emptyenv())
+.srl_panel_state$builtins_registered <- FALSE
 
+.ensure_builtin_panels <- function() {
+  if (isTRUE(.srl_panel_state$builtins_registered)) return(invisible(TRUE))
+  builtins <- list(
+    cluster_size = panel_cluster_size,
+    sample_composition = panel_sample_composition,
+    gene_expression = panel_gene_expression
+  )
+  for (panel in builtins) register_panel(panel)
+  .srl_panel_state$builtins_registered <- TRUE
+  invisible(TRUE)
+}
 #' Register a panel definition
 #'
 #' @param panel A panel definition list with at least \code{name} and \code{render}
@@ -47,6 +60,7 @@ register_panel <- function(panel) {
 #' @return Panel definition list, or NULL if not found
 #' @keywords internal
 get_panel <- function(name) {
+  .ensure_builtin_panels()
   .srl_panels[[name]]
 }
 
@@ -55,6 +69,7 @@ get_panel <- function(name) {
 #' @return Character vector of panel names
 #' @keywords internal
 list_panels <- function() {
+  .ensure_builtin_panels()
   names(.srl_panels)
 }
 
@@ -114,22 +129,4 @@ render_panel_section <- function(pn, params) {
       p$render(params)
     )
   )
-}
-
-
-# ---- Registration -------------------------------------------------------------
-# R sources files alphabetically: panel_cluster_size.R comes before panels.R,
-# so panel_cluster_size is already defined when this code runs.
-# The exists() guard handles non-package contexts (e.g. test scripts).
-
-if (exists("panel_cluster_size", inherits = FALSE)) {
-  register_panel(panel_cluster_size)
-}
-
-if (exists("panel_sample_composition", inherits = FALSE)) {
-  register_panel(panel_sample_composition)
-}
-
-if (exists("panel_gene_expression", inherits = FALSE)) {
-  register_panel(panel_gene_expression)
 }

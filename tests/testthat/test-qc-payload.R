@@ -70,12 +70,17 @@ test_that("build_qc_payload rejects NaN in QC columns", {
   expect_error(build_qc_payload(df), "contains Inf or NaN")
 })
 
-test_that("build_qc_payload allows NA in QC columns (converts to 0)", {
+test_that("build_qc_payload preserves missing QC metrics", {
   df <- make_qc(5, 5)
   df$nCount_RNA[1] <- NA
-  expect_silent(payload <- build_qc_payload(df, max_points_per_group = 100))
+  expect_message(
+    payload <- build_qc_payload(df, max_points_per_group = 100),
+    "build_qc_payload"
+  )
 
-  # Cell with NA nCount_RNA should have 0 in the payload
   idx <- which(vapply(payload$cells, function(x) x$cell == df$cell[1], logical(1)))
-  expect_equal(payload$cells[[idx]]$nCount_RNA, 0)
+  expect_true(is.na(payload$cells[[idx]]$nCount_RNA))
+  expect_false(identical(payload$cells[[idx]]$nCount_RNA, 0))
+  json <- jsonlite::toJSON(payload, auto_unbox = TRUE, na = "null")
+  expect_match(json, '"nCount_RNA":null', fixed = TRUE)
 })

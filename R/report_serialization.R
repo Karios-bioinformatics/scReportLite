@@ -2,6 +2,35 @@
 
 # ---- Feature diagnostics JSON builder (internal) -------------------------------
 
+#' Escape serialized JSON for embedding inside an HTML script element
+#'
+#' JSON permits literal less-than, greater-than and ampersand characters, but an
+#' HTML parser can interpret a literal `</script>` inside JSON as the end of the
+#' surrounding script element.  Unicode line and paragraph separators also need
+#' escaping for compatibility with JavaScript parsers.  This helper is applied at
+#' the final HTML data-port boundary so all module payloads follow one contract.
+#'
+#' @param json A length-one serialized JSON character string.
+#' @return The JSON string with HTML-script-sensitive characters escaped.
+#' @keywords internal
+.escape_json_for_script <- function(json) {
+  if (!is.character(json) || length(json) != 1L || is.na(json)) {
+    stop("json must be one non-missing serialized JSON string", call. = FALSE)
+  }
+
+  replacements <- c(
+    "<" = "\\u003c",
+    ">" = "\\u003e",
+    "&" = "\\u0026",
+    "\u2028" = "\\u2028",
+    "\u2029" = "\\u2029"
+  )
+  for (needle in names(replacements)) {
+    json <- gsub(needle, replacements[[needle]], json, fixed = TRUE)
+  }
+  json
+}
+
 #' Build the feature diagnostics JSON string from cleaned data
 #'
 #' Merges pre-serialized sub-module JSON fragments into a single JS object literal.

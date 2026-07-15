@@ -34,7 +34,7 @@
       available = available,
       tab_id = paste0("view-tab-", id),
       container_id = container_id,
-      container_class = container_class,
+      container_class = paste("sr-report-view", container_class),
       layout_class = layout_class,
       slots = slots,
       style = style
@@ -99,6 +99,7 @@
           if (identical(first_view, module$id)) " active" else ""
         ),
         id = module$tab_id,
+        `data-report-view` = module$id,
         onclick = sprintf("switchView('%s')", module$id),
         module$label
       )

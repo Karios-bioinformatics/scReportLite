@@ -157,20 +157,7 @@ function _FEATURE_makePlotDiv(parent) {
 
 // Natural sort: "Cluster 2" < "Cluster 10"
 function _FEATURE_naturalSort(a, b) {
-  var re = /([0-9]+)|([^0-9]+)/g;
-  var aa = String(a).match(re) || [];
-  var bb = String(b).match(re) || [];
-  for (var i = 0; i < Math.min(aa.length, bb.length); i++) {
-    var ca = aa[i], cb = bb[i];
-    var na = parseInt(ca, 10), nb = parseInt(cb, 10);
-    if (!isNaN(na) && !isNaN(nb)) {
-      if (na !== nb) return na - nb;
-    } else {
-      if (ca < cb) return -1;
-      if (ca > cb) return 1;
-    }
-  }
-  return aa.length - bb.length;
+  return _SR_naturalCompare(a, b);
 }
 
 // =========================================================================
@@ -560,7 +547,7 @@ function _FEATURE_renderScatter() {
       groups[gKey].hovers.push("Cell: " + (r.cell||"") + "<br>" + cBy + ": " + gKey + "<br>" + xCol + ": " + r[xCol].toFixed(2) + "<br>" + yCol + ": " + r[yCol].toFixed(2));
     }
 
-    var gNames = Object.keys(groups).sort();
+    var gNames = Object.keys(groups).sort(_SR_naturalCompare);
     var hasHighlight = (hlGroup !== null);
 
     for (var gi = 0; gi < gNames.length; gi++) {

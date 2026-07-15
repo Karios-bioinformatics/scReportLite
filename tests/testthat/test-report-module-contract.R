@@ -91,3 +91,54 @@ testthat::test_that("report views preserve their module and slot contract", {
     logical(1)
   )))
 })
+
+testthat::test_that("top-level module order follows panels order", {
+  context <- list(
+    has_plot = TRUE,
+    has_feature = TRUE,
+    has_pca = TRUE,
+    pca_has_sample = FALSE,
+    has_umap = TRUE,
+    sidebar_html = NULL,
+    umap_tags = NULL,
+    panel_sections_html = list()
+  )
+  modules <- .build_registered_report_modules(
+    c("umap", "pca", "qc", "feature"),
+    context
+  )
+  expect_equal(
+    vapply(modules, `[[`, character(1), "id"),
+    c("umap", "pca", "plot", "feature")
+  )
+  expect_equal(modules[[1]]$style, "")
+  expect_true(all(vapply(modules[-1], `[[`, character(1), "style") == "display:none;"))
+})
+
+testthat::test_that("new top-level modules can register without assembly edits", {
+  register_report_module("custom", "custom_panel", function(x) {
+    .new_report_module(
+      id = "custom",
+      label = "Custom",
+      available = TRUE,
+      container_id = "sr-view-custom",
+      container_class = "sr-view-custom",
+      layout_class = NULL,
+      slots = list(centre = htmltools::tags$div("custom"))
+    )
+  })
+  modules <- .build_registered_report_modules(
+    c("custom_panel", "qc"),
+    list(
+      has_plot = TRUE,
+      has_feature = FALSE,
+      has_pca = FALSE,
+      pca_has_sample = FALSE,
+      has_umap = FALSE,
+      sidebar_html = NULL,
+      umap_tags = NULL,
+      panel_sections_html = list()
+    )
+  )
+  expect_equal(vapply(modules, `[[`, character(1), "id"), c("custom", "plot"))
+})
