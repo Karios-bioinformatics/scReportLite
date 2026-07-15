@@ -1,0 +1,41 @@
+/* === Global interactive polish (v0.4.0) === */
+
+/* Plotly modebar */
+.modebar-btn {
+  border-radius: var(--sr-radius-sm) !important;
+}
+.modebar-btn:hover {
+  background: var(--sr-accent-soft) !important;
+}
+
+/* Global button reset */
+button {
+  outline: none;
+}
+
+/* Global select */
+select {
+  border-radius: var(--sr-radius-sm);
+  border: 1px solid var(--sr-border);
+  background: #ffffff;
+  color: var(--sr-text);
+  padding: 6px 8px;
+  font-size: 0.82em;
+}
+select:focus {
+  outline: none;
+  border-color: var(--sr-accent);
+  box-shadow: 0 0 0 2px var(--sr-accent-soft);
+}
+
+/* Checkbox / check mark polish */
+.pca-pc-check,
+.cluster-check {
+  border-radius: 4px;
+}
+
+/* Table row hover */
+.pca-loading-table tbody tr:hover,
+.marker-table tbody tr:hover {
+  background: var(--sr-accent-soft);
+}

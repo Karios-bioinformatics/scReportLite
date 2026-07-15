@@ -1,0 +1,78 @@
+/* === scReportLite v0.4.0 Styles === */
+
+:root {
+  --sr-accent: #00b894;
+  --sr-accent-dark: #00997a;
+  --sr-accent-soft: rgba(0, 184, 148, 0.12);
+  --sr-accent-border: rgba(0, 184, 148, 0.35);
+  --sr-border: #dfe6e9;
+  --sr-text: #2d3436;
+  --sr-muted: #95a5a6;
+  --sr-radius-sm: 6px;
+  --sr-radius-md: 8px;
+  --sr-radius-lg: 10px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  background: #f5f6fa;
+  color: #2d3436;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* --- View tabs (PCA / UMAP top-level switch) --- */
+.view-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--sr-border);
+  flex-shrink: 0;
+}
+.view-tab { border-radius: var(--sr-radius-sm) var(--sr-radius-sm) 0 0; 
+  flex: 1;
+  text-align: center;
+  padding: 7px 8px;
+  cursor: pointer;
+  font-size: 0.82em;
+  font-weight: 600;
+  color: #636e72;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  user-select: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.view-tab:hover { color: #2d3436; background: rgba(0,0,0,0.04); }
+.view-tab.active {
+  color: var(--sr-accent);
+  border-bottom-color: var(--sr-accent);
+}
+
+/* --- View containers (v0.2.0) --- */
+.sr-view-umap {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.sr-view-pca {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+

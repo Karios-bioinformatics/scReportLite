@@ -1,0 +1,232 @@
+/* --- Content area --- */
+.content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* --- UMAP plot --- */
+.umap-section {
+  min-height: 760px;
+  flex-shrink: 0;
+  padding: 16px;
+  background: #fff;
+  margin: 12px 12px 6px 0;
+  border-radius: var(--sr-radius-sm);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+}
+.umap-section .section-title {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #636e72;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.umap-container {
+  flex: 1;
+  min-height: 680px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+/* Force plot container to a near-square region so UMAP clusters fill the view */
+.umap-container > *,
+.umap-container .html-widget,
+.umap-container .plotly,
+.umap-container .js-plotly-plot {
+  width: min(760px, 100%) !important;
+  height: 680px !important;
+  max-width: 760px;
+}
+
+/* --- Cell Info Panel --- */
+.cell-info-panel {
+  display: none;
+  padding: 12px 16px;
+  background: #fff;
+  margin: 6px 12px 6px 0;
+  border-radius: var(--sr-radius-sm);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border-left: 4px solid #0984e3;
+  flex-shrink: 0;
+}
+.cell-info-panel.visible {
+  display: block;
+}
+.cell-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cell-info-title {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #2d3436;
+}
+.cell-info-cellid {
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-size: 0.85em;
+  color: #0984e3;
+}
+
+.copy-btn {
+  padding: 4px 12px;
+  background: #dfe6e9;
+  border: none;
+  border-radius: var(--sr-radius-sm);
+  cursor: pointer;
+  font-size: 0.8em;
+  color: #636e72;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.copy-btn:hover {
+  background: #0984e3;
+  color: #fff;
+}
+.copy-btn.copied {
+  background: var(--sr-accent);
+  color: #fff;
+}
+
+.cell-info-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+.cell-info-table td {
+  padding: 3px 8px;
+  vertical-align: top;
+}
+.ci-label {
+  color: #636e72;
+  font-weight: 500;
+  width: 90px;
+  white-space: nowrap;
+}
+.ci-value {
+  color: #2d3436;
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+}
+.cell-info-hint {
+  font-size: 0.8em;
+  color: #b2bec3;
+  font-style: italic;
+  padding: 12px 0;
+  text-align: center;
+}
+
+/* --- Panel sections (shared card style) --- */
+.panel-section {
+  padding: 16px;
+  background: #fff;
+  margin: 6px 12px 12px 0;
+  border-radius: var(--sr-radius-sm);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.panel-section .section-title {
+  font-size: 0.95em;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #2d3436;
+}
+
+/* Panel body — wraps panel content (plotly widgets, tables, etc.) */
+.panel-body {
+  min-height: 200px;
+}
+.panel-cluster_size .panel-body {
+  height: 400px;
+}
+
+/* Force htmlwidget children to fill panel body */
+.panel-body > *,
+.panel-body .html-widget,
+.panel-body .plotly,
+.panel-body .js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Marker section (panel variant — adds scroll constraints) */
+.marker-section {
+  min-height: 220px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+#marker-table-container {
+  min-height: 140px;
+}
+
+.marker-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88em;
+}
+.marker-table thead {
+  position: sticky;
+  top: 0;
+  background: #f8f9fc;
+}
+.marker-table th {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--sr-border);
+  font-weight: 600;
+  color: #636e72;
+  font-size: 0.85em;
+}
+.marker-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #f0f1f5;
+}
+.marker-table tbody tr:hover {
+  background: #f8f9fc;
+}
+
+.gene-name {
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-style: italic;
+  color: #2d3436;
+}
+.logfc {
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-weight: 500;
+}
+.logfc.pos { color: #d63031; }
+.logfc.neg { color: #0984e3; }
+.pval {
+  font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+  font-size: 0.85em;
+  color: #636e72;
+}
+
+.no-data {
+  color: #b2bec3;
+  font-style: italic;
+  padding: 20px 0;
+  text-align: center;
+}
+
+/* --- Reset button --- */
+.reset-btn {
+  padding: 6px 16px;
+  background: #dfe6e9;
+  border: none;
+  border-radius: var(--sr-radius-sm);
+  cursor: pointer;
+  font-size: 0.85em;
+  color: #636e72;
+  transition: background 0.15s;
+}
+.reset-btn:hover {
+  background: #b2bec3;
+}
+

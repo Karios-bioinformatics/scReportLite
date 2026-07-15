@@ -1,0 +1,270 @@
+/* --- PCA layout (v0.2.2) --- */
+.pca-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  height: 100%;
+  overflow: hidden;
+}
+
+.pca-controls {
+  width: 220px;
+  min-width: 220px;
+  background: #fff;
+  border-right: 1px solid var(--sr-border);
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pca-controls-section {
+  /* wrapper for each logical group in PCA controls */
+}
+
+.pca-controls-label {
+  font-size: 0.78em;
+  font-weight: 600;
+  color: #b2bec3;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.pca-cm-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.pca-cm-btn {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--sr-border);
+  background: #fff;
+  border-radius: var(--sr-radius-sm);
+  cursor: pointer;
+  font-size: 0.8em;
+  color: #636e72;
+  transition: background 0.15s, color 0.15s;
+}
+.pca-cm-btn:hover { background: var(--sr-accent-soft); }
+.pca-cm-btn.active {
+  background: var(--sr-accent);
+  color: #fff;
+  border-color: var(--sr-accent);
+}
+
+/* --- PC selector list --- */
+.pca-pc-list {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.pca-pc-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: var(--sr-radius-sm);
+  font-size: 0.82em;
+  gap: 6px;
+  transition: background 0.1s;
+  user-select: none;
+}
+.pca-pc-item:hover { background: var(--sr-accent-soft); }
+.pca-pc-item.active {
+  background: var(--sr-accent-soft);
+  font-weight: 600;
+}
+
+.pca-pc-check {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #b2bec3;
+  border-radius: var(--sr-radius-sm);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.pca-pc-item.active .pca-pc-check {
+  background: var(--sr-accent);
+  border-color: var(--sr-accent);
+  color: #fff;
+}
+
+/* --- Group list --- */
+.pca-group-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.pca-group-item {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: var(--sr-radius-sm);
+  font-size: 0.82em;
+  gap: 6px;
+  transition: background 0.1s;
+  user-select: none;
+}
+.pca-group-item:hover { background: var(--sr-accent-soft); }
+.pca-group-item.active {
+  background: var(--sr-accent-soft);
+  font-weight: 600;
+}
+
+.pca-group-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pca-group-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pca-reset-btn {
+  width: 100%;
+  padding: 5px 12px;
+  border: 1px solid var(--sr-border);
+  background: #fff;
+  border-radius: var(--sr-radius-sm);
+  cursor: pointer;
+  font-size: 0.82em;
+  color: #636e72;
+  transition: background 0.15s;
+}
+.pca-reset-btn:hover { background: var(--sr-accent-soft); }
+
+/* --- PCA plot area (pair scatter, single-PC, loading) --- */
+.pca-plot-area {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.pca-plot-area .section-title {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #636e72;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.pca-plot-area .pca-container {
+  flex: 1;
+  min-height: 0;
+}
+.pca-plot-area .pca-container > *,
+.pca-plot-area .pca-container .html-widget,
+.pca-plot-area .pca-container .plotly,
+.pca-plot-area .pca-container .js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Single-PC score area */
+.pca-single-pc-area {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.pca-single-pc-area .section-title {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #636e72;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.pca-single-pc-area .pca-container {
+  flex: 1;
+  min-height: 0;
+}
+.pca-single-pc-area .pca-container > *,
+.pca-single-pc-area .pca-container .html-widget,
+.pca-single-pc-area .pca-container .plotly,
+.pca-single-pc-area .pca-container .js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Pair scatter area */
+.pca-pair-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.pca-pair-area .section-title {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #636e72;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.pca-pair-area .pca-container {
+  flex: 1;
+  min-height: 0;
+}
+.pca-pair-area .pca-container > *,
+.pca-pair-area .pca-container .html-widget,
+.pca-pair-area .pca-container .plotly,
+.pca-pair-area .pca-container .js-plotly-plot {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* PC loading / composition area */
+.pca-loading-area {
+  flex: 0 0 260px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.pca-loading-area .section-title {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #636e72;
+  margin-bottom: 8px;
+}
+
+.pca-loading-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82em;
+}
+.pca-loading-table thead {
+  position: sticky;
+  top: 0;
+  background: #f8f9fc;
+}
+.pca-loading-table th {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 2px solid var(--sr-border);
+  font-weight: 600;
+  color: #636e72;
+  font-size: 0.85em;
+}
+.pca-loading-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #f0f1f5;
+}
+.pca-loading-table tbody tr:hover {
+  background: #f8f9fc;
+}
+
