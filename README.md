@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v0.5.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/Version-v0.6.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/Status-Active%20Development-green" alt="Status">
   <img src="https://img.shields.io/badge/Layer-scReport%20Lite-lightgrey" alt="Layer">
   <img src="https://img.shields.io/badge/Focus-Single--cell%20Reporting-purple" alt="Focus">
@@ -21,12 +21,12 @@ It is designed as the **Lite layer of the scReport ecosystem**: a focused, brows
 
 scReportLite does **not** replace Seurat, Scanpy, or upstream analysis workflows. Instead, it converts pre-computed single-cell outputs into a shareable interactive report for exploration, presentation, and communication.
 
-## Current release
+## Current development version
 
-The current release is:
+The current development version is:
 
 ```text
-scReportLite v0.5.0
+scReportLite v0.6.0
 ```
 
 This version defines the current four-axis architecture of scReportLite:
@@ -35,7 +35,7 @@ This version defines the current four-axis architecture of scReportLite:
 QC | FEATURE | PCA | UMAP
 ```
 
-The corresponding Zenodo DOI is:
+The latest archived Zenodo release currently remains v0.5.0:
 
 ```text
 10.5281/zenodo.21245542
@@ -135,8 +135,8 @@ sc_report(
   marker_df = marker_df,
   gene_expr_df = gene_expr_df,
   sample_col = "sample",
-  output = "scReportLite_v050_report.html",
-  title = "scReportLite v0.5.0 report",
+  output = "scReportLite_v060_report.html",
+  title = "scReportLite v0.6.0 report",
   panels = c(
     "qc",
     "feature",
@@ -152,9 +152,9 @@ sc_report(
 
 ---
 
-## Recommended v0.5.0 Panels
+## Recommended v0.6.0 Panels
 
-For a complete v0.5.0 report, use:
+For a complete v0.6.0 report, use:
 
 ```r
 panels = c(
@@ -397,7 +397,7 @@ sc_report(
     "sample_composition",
     "gene_expression"
   ),
-  output = "scReportLite_v050_report.html"
+  output = "scReportLite_v060_report.html"
 )
 ```
 
@@ -686,6 +686,23 @@ scReportCore        → shared schemas, plugin protocol, and reusable UI compone
 
 ## Changelog
 
+### v0.6.0 - Modular report framework
+
+v0.6.0 restructures the report implementation into independently composable
+view modules while preserving the existing public API and report capabilities.
+
+Major changes:
+
+- Introduced an internal report-module registry
+- Defined explicit left, centre, and right layout slots for report views
+- Separated QC, FEATURE, PCA, and UMAP view construction
+- Isolated UMAP and gene sidebar construction
+- Separated module data ports from final HTML assembly
+- Moved CSS and JavaScript into responsibility-specific packaged assets
+- Split Feature Diagnostics builders by responsibility
+- Added packaged-asset and report-module contract regression tests
+- Preserved existing report behavior during the structural refactor
+
 ### v0.5.0 - UMAP-optional report generation
 
 v0.5.0 improves the main report flow so QC, FEATURE, and PCA reports can be generated without requiring UMAP data.
@@ -780,6 +797,9 @@ Major changes:
 ## Citation
 
 If you use scReportLite in research projects, please cite:
+
+The citation below refers to the latest archived Zenodo release (v0.5.0).
+It should be updated when v0.6.0 is archived.
 
 > Park, K. K. (2026).  
 > scReportLite v0.5.0.

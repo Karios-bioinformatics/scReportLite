@@ -78,6 +78,16 @@ testthat::test_that("asset readers return CSS and JavaScript text", {
   testthat::expect_match(js, "window.addEventListener", fixed = TRUE)
   testthat::expect_match(js, "Plotly", fixed = TRUE)
 
+  # Two backslashes before a quote are not a valid way to escape an HTML
+  # attribute inside a JavaScript double-quoted string. This exact sequence
+  # makes the complete interaction bundle fail to parse in the browser.
+  invalid_double_quote_escape <- intToUtf8(c(92L, 92L, 34L))
+  testthat::expect_false(grepl(
+    invalid_double_quote_escape,
+    js,
+    fixed = TRUE
+  ))
+
   module_markers <- c(
     "function switchView",
     "function _PLOT_renderCurrentState",

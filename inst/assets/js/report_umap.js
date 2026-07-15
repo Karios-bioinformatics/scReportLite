@@ -143,13 +143,13 @@ function updateGeneSummary(geneName) {
   if (!body) return;
 
   if (!geneName) {
-    body.innerHTML = "<p class=\\"no-data\\">Select a gene to view expression on UMAP.</p>";
+    body.innerHTML = "<p class=\"no-data\">Select a gene to view expression on UMAP.</p>";
     return;
   }
 
   var exprData = window._GENE_EXPR_DATA;
   if (!exprData || !exprData[geneName]) {
-    body.innerHTML = "<p class=\\"no-data\\">No expression data for " + escHtml(geneName) + ".</p>";
+    body.innerHTML = "<p class=\"no-data\">No expression data for " + escHtml(geneName) + ".</p>";
     return;
   }
 
@@ -164,14 +164,14 @@ function updateGeneSummary(geneName) {
   var maxV = Math.max.apply(null, allVals).toFixed(4);
 
   body.innerHTML =
-    "<div style=\\"padding:4px 0;\\">" +
-    "<table style=\\"width:100%;font-size:0.9em;\\">" +
-    "<tr><td style=\\"color:#636e72;width:140px;\\">Gene</td>" +
-    "<td style=\\"font-weight:600;font-style:italic;font-family:monospace;\\">" + escHtml(geneName) + "</td></tr>" +
-    "<tr><td style=\\"color:#636e72;\\">Expressing cells</td>" +
+    "<div style=\"padding:4px 0;\">" +
+    "<table style=\"width:100%;font-size:0.9em;\">" +
+    "<tr><td style=\"color:#636e72;width:140px;\">Gene</td>" +
+    "<td style=\"font-weight:600;font-style:italic;font-family:monospace;\">" + escHtml(geneName) + "</td></tr>" +
+    "<tr><td style=\"color:#636e72;\">Expressing cells</td>" +
     "<td>" + nExpr + " / " + nTotal + " (" + pct + "%)</td></tr>" +
-    "<tr><td style=\\"color:#636e72;\\">Mean expression</td><td>" + mean + "</td></tr>" +
-    "<tr><td style=\\"color:#636e72;\\">Max expression</td><td>" + maxV + "</td></tr>" +
+    "<tr><td style=\"color:#636e72;\">Mean expression</td><td>" + mean + "</td></tr>" +
+    "<tr><td style=\"color:#636e72;\">Max expression</td><td>" + maxV + "</td></tr>" +
     "</table></div>";
 }
 
@@ -267,7 +267,7 @@ function updateSampleComposition(sampleId) {
   var colors = window._CLUSTER_COLORS || {};
 
   if (!data || !data[sampleId]) {
-    body.innerHTML = "<p class=\\"no-data\\">No composition data available for this sample.</p>";
+    body.innerHTML = "<p class=\"no-data\">No composition data available for this sample.</p>";
     return;
   }
 
@@ -432,7 +432,7 @@ function showMultiClusterMessage() {
   if (!container) return;
   document.getElementById("marker-title").textContent = "Marker Genes";
   container.innerHTML =
-    "<p class=\\"no-data\\">Marker genes are shown only when exactly one cluster is selected.</p>";
+    "<p class=\"no-data\">Marker genes are shown only when exactly one cluster is selected.</p>";
 }
 
 // =========================================================================
@@ -544,7 +544,7 @@ function updateMarkerTable(clusterId) {
 
   if (!window._MARKER_DATA || window._MARKER_DATA.length === 0) {
     titleEl.textContent = "Marker Genes";
-    container.innerHTML = "<p class=\\"no-data\\">No marker gene data provided.</p>";
+    container.innerHTML = "<p class=\"no-data\">No marker gene data provided.</p>";
     return;
   }
 
@@ -555,7 +555,7 @@ function updateMarkerTable(clusterId) {
   if (markers.length === 0) {
     titleEl.textContent = "Cluster " + clusterId + " — No markers available";
     container.innerHTML =
-      "<p class=\\"no-data\\">No marker genes found for cluster " +
+      "<p class=\"no-data\">No marker genes found for cluster " +
       escHtml(clusterId) + ".</p>";
     return;
   }
@@ -577,18 +577,18 @@ function updateMarkerTable(clusterId) {
   titleEl.textContent = "Cluster " + clusterId +
     " — Top " + markers.length + " Marker Genes" + selInfo;
 
-  var html = "<table class=\\"marker-table\\"><thead><tr>" +
+  var html = "<table class=\"marker-table\"><thead><tr>" +
     "<th>#</th><th>Gene</th><th>avg_log2FC</th><th>p_val_adj</th>" +
     "</tr></thead><tbody>";
 
   markers.forEach(function(row, idx) {
     var fcClass = row.avg_log2FC >= 0 ? "pos" : "neg";
     html += "<tr>" +
-      "<td style=\\"color:#b2bec3;font-size:0.8em;\\">" + (idx + 1) + "</td>" +
-      "<td class=\\"gene-name\\">" + escHtml(row.gene) + "</td>" +
-      "<td class=\\"logfc " + fcClass + "\\">" +
+      "<td style=\"color:#b2bec3;font-size:0.8em;\">" + (idx + 1) + "</td>" +
+      "<td class=\"gene-name\">" + escHtml(row.gene) + "</td>" +
+      "<td class=\"logfc " + fcClass + "\">" +
         (row.avg_log2FC >= 0 ? "+" : "") + row.avg_log2FC.toFixed(4) + "</td>" +
-      "<td class=\\"pval\\">" + formatPval(row.p_val_adj) + "</td>" +
+      "<td class=\"pval\">" + formatPval(row.p_val_adj) + "</td>" +
       "</tr>";
   });
 
@@ -602,7 +602,7 @@ function clearMarkerTable() {
   document.getElementById("marker-title").textContent =
     "Click a cluster to view marker genes";
   container.innerHTML =
-    "<p class=\\"no-data\\">Select a cluster from the sidebar to see its marker genes.</p>";
+    "<p class=\"no-data\">Select a cluster from the sidebar to see its marker genes.</p>";
 }
 
 // Cell Info Panel (driven by plotly customdata)
@@ -624,21 +624,21 @@ function showCellInfoFromCD(cd) {
 
   if (titleEl) titleEl.textContent = escHtml(cellId);
 
-  var html = "<table class=\\"cell-info-table\\">";
-  html += "<tr><td class=\\"ci-label\\">Cell ID</td>" +
-    "<td class=\\"ci-value\\">" + escHtml(cellId) + "</td></tr>";
-  html += "<tr><td class=\\"ci-label\\">Cluster</td>" +
-    "<td class=\\"ci-value\\">" + escHtml(cluster) + "</td></tr>";
+  var html = "<table class=\"cell-info-table\">";
+  html += "<tr><td class=\"ci-label\">Cell ID</td>" +
+          "<td class=\"ci-value\">" + escHtml(cellId) + "</td></tr>";
+  html += "<tr><td class=\"ci-label\">Cluster</td>" +
+          "<td class=\"ci-value\">" + escHtml(cluster) + "</td></tr>";
 
   if (_HAS_SAMPLES && sample != null && String(sample) !== "") {
-    html += "<tr><td class=\\"ci-label\\">Sample</td>" +
-      "<td class=\\"ci-value\\">" + escHtml(String(sample)) + "</td></tr>";
+    html += "<tr><td class=\"ci-label\">Sample</td>" +
+            "<td class=\"ci-value\">" + escHtml(String(sample)) + "</td></tr>";
   }
 
-  html += "<tr><td class=\\"ci-label\\">UMAP_1</td>" +
-    "<td class=\\"ci-value\\">" + umap1.toFixed(4) + "</td></tr>";
-  html += "<tr><td class=\\"ci-label\\">UMAP_2</td>" +
-    "<td class=\\"ci-value\\">" + umap2.toFixed(4) + "</td></tr>";
+  html += "<tr><td class=\"ci-label\">UMAP_1</td>" +
+          "<td class=\"ci-value\">" + umap1.toFixed(4) + "</td></tr>";
+  html += "<tr><td class=\"ci-label\">UMAP_2</td>" +
+          "<td class=\"ci-value\">" + umap2.toFixed(4) + "</td></tr>";
   html += "</table>";
 
   content.innerHTML = html;
@@ -653,7 +653,7 @@ function hideCellInfo() {
     var content = document.getElementById("cell-info-content");
     if (content) {
       content.innerHTML =
-        "<p class=\\"cell-info-hint\\">Click a cell on the UMAP to view its details</p>";
+    "<p class=\"cell-info-hint\">Click a cell on the UMAP to view its details</p>";
     }
   }
 }
