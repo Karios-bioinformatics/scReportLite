@@ -11,6 +11,7 @@ assemble_report(
   cluster_col,
   cell_col,
   sample_col,
+  resolution_payload = list(resolutions = list(), active = NULL, edges = list()),
   gene_expr_df = NULL,
   pca_df = NULL,
   pca_data_json = "null",

@@ -36,6 +36,139 @@ function _PLOT_formatMetric(value, digits) {
   return _PLOT_isFiniteMetric(value) ? value.toFixed(digits || 0) : "missing";
 }
 
+function _PLOT_quantile(sorted, probability) {
+  if (!sorted.length) return null;
+  var index = (sorted.length - 1) * probability;
+  var lower = Math.floor(index);
+  var upper = Math.ceil(index);
+  if (lower === upper) return sorted[lower];
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
+}
+
+function _PLOT_metricSummary(values) {
+  var sorted = values.filter(_PLOT_isFiniteMetric).slice().sort(function(a, b) {
+    return a - b;
+  });
+  if (!sorted.length) return null;
+  return {
+    minimum: sorted[0],
+    q1: _PLOT_quantile(sorted, 0.25),
+    median: _PLOT_quantile(sorted, 0.5),
+    q3: _PLOT_quantile(sorted, 0.75),
+    maximum: sorted[sorted.length - 1],
+    count: sorted.length
+  };
+}
+
+function _PLOT_shade(color, shade) {
+  var match = String(color || "").match(
+    /^hsl\(\s*([0-9.]+)\s+([0-9.]+)%\s+([0-9.]+)%\s*\)$/i
+  );
+  if (!match) return color || "#055E70";
+  var lightness = {400: 59, 600: 41, 700: 32, 800: 23}[shade] || 59;
+  return "hsl(" + Math.floor(Number(match[1])) + " " +
+    Number(match[2]) + "% " + lightness + "%)";
+}
+
+function _PLOT_pointColor(color) {
+  return _PLOT_shade(color, 700);
+}
+
+function _PLOT_renderSummary(sample, metric, values, selectedValue) {
+  var panel = document.getElementById("sr-qc-summary-content");
+  if (!panel) return;
+  var summary = _PLOT_metricSummary(values);
+  if (!summary) {
+    panel.innerHTML = '<div class="sr-warning-card">QC data are missing for this sample and metric.</div>';
+    return;
+  }
+  var metricName = metric === "percent_mt" ? "percent.mt" : metric;
+  var rows = [
+    ["Sample", sample],
+    ["Metric", metricName],
+    ["Cells", summary.count],
+    ["Minimum", _PLOT_formatMetric(summary.minimum, 2)],
+    ["Q1", _PLOT_formatMetric(summary.q1, 2)],
+    ["Median", _PLOT_formatMetric(summary.median, 2)],
+    ["Q3", _PLOT_formatMetric(summary.q3, 2)],
+    ["Maximum", _PLOT_formatMetric(summary.maximum, 2)]
+  ];
+  if (_PLOT_isFiniteMetric(selectedValue)) {
+    rows.push(["Selected height", _PLOT_formatMetric(selectedValue, 2)]);
+  }
+  panel.innerHTML = '<div class="sr-qc-summary-card">' + rows.map(function(row) {
+    return '<div><span>' + row[0] + '</span><strong>' + row[1] + '</strong></div>';
+  }).join("") + "</div>";
+}
+
+function _PLOT_renderCellDetail(record, metric, value) {
+  var deck = document.getElementById("sr-qc-detail-deck");
+  if (!deck || !record) return;
+  var filtered = record.qc_status === "filtered";
+  deck.innerHTML =
+    '<article class="sr-detail-card sr-qc-cell-card">' +
+      '<header><span>' + record.cell + '</span><button type="button" data-qc-clear="true" aria-label="Clear selected cell">×</button></header>' +
+      '<dl>' +
+        '<div><dt>Cell</dt><dd>' + record.cell + '</dd></div>' +
+        '<div><dt>Sample</dt><dd>' + record.sample + '</dd></div>' +
+        '<div><dt>Metric</dt><dd>' + (metric === "percent_mt" ? "percent.mt" : metric) + '</dd></div>' +
+        '<div><dt>Height</dt><dd>' + _PLOT_formatMetric(value, 2) + '</dd></div>' +
+        '<div><dt>QC status</dt><dd class="' + (filtered ? "sr-status-filtered" : "sr-status-retained") + '">' +
+          (filtered ? "Filtered out" : "Retained") + '</dd></div>' +
+      '</dl>' +
+    '</article>';
+}
+
+function _PLOT_referenceShape(value, color) {
+  return {
+    type: "line", xref: "paper", x0: 0, x1: 1,
+    yref: "y", y0: value, y1: value,
+    line: {color: _PLOT_shade(color, 800), width: 2, dash: "solid"}
+  };
+}
+
+function _PLOT_wireCellPlot(gd, sample, metric, values, allowReference) {
+  if (!gd || typeof gd.on !== "function") return;
+  var color = _PLOT_getSampleColor(sample);
+  var pinned = null;
+  if (sample) _PLOT_renderSummary(sample, metric, values, null);
+  if (allowReference) {
+    gd.on("plotly_hover", function(event) {
+      if (pinned !== null || !event.points || !event.points.length) return;
+      var value = Number(event.points[0].y);
+      if (_PLOT_isFiniteMetric(value)) {
+        Plotly.relayout(gd, {shapes: [_PLOT_referenceShape(value, color)]});
+        _PLOT_renderSummary(sample, metric, values, value);
+      }
+    });
+    gd.on("plotly_unhover", function() {
+      if (pinned === null) Plotly.relayout(gd, {shapes: []});
+    });
+  }
+  gd.on("plotly_click", function(event) {
+    if (!event.points || !event.points.length) return;
+    var point = event.points[0];
+    var value = Number(point.y);
+    if (allowReference && _PLOT_isFiniteMetric(value)) {
+      pinned = value;
+      Plotly.relayout(gd, {shapes: [_PLOT_referenceShape(value, color)]});
+    }
+    var record = point.customdata;
+    if (record && typeof record === "object" && !Array.isArray(record)) {
+      var detailSample = sample || record.sample;
+      var detailValues = values;
+      if (!sample && window._QC_DATA && Array.isArray(window._QC_DATA.cells)) {
+        detailValues = window._QC_DATA.cells.filter(function(cell) {
+          return String(cell.sample) === String(detailSample);
+        }).map(function(cell) { return Number(cell[metric]); })
+          .filter(_PLOT_isFiniteMetric);
+      }
+      _PLOT_renderCellDetail(record, metric, value);
+      _PLOT_renderSummary(detailSample, metric, detailValues, value);
+    }
+  });
+}
+
 // ---- Focus → opacities ----
 function _PLOT_focusOpacities(focus) {
   if (focus === "violin")   return {v:0.90, p:0.00};
@@ -116,20 +249,9 @@ function _PLOT_stableJitter(key, width) {
 
 // ---- Cartesian modebar config (explicit button list, v0.3.0) ----
 function _SR_cartesianModebarConfig() {
-  return {
-    displayModeBar: true,
-    displaylogo: false,
-    modeBarButtons: [[
-      "toImage",
-      "zoom2d",
-      "pan2d",
-      "zoomIn2d",
-      "zoomOut2d",
-      "resetScale2d",
-      "hoverClosestCartesian",
-      "hoverCompareCartesian"
-    ]]
-  };
+  return typeof _SR_standardModebarConfig === "function"
+    ? _SR_standardModebarConfig()
+    : {displayModeBar: true, displaylogo: false};
 }
 
 // ---- Debounced render scheduler ----
@@ -365,12 +487,63 @@ function _PLOT_updateNav(activeView) {
 // =========================================================================
 // RENDER: Overview / By metric — 3 violins stacked vertically
 // =========================================================================
+function _PLOT_buildOverviewFrame(canvas, orientation) {
+  canvas.innerHTML = "";
+  canvas.style.overflow = "hidden";
+
+  var frame = document.createElement("div");
+  frame.className = "sr-qc-overview-frame sr-qc-overview-frame-" + orientation;
+  var scroller = document.createElement("div");
+  scroller.className = "sr-qc-overview-scroller sr-qc-overview-scroller-" + orientation;
+  frame.appendChild(scroller);
+
+  var capsule = document.createElement("nav");
+  capsule.className = "sr-scroll-capsule sr-qc-overview-capsule sr-qc-overview-capsule-" + orientation;
+  capsule.setAttribute("aria-label", orientation === "vertical"
+    ? "QC metric plot navigation"
+    : "QC sample plot navigation");
+  frame.appendChild(capsule);
+  canvas.appendChild(frame);
+  return {frame: frame, scroller: scroller, capsule: capsule};
+}
+
+function _PLOT_addOverviewCapsuleDot(capsule, target, label, colour, scroller, orientation) {
+  var dot = document.createElement("button");
+  dot.type = "button";
+  dot.className = "sr-scroll-capsule-dot sr-qc-overview-capsule-dot";
+  dot.setAttribute("aria-label", "Go to " + label);
+  dot.setAttribute("title", label);
+  dot.style.setProperty("--sr-dot-colour", colour);
+  dot.addEventListener("click", function() {
+    if (orientation === "vertical") {
+      scroller.scrollTo({top: target.offsetTop, behavior: "smooth"});
+    } else {
+      scroller.scrollTo({left: target.offsetLeft, behavior: "smooth"});
+    }
+  });
+  capsule.appendChild(dot);
+  return dot;
+}
+
+function _PLOT_observeOverviewCapsule(scroller, targets, dots) {
+  if (!window.IntersectionObserver) {
+    dots.forEach(function(dot) { dot.classList.add("in-view"); });
+    return;
+  }
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      var index = targets.indexOf(entry.target);
+      if (index < 0 || !dots[index]) return;
+      dots[index].classList.toggle("in-view", entry.intersectionRatio > 0);
+      dots[index].classList.toggle("mostly-in-view", entry.intersectionRatio >= 0.75);
+    });
+  }, {root: scroller, threshold: [0, 0.01, 0.75, 1]});
+  targets.forEach(function(target) { observer.observe(target); });
+}
+
 function _PLOT_renderOvMetric(d) {
   var canvas = document.getElementById("plot-active-canvas");
   if (!canvas) return;
-  canvas.scrollTop = 0;
-  canvas.style.overflowY = "auto";
-  canvas.style.overflowX = "hidden";
 
   var op = _PLOT_focusOpacities(_PLOT_STATE.overview.focus);
   _PLOT_STATE._activeCanvasIds = ["plot-ov-metric-0","plot-ov-metric-1","plot-ov-metric-2"];
@@ -379,18 +552,32 @@ function _PLOT_renderOvMetric(d) {
   var yLabels = ["nCount_RNA","nFeature_RNA","percent_mt"];
 
   // Build 3 stacked containers
-  canvas.innerHTML = "";
+  var overviewFrame = _PLOT_buildOverviewFrame(canvas, "vertical");
   var wrapper = document.createElement("div");
-  wrapper.style.cssText = "display:flex;flex-direction:column;gap:4px;min-height:min-content;";
+  wrapper.className = "sr-qc-overview-stack";
+  var capsuleTargets = [];
+  var capsuleDots = [];
+  var metricColours = window.SRColor ? window.SRColor.palette(metrics.length, 400) :
+    ["#27D3F5", "#692EFF", "#DE694F"];
 
   for (var mi = 0; mi < metrics.length; mi++) {
     var metric = metrics[mi];
     var panel = document.createElement("div");
-    panel.style.cssText = "height:300px;min-height:300px;flex:0 0 300px;";
+    panel.className = "sr-qc-overview-metric-panel";
     panel.id = "plot-ov-metric-" + mi;
     wrapper.appendChild(panel);
+    capsuleTargets.push(panel);
+    capsuleDots.push(_PLOT_addOverviewCapsuleDot(
+      overviewFrame.capsule, panel, yLabels[mi], metricColours[mi],
+      overviewFrame.scroller, "vertical"
+    ));
   }
-  canvas.appendChild(wrapper);
+  overviewFrame.scroller.appendChild(wrapper);
+  if (typeof _SR_bindCapsulePager === "function") {
+    _SR_bindCapsulePager(overviewFrame.capsule, capsuleDots,
+      {pageSize: 10, step: 10});
+  }
+  _PLOT_observeOverviewCapsule(overviewFrame.scroller, capsuleTargets, capsuleDots);
 
   // Render each panel
   for (var mi = 0; mi < metrics.length; mi++) {
@@ -405,11 +592,13 @@ function _PLOT_renderOvMetric(d) {
       var yVals = [];
       var hoverTexts = [];
       var cellIds = [];
+      var cellRecords = [];
       for (var ci = 0; ci < d.cells.length; ci++) {
         if (d.cells[ci].sample !== s) continue;
         if (!_PLOT_isFiniteMetric(d.cells[ci][metric])) continue;
         yVals.push(d.cells[ci][metric]);
         cellIds.push(d.cells[ci].cell);
+        cellRecords.push(d.cells[ci]);
         hoverTexts.push("Cell: " + d.cells[ci].cell +
           "<br>Sample: " + s +
           "<br>nCount: " + d.cells[ci].nCount_RNA +
@@ -427,20 +616,25 @@ function _PLOT_renderOvMetric(d) {
         fillcolor: fillCol, line: {color: fillCol, width: 1.2},
         opacity: op.v, hoverinfo: "all", width: 0.6, spanmode: "hard", span: [0, null]
       });
-      // Point trace (sampled overlay)
+      // Point trace (complete per-cell overlay)
       if (op.p > 0.001) {
-        var px = []; var py = []; var pt = [];
-        var total = yVals.length > 1000 ? 1000 : yVals.length;
-        var step = Math.max(1, Math.floor(yVals.length / total));
-        for (var k = 0; k < yVals.length; k += step) {
+        var px = []; var py = []; var pt = []; var pc = [];
+        for (var k = 0; k < yVals.length; k++) {
           px.push(si + _PLOT_stableJitter(cellIds[k] + "_" + metric + "_" + s, 0.4));
           py.push(yVals[k]);
           pt.push(hoverTexts[k] || "");
+          pc.push(cellRecords[k]);
         }
         traces.push({
-          x: px, y: py, text: pt,
+          x: px, y: py, text: pt, customdata: pc,
           type: "scatter", mode: "markers", hoverinfo: "text",
-          marker: {color: fillCol, size: 1.5, opacity: op.p, line: {width: 0}},
+          marker: {
+            color: pc.map(function(record) {
+              return record && record.qc_status === "filtered"
+                ? "#a8a8a8" : _PLOT_pointColor(fillCol);
+            }),
+            size: 1.5, opacity: op.p, line: {width: 0}
+          },
           name: "pts_" + s, showlegend: false
         });
       }
@@ -452,7 +646,11 @@ function _PLOT_renderOvMetric(d) {
               showgrid:false, zeroline:false},
       yaxis: {title:yLabels[mi], showgrid:true, zeroline:false, rangemode:"nonnegative"},
       hovermode: "closest", dragmode: "pan"
-    }, _SR_cartesianModebarConfig());
+    }, _SR_cartesianModebarConfig()).then((function(metricName) {
+      return function(gd) {
+        _PLOT_wireCellPlot(gd, null, metricName, [], false);
+      };
+    })(metric));
   }
 }
 
@@ -462,9 +660,6 @@ function _PLOT_renderOvMetric(d) {
 function _PLOT_renderOvSample(d) {
   var canvas = document.getElementById("plot-active-canvas");
   if (!canvas) return;
-  canvas.scrollLeft = 0;
-  canvas.style.overflowX = "auto";
-  canvas.style.overflowY = "hidden";
 
   var op = _PLOT_focusOpacities(_PLOT_STATE.overview.focus);
   var samples = d.samples;
@@ -486,37 +681,50 @@ function _PLOT_renderOvSample(d) {
     metricRanges[gmName] = [0, gMax * 1.05];
   }
 
-  canvas.innerHTML = "";
+  var overviewFrame = _PLOT_buildOverviewFrame(canvas, "horizontal");
   var wrapper = document.createElement("div");
-  wrapper.style.cssText = "display:flex;flex-direction:row;gap:8px;height:100%;min-width:max-content;";
+  wrapper.className = "sr-qc-overview-sample-strip";
 
   // Build sample cards (each with label + 3-column metric row)
   var allPanelIds = [];
+  var capsuleTargets = [];
+  var capsuleDots = [];
   for (var si = 0; si < samples.length; si++) {
     var s = samples[si];
     var card = document.createElement("div");
-    card.style.cssText = "flex:0 0 640px;display:flex;flex-direction:column;min-height:0;";
+    card.className = "sr-qc-overview-sample-card";
+    card.setAttribute("data-qc-sample", s);
 
     var label = document.createElement("div");
     label.textContent = s;
-    label.style.cssText = "font-size:0.78em;font-weight:600;color:#636e72;text-align:center;padding:4px 0;flex-shrink:0;";
+    label.className = "sr-qc-overview-sample-title";
     card.appendChild(label);
 
     var metricRow = document.createElement("div");
-    metricRow.style.cssText = "display:flex;flex-direction:row;gap:4px;flex:1;min-height:0;";
+    metricRow.className = "sr-qc-overview-sample-metrics";
 
     for (var mi = 0; mi < metrics.length; mi++) {
       var pid = "plot-ov-sample-" + si + "-" + mi;
       allPanelIds.push(pid);
       var panel = document.createElement("div");
-      panel.style.cssText = "flex:0 0 200px;min-height:0;";
+      panel.className = "sr-qc-overview-sample-panel";
       panel.id = pid;
       metricRow.appendChild(panel);
     }
     card.appendChild(metricRow);
     wrapper.appendChild(card);
+    capsuleTargets.push(card);
+    capsuleDots.push(_PLOT_addOverviewCapsuleDot(
+      overviewFrame.capsule, card, s, _PLOT_getSampleColor(s),
+      overviewFrame.scroller, "horizontal"
+    ));
   }
-  canvas.appendChild(wrapper);
+  overviewFrame.scroller.appendChild(wrapper);
+  if (typeof _SR_bindCapsulePager === "function") {
+    _SR_bindCapsulePager(overviewFrame.capsule, capsuleDots,
+      {pageSize: 10, step: 10});
+  }
+  _PLOT_observeOverviewCapsule(overviewFrame.scroller, capsuleTargets, capsuleDots);
   _PLOT_STATE._activeCanvasIds = allPanelIds;
 
   // Render each sample × metric panel
@@ -531,12 +739,13 @@ function _PLOT_renderOvSample(d) {
       if (!panel) continue;
 
       // Gather cells for this sample+metric
-      var yVals = []; var hovers = []; var cellIds = [];
+      var yVals = []; var hovers = []; var cellIds = []; var cellRecords = [];
       for (var ci = 0; ci < d.cells.length; ci++) {
         if (d.cells[ci].sample !== s) continue;
         if (!_PLOT_isFiniteMetric(d.cells[ci][metric])) continue;
         yVals.push(d.cells[ci][metric]);
         cellIds.push(d.cells[ci].cell);
+        cellRecords.push(d.cells[ci]);
         hovers.push("Cell: " + d.cells[ci].cell + "<br>" + metric + ": " + d.cells[ci][metric]);
       }
       if (!yVals.length) continue;
@@ -549,16 +758,21 @@ function _PLOT_renderOvSample(d) {
         opacity: op.v, hoverinfo: "all", width: 0.6, spanmode: "hard", span: [0, null]
       });
       if (op.p > 0.001) {
-        var px=[], py=[], pt=[];
-        var total = yVals.length > 500 ? 500 : yVals.length;
-        var step = Math.max(1, Math.floor(yVals.length/total));
-        for (var k=0; k<yVals.length; k+=step) {
+        var px=[], py=[], pt=[], pc=[];
+        for (var k=0; k<yVals.length; k++) {
           px.push(_PLOT_stableJitter(cellIds[k] + "_" + metric + "_" + s, 0.3));
           py.push(yVals[k]); pt.push(hovers[k]||"");
+          pc.push(cellRecords[k]);
         }
         traces.push({
-          x:px, y:py, text:pt, type:"scatter", mode:"markers", hoverinfo:"text",
-          marker:{color:fillCol, size:1.5, opacity:op.p, line:{width:0}},
+          x:px, y:py, text:pt, customdata:pc, type:"scatter", mode:"markers", hoverinfo:"text",
+          marker:{
+            color:pc.map(function(record) {
+              return record && record.qc_status === "filtered"
+                ? "#a8a8a8" : _PLOT_pointColor(fillCol);
+            }),
+            size:1.5, opacity:op.p, line:{width:0}
+          },
           name:"pts_"+mi, showlegend:false
         });
       }
@@ -568,7 +782,11 @@ function _PLOT_renderOvSample(d) {
         xaxis:{title:"", showgrid:false, zeroline:false, showticklabels:false, range:[-0.5, 0.5]},
         yaxis:{title:"", showgrid:true, zeroline:false, range:metricRanges[metric]},
         hovermode:"closest", dragmode:"pan"
-      }, _SR_cartesianModebarConfig());
+      }, _SR_cartesianModebarConfig()).then((function(sampleName, metricName, values) {
+        return function(gd) {
+          _PLOT_wireCellPlot(gd, sampleName, metricName, values, true);
+        };
+      })(s, metric, yVals.slice()));
     }
   }
 }
@@ -597,12 +815,13 @@ function _PLOT_renderSmMetric(d) {
   var traces = [];
   for (var si = 0; si < samples.length; si++) {
     var s = samples[si];
-    var yVals = []; var hovers = []; var cellIds = [];
+    var yVals = []; var hovers = []; var cellIds = []; var cellRecords = [];
     for (var ci = 0; ci < d.cells.length; ci++) {
       if (d.cells[ci].sample !== s) continue;
       if (!_PLOT_isFiniteMetric(d.cells[ci][metric])) continue;
       yVals.push(d.cells[ci][metric]);
       cellIds.push(d.cells[ci].cell);
+      cellRecords.push(d.cells[ci]);
       hovers.push("Cell: "+d.cells[ci].cell+"<br>Sample: "+s+"<br>"+metric+": "+d.cells[ci][metric]);
     }
     if (!yVals.length) continue;
@@ -615,16 +834,21 @@ function _PLOT_renderSmMetric(d) {
       opacity:op.v, hoverinfo:"all", width:0.6, spanmode:"hard", span:[0,null]
     });
     if (op.p > 0.001) {
-      var px=[]; var py=[]; var pt=[];
-      var total = yVals.length > 1000 ? 1000 : yVals.length;
-      var step = Math.max(1, Math.floor(yVals.length/total));
-      for (var k=0; k<yVals.length; k+=step) {
+      var px=[]; var py=[]; var pt=[]; var pc=[];
+      for (var k=0; k<yVals.length; k++) {
         px.push(si + _PLOT_stableJitter(cellIds[k] + "_" + metric + "_" + s, 0.4));
         py.push(yVals[k]); pt.push(hovers[k]||"");
+        pc.push(cellRecords[k]);
       }
       traces.push({
-        x:px, y:py, text:pt, type:"scatter", mode:"markers", hoverinfo:"text",
-        marker:{color:fillCol, size:2, opacity:op.p, line:{width:0}},
+        x:px, y:py, text:pt, customdata:pc, type:"scatter", mode:"markers", hoverinfo:"text",
+        marker:{
+          color:pc.map(function(record) {
+            return record && record.qc_status === "filtered"
+              ? "#a8a8a8" : _PLOT_pointColor(fillCol);
+          }),
+          size:2, opacity:op.p, line:{width:0}
+        },
         name:"pts_"+s, showlegend:false
       });
     }
@@ -635,7 +859,9 @@ function _PLOT_renderSmMetric(d) {
     xaxis:{title:"", ticktext:samples, tickvals:samples.map(function(_,i){return i;}), showgrid:false},
     yaxis:{title:metric, showgrid:true, rangemode:"nonnegative"},
     hovermode:"closest", dragmode:"pan"
-  }, _SR_cartesianModebarConfig());
+  }, _SR_cartesianModebarConfig()).then(function(gd) {
+    _PLOT_wireCellPlot(gd, null, metric, [], false);
+  });
 }
 
 // =========================================================================
@@ -692,12 +918,13 @@ function _PLOT_renderSmSample(d) {
     var panel = document.getElementById("plot-sm-metric-" + mi);
     if (!panel) continue;
 
-    var yVals = []; var hovers = []; var cellIds = [];
+    var yVals = []; var hovers = []; var cellIds = []; var cellRecords = [];
     for (var ci = 0; ci < d.cells.length; ci++) {
       if (d.cells[ci].sample !== sample) continue;
       if (!_PLOT_isFiniteMetric(d.cells[ci][metric])) continue;
       yVals.push(d.cells[ci][metric]);
       cellIds.push(d.cells[ci].cell);
+      cellRecords.push(d.cells[ci]);
       hovers.push("Cell: "+d.cells[ci].cell+"<br>"+metric+": "+d.cells[ci][metric]);
     }
     if (!yVals.length) continue;
@@ -710,16 +937,21 @@ function _PLOT_renderSmSample(d) {
       opacity:op.v, hoverinfo:"all", width:0.6, spanmode:"hard", span:[0,null]
     });
     if (op.p > 0.001) {
-      var px=[], py=[], pt=[];
-      var total = yVals.length > 500 ? 500 : yVals.length;
-      var step = Math.max(1, Math.floor(yVals.length/total));
-      for (var k=0; k<yVals.length; k+=step) {
+      var px=[], py=[], pt=[], pc=[];
+      for (var k=0; k<yVals.length; k++) {
         px.push(_PLOT_stableJitter(cellIds[k] + "_" + metric + "_" + sample, 0.3));
         py.push(yVals[k]); pt.push(hovers[k]||"");
+        pc.push(cellRecords[k]);
       }
       traces.push({
-        x:px, y:py, text:pt, type:"scatter", mode:"markers", hoverinfo:"text",
-        marker:{color:fillCol, size:2, opacity:op.p, line:{width:0}},
+        x:px, y:py, text:pt, customdata:pc, type:"scatter", mode:"markers", hoverinfo:"text",
+        marker:{
+          color:pc.map(function(record) {
+            return record && record.qc_status === "filtered"
+              ? "#a8a8a8" : _PLOT_pointColor(fillCol);
+          }),
+          size:2, opacity:op.p, line:{width:0}
+        },
         name:"pts_"+mi, showlegend:false
       });
     }
@@ -729,7 +961,11 @@ function _PLOT_renderSmSample(d) {
       xaxis:{title:"", showgrid:false, zeroline:false, showticklabels:false, range:[-0.5,0.5]},
       yaxis:{title:mLabels[mi], showgrid:true, zeroline:false, range:metricRanges[metric]},
       hovermode:"closest", dragmode:"pan"
-    }, _SR_cartesianModebarConfig());
+    }, _SR_cartesianModebarConfig()).then((function(sampleName, metricName, values) {
+      return function(gd) {
+        _PLOT_wireCellPlot(gd, sampleName, metricName, values, true);
+      };
+    })(sample, metric, yVals.slice()));
   }
 }
 
@@ -756,13 +992,14 @@ function _PLOT_renderScatter(d) {
   var traces = [];
   for (var si = 0; si < samples.length; si++) {
     var s = samples[si];
-    var xVals=[]; var yVals=[]; var hovers=[];
+    var xVals=[]; var yVals=[]; var hovers=[]; var records=[];
     for (var ci = 0; ci < d.cells.length; ci++) {
       if (d.cells[ci].sample !== s) continue;
       if (!_PLOT_isFiniteMetric(d.cells[ci].nCount_RNA) ||
           !_PLOT_isFiniteMetric(d.cells[ci].nFeature_RNA)) continue;
       xVals.push(d.cells[ci].nCount_RNA);
       yVals.push(d.cells[ci].nFeature_RNA);
+      records.push(d.cells[ci]);
       hovers.push("Cell: "+d.cells[ci].cell+"<br>Sample: "+s+
         "<br>nCount: "+d.cells[ci].nCount_RNA+"<br>nFeature: "+d.cells[ci].nFeature_RNA);
     }
@@ -772,18 +1009,15 @@ function _PLOT_renderScatter(d) {
     var opac = 0.7;
     if (hl) { opac = (s === hl) ? 0.85 : 0.06; }
 
-    // Sample points for scatter (can be large)
-    var total = xVals.length > 2000 ? 2000 : xVals.length;
-    var step = Math.max(1, Math.floor(xVals.length / total));
-    var sx=[]; var sy=[]; var sh=[];
-    for (var k=0; k<xVals.length; k+=step) {
-      sx.push(xVals[k]); sy.push(yVals[k]); sh.push(hovers[k]||"");
-    }
-
     traces.push({
-      x:sx, y:sy, text:sh,
+      x:xVals, y:yVals, text:hovers, customdata:records,
       type:"scatter", mode:"markers", hoverinfo:"text",
-      marker:{color:fillCol, size:3, opacity:opac},
+      marker:{
+        color:records.map(function(record) {
+          return record.qc_status === "filtered" ? "#a8a8a8" : fillCol;
+        }),
+        size:3, opacity:opac
+      },
       name:s, showlegend:false
     });
   }
@@ -794,7 +1028,9 @@ function _PLOT_renderScatter(d) {
     xaxis:{title:"nCount_RNA", showgrid:false},
     yaxis:{title:"nFeature_RNA", showgrid:false},
     hovermode:"closest", dragmode:"pan"
-  }, _SR_cartesianModebarConfig());
+  }, _SR_cartesianModebarConfig()).then(function(gd) {
+    _PLOT_wireCellPlot(gd, null, "nFeature_RNA", [], false);
+  });
 }
 
 // =========================================================================

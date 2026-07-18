@@ -27,6 +27,21 @@ var _PCA_ALL_PCS        = [];     // sorted PC column names
 var _PCA_SELECTED_PCS   = ["PC_1", "PC_2"];  // default pair
 var _PCA_LOADING        = [];     // loading data
 var _PCA_LOADING_TOP_N  = 10;
+var _PCA_LOADING_DIRECTION = "both";
+var _PCA_SUBVIEW        = "elbow";
+
+function _PCA_modebarConfig() {
+  return typeof _SR_standardModebarConfig === "function"
+    ? _SR_standardModebarConfig()
+    : {
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: [
+          "sendDataToCloud", "lasso2d", "select2d",
+          "autoScale2d", "toggleSpikelines"
+        ]
+      };
+}
 
 function pcaSortGroups(arr) {
   return arr.slice().sort(_SR_naturalCompare);
@@ -58,26 +73,229 @@ function buildPcaGroupIndices() {
   return { groups: groups, indices: indices };
 }
 
+function pcaGroupColors(groups) {
+  var generated = window.SRColor
+    ? window.SRColor.palette(groups.length, 400)
+    : _PCA_PALETTE;
+  var colors = {};
+  for (var i = 0; i < groups.length; i++) {
+    var group = groups[i];
+    colors[group] = (_PCA_COLOR_MODE === "cluster" &&
+      _PCA_COLORS && _PCA_COLORS[group])
+      ? _PCA_COLORS[group]
+      : generated[i % generated.length];
+  }
+  return colors;
+}
+
+function _PCA_plotColor(color) {
+  var match = String(color || "").match(
+    /^hsl\(\s*([0-9.]+)\s+([0-9.]+)%\s+([0-9.]+)%\s*\)$/i
+  );
+  if (!match) return color;
+  return "hsl(" + match[1] + "," + match[2] + "%," + match[3] + "%)";
+}
+
+function _PCA_quantile(sorted, probability) {
+  if (!sorted.length) return null;
+  var index = (sorted.length - 1) * probability;
+  var lower = Math.floor(index);
+  var upper = Math.ceil(index);
+  if (lower === upper) return sorted[lower];
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
+}
+
+function _PCA_scoreSummary(values) {
+  var sorted = values.filter(function(value) {
+    return typeof value === "number" && isFinite(value);
+  }).slice().sort(function(a, b) { return a - b; });
+  if (!sorted.length) return null;
+  var q1 = _PCA_quantile(sorted, 0.25);
+  var q3 = _PCA_quantile(sorted, 0.75);
+  var iqr = q3 - q1;
+  var lowerLimit = q1 - 1.5 * iqr;
+  var upperLimit = q3 + 1.5 * iqr;
+  var lowerWhisker = sorted[0];
+  var upperWhisker = sorted[sorted.length - 1];
+  for (var i = 0; i < sorted.length; i++) {
+    if (sorted[i] >= lowerLimit) {
+      lowerWhisker = sorted[i];
+      break;
+    }
+  }
+  for (var j = sorted.length - 1; j >= 0; j--) {
+    if (sorted[j] <= upperLimit) {
+      upperWhisker = sorted[j];
+      break;
+    }
+  }
+  return {
+    minimum: sorted[0],
+    q1: q1,
+    median: _PCA_quantile(sorted, 0.5),
+    q3: q3,
+    maximum: sorted[sorted.length - 1],
+    lowerWhisker: lowerWhisker,
+    upperWhisker: upperWhisker,
+    count: sorted.length
+  };
+}
+
+function _PCA_stableCellJitter(cellId) {
+  var text = String(cellId == null ? "" : cellId);
+  var hash = 2166136261;
+  for (var i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (((hash >>> 0) % 1000003) / 1000003 - 0.5) * 0.56;
+}
+
+function _PCA_scoreDetail(cellData, pc, group, groupValues) {
+  var summary = _PCA_scoreSummary(groupValues);
+  var cellRows = [
+    ["Cluster", String(cellData[1])],
+    ["Sample", String(cellData[2] || "Not supplied")],
+    [pc, Number(cellData[3]).toFixed(3)],
+    ["Grouping", _PCA_COLOR_MODE === "cluster" ? "Cluster" : "Sample"],
+    ["Group", String(group)]
+  ];
+  var groupRows = [];
+  if (summary) {
+    groupRows.push(
+      ["Cells", String(summary.count)],
+      ["Q1", Number(summary.q1).toFixed(3)],
+      ["Median", Number(summary.median).toFixed(3)],
+      ["Q3", Number(summary.q3).toFixed(3)],
+      ["Lower whisker", Number(summary.lowerWhisker).toFixed(3)],
+      ["Upper whisker", Number(summary.upperWhisker).toFixed(3)]
+    );
+  }
+  renderPcaDetail({
+    cards: [
+      {title: String(cellData[0]), rows: cellRows},
+      {title: String(group) + " distribution", rows: groupRows}
+    ]
+  });
+}
+
 // ---- Main PCA render dispatcher ----
 function renderPcaPlot() {
   if (!_SR_isActiveView("pca")) return;
   if (!_PCA_INITIALIZED) return;
 
-  if (_PCA_SELECTED_PCS.length === 1) {
+  if (_PCA_SUBVIEW === "elbow") {
+    renderPcaElbow();
+  } else if (_PCA_SUBVIEW === "score") {
     renderPcaSingleMode();
   } else {
     renderPcaPairMode();
   }
 }
 
+function renderPcaElbow() {
+  var elbowArea = document.getElementById("pca-elbow-area");
+  var scoreArea = document.getElementById("pca-single-pc-area");
+  var pairArea = document.getElementById("pca-pair-area");
+  var container = document.getElementById("pca-elbow-container");
+  if (elbowArea) elbowArea.style.display = "";
+  if (scoreArea) scoreArea.style.display = "none";
+  if (pairArea) pairArea.style.display = "none";
+  if (!container || !window.Plotly) return;
+
+  var rows = window._FEATURE_DIAG_DATA &&
+    Array.isArray(window._FEATURE_DIAG_DATA.elbow)
+      ? window._FEATURE_DIAG_DATA.elbow : [];
+  if (!rows.length) {
+    container.innerHTML = '<div class="sr-detail-empty sr-visible-empty">No PCA variance data supplied.</div>';
+    renderPcLoading(null);
+    return;
+  }
+
+  var custom = rows.map(function(row) {
+    return [row.PC, row.stdev, row.variance_percent, row.cumulative_variance];
+  });
+  Plotly.react(container, [{
+    type: "scatter", mode: "markers",
+    x: rows.map(function(row) { return row.PC; }),
+    y: rows.map(function(row) { return row.stdev; }),
+    customdata: custom,
+    marker: { color: "#27D3F5", size: 7 },
+    hovertemplate:
+      "PC %{customdata[0]}<br>stdev: %{customdata[1]:.4f}" +
+      "<br>Variance: %{customdata[2]:.2f}%" +
+      "<br>Cumulative: %{customdata[3]:.2f}%<extra></extra>",
+    showlegend: false
+  }], {
+    xaxis: { title: "PC", showgrid: true, zeroline: false },
+    yaxis: { title: "Standard deviation", showgrid: true, zeroline: false },
+    margin: { l: 64, r: 24, t: 20, b: 56 },
+    hovermode: "closest"
+  }, _PCA_modebarConfig());
+
+  container.removeAllListeners && container.removeAllListeners("plotly_click");
+  container.on("plotly_click", function(event) {
+    var point = event && event.points && event.points[0];
+    if (!point || !point.customdata) return;
+    var values = point.customdata;
+    var pc = "PC_" + values[0];
+    _PCA_SELECTED_PCS = [pc];
+    renderPcLoading(pc);
+    renderPcaDetail({
+      title: pc,
+      rows: [
+        ["Standard deviation", Number(values[1]).toFixed(4)],
+        ["Variance explained", Number(values[2]).toFixed(2) + "%"],
+        ["Cumulative variance", Number(values[3]).toFixed(2) + "%"]
+      ]
+    });
+  });
+}
+
+function renderPcaDetail(detail) {
+  var deck = document.getElementById("sr-pca-detail-deck");
+  if (!deck) return;
+  var cards = detail.cards || [detail];
+  deck.innerHTML = "";
+  cards.forEach(function(cardData) {
+    var card = document.createElement("article");
+    card.className = "sr-detail-card";
+    var title = document.createElement("h3");
+    title.textContent = cardData.title;
+    card.appendChild(title);
+    (cardData.rows || []).forEach(function(row) {
+      var line = document.createElement("div");
+      line.className = "sr-detail-row";
+      var label = document.createElement("span");
+      var value = document.createElement("strong");
+      label.textContent = row[0];
+      value.textContent = row[1];
+      line.appendChild(label);
+      line.appendChild(value);
+      card.appendChild(line);
+    });
+    deck.appendChild(card);
+  });
+}
+
+function clearPcaDetail(message) {
+  var deck = document.getElementById("sr-pca-detail-deck");
+  if (!deck) return;
+  deck.innerHTML = "";
+  var empty = document.createElement("div");
+  empty.className = "sr-detail-empty";
+  empty.textContent = message || "Select a PC or cell to inspect its data.";
+  deck.appendChild(empty);
+}
+
 function renderPcaSingleMode() {
   var pairArea    = document.getElementById("pca-pair-area");
   var singleArea  = document.getElementById("pca-single-pc-area");
-  var loadingArea = document.getElementById("pca-loading-area");
+  var elbowArea   = document.getElementById("pca-elbow-area");
 
   if (pairArea)    pairArea.style.display    = "none";
   if (singleArea)  singleArea.style.display  = "";
-  if (loadingArea) loadingArea.style.display = "";
+  if (elbowArea)   elbowArea.style.display   = "none";
 
   setTimeout(function() {
     renderSinglePcPlot();
@@ -94,10 +312,10 @@ function renderPcaSingleMode() {
 function renderPcaPairMode() {
   var pairArea    = document.getElementById("pca-pair-area");
   var singleArea  = document.getElementById("pca-single-pc-area");
-  var loadingArea = document.getElementById("pca-loading-area");
+  var elbowArea   = document.getElementById("pca-elbow-area");
 
   if (singleArea)  singleArea.style.display  = "none";
-  if (loadingArea) loadingArea.style.display = "none";
+  if (elbowArea)   elbowArea.style.display   = "none";
   if (pairArea)    pairArea.style.display    = "";
 
   setTimeout(function() {
@@ -123,7 +341,7 @@ function renderPcaPairScatter() {
   var scoreX = _PCA_SCORES[pcX];
   var scoreY = _PCA_SCORES[pcY];
 
-  if (titleEl) titleEl.textContent = "PCA — " + pcX + " vs " + pcY;
+  if (titleEl) titleEl.textContent = "PCA \u2014 " + pcX + " vs " + pcY;
   pairArea.style.display = "";
 
   var gi      = buildPcaGroupIndices();
@@ -131,13 +349,7 @@ function renderPcaPairScatter() {
   var indices = gi.indices;
   var traces  = [];
 
-  var groupColors = {};
-  for (var ci = 0; ci < groups.length; ci++) {
-    var cg = groups[ci];
-    groupColors[cg] = (_PCA_COLORS && _PCA_COLORS[cg])
-      ? _PCA_COLORS[cg]
-      : _PCA_PALETTE[ci % _PCA_PALETTE.length];
-  }
+  var groupColors = pcaGroupColors(groups);
 
   for (var gi = 0; gi < groups.length; gi++) {
     var g = groups[gi];
@@ -180,12 +392,21 @@ function renderPcaPairScatter() {
     yaxis: { title: pcY, showgrid: false, zeroline: false, showticklabels: true,
              scaleanchor: "x", scaleratio: 1 },
     hovermode: "closest", margin: { l: 60, r: 30, b: 60, t: 30 }, dragmode: "pan"
-  }, {
-    displayModeBar: true,
-    modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
-    modeBarButtonsToRemove: ["sendDataToCloud", "lasso2d", "select2d",
-      "autoScale2d", "toggleSpikelines"],
-    displaylogo: false
+  }, _PCA_modebarConfig());
+  container.removeAllListeners && container.removeAllListeners("plotly_click");
+  container.on("plotly_click", function(event) {
+    var point = event && event.points && event.points[0];
+    if (!point || !point.customdata) return;
+    var cd = point.customdata;
+    renderPcaDetail({
+      title: String(cd[0]),
+      rows: [
+        ["Cluster", String(cd[1])],
+        ["Sample", String(cd[2] || "Not supplied")],
+        [pcX, Number(cd[3]).toFixed(3)],
+        [pcY, Number(cd[4]).toFixed(3)]
+      ]
+    });
   });
 }
 
@@ -199,100 +420,228 @@ function renderSinglePcPlot() {
   area.style.display = "";
   var pc = _PCA_SELECTED_PCS[0];
   var scores = _PCA_SCORES[pc];
-  if (titleEl) titleEl.textContent = "Single-PC score — " + pc;
+  if (titleEl) titleEl.textContent = "Single-PC score \u2014 " + pc;
   if (!scores) return;
 
-  var gi      = buildPcaGroupIndices();
-  var groups  = gi.groups;
-  var indices = gi.indices;
-  var traces  = [];
-
-  var groupColors = {};
-  for (var ci = 0; ci < groups.length; ci++) {
-    var cg = groups[ci];
-    groupColors[cg] = (_PCA_COLORS && _PCA_COLORS[cg])
-      ? _PCA_COLORS[cg]
-      : _PCA_PALETTE[ci % _PCA_PALETTE.length];
-  }
-
-  for (var gi = 0; gi < groups.length; gi++) {
-    var g = groups[gi];
-    var idx = indices[g];
-    var n = idx.length;
-    var x = new Array(n), y = new Array(n);
-    var text = new Array(n);
-    var op = new Array(n);
-
-    for (var k = 0; k < n; k++) {
-      var i = idx[k];
-      // Jitter X by index spread (not random) for consistent layout
-      x[k] = k * 0.8 - n * 0.4;
-      y[k] = scores[i];
-      var h = "Cell: " + _PCA_CELLS[i] +
-        "<br>Cluster: " + _PCA_CLUSTERS[i] +
-        "<br>" + pc + ": " + scores[i].toFixed(3);
-      if (_PCA_HAS_SAMPLE) h += "<br>Sample: " + _PCA_SAMPLES[i];
-      text[k] = h;
-      op[k] = (_PCA_HIGHLIGHT !== null && g !== _PCA_HIGHLIGHT) ? 0.12 : 0.9;
-    }
-
-    var mc = (_PCA_HIGHLIGHT !== null && g !== _PCA_HIGHLIGHT)
-      ? "#D0D0D0" : groupColors[g];
-
-    traces.push({
-      x: x, y: y,
-      type: _PCA_USE_WEBGL ? "scattergl" : "scatter",
-      mode: "markers",
-      marker: { color: mc, size: 3, opacity: op },
-      text: text, hoverinfo: "text",
-      name: "pca_single_" + g, showlegend: false
-    });
-  }
-
-  Plotly.react(container, traces, {
-    xaxis: { title: "", showgrid: false, zeroline: false, showticklabels: false },
-    yaxis: { title: pc + " score", showgrid: true, zeroline: true, showticklabels: true },
-    hovermode: "closest", margin: { l: 60, r: 30, b: 40, t: 30 }, dragmode: "pan"
-  }, {
-    displayModeBar: true,
-    modeBarButtonsToAdd: ["hoverClosestCartesian","hoverCompareCartesian"],
-    modeBarButtonsToRemove: ["sendDataToCloud", "lasso2d", "select2d",
-      "autoScale2d", "toggleSpikelines"],
-    displaylogo: false
+  var grouped = buildPcaGroupIndices();
+  var groups = grouped.groups;
+  var indices = grouped.indices;
+  var groupColors = pcaGroupColors(groups);
+  var finiteScores = scores.filter(function(value) {
+    return typeof value === "number" && isFinite(value);
   });
+  if (!finiteScores.length) return;
+  var globalMin = Math.min.apply(null, finiteScores);
+  var globalMax = Math.max.apply(null, finiteScores);
+  var padding = Math.max((globalMax - globalMin) * 0.06, 0.5);
+  var sharedRange = [globalMin - padding, globalMax + padding];
+
+  container.innerHTML =
+    '<div class="sr-pca-score-shell">' +
+      '<div class="sr-pca-score-axis" aria-label="' + pc + ' shared axis"></div>' +
+      '<div class="sr-pca-score-scroller"><div class="sr-pca-score-strip"></div></div>' +
+      '<nav class="sr-scroll-capsule sr-pca-score-capsule" aria-label="PC score group navigation"></nav>' +
+    '</div>';
+  var shell = container.querySelector(".sr-pca-score-shell");
+  var axis = container.querySelector(".sr-pca-score-axis");
+  var scroller = container.querySelector(".sr-pca-score-scroller");
+  var strip = container.querySelector(".sr-pca-score-strip");
+  var capsule = container.querySelector(".sr-pca-score-capsule");
+  if (!shell || !axis || !scroller || !strip || !capsule) return;
+
+  Plotly.newPlot(axis, [{type: "scatter", x: [], y: []}], {
+    margin: {l: 56, r: 2, b: 24, t: 44},
+    xaxis: {visible: false, fixedrange: true},
+    yaxis: {
+      title: pc + " score", range: sharedRange, fixedrange: true,
+      showgrid: true, zeroline: true, showticklabels: true
+    },
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(0,0,0,0)",
+    showlegend: false
+  }, {displayModeBar: false, responsive: true, staticPlot: true});
+
+  var cards = [];
+  var dots = [];
+  groups.forEach(function(group, groupIndex) {
+    var idx = indices[group];
+    var values = idx.map(function(i) { return scores[i]; });
+    var summary = _PCA_scoreSummary(values);
+    var colour = (_PCA_HIGHLIGHT !== null && group !== _PCA_HIGHLIGHT)
+      ? "#D0D0D0" : _PCA_plotColor(groupColors[group]);
+    var card = document.createElement("section");
+    card.className = "sr-pca-score-card";
+    card.setAttribute("data-pca-score-group", group);
+    card.style.setProperty("--sr-pca-group-colour", groupColors[group]);
+    card.style.setProperty("--sr-pca-title-colour",
+      window.SRColor && typeof window.SRColor.shadeFrom === "function"
+        ? window.SRColor.shadeFrom(groupColors[group], 800)
+        : groupColors[group]);
+    card.innerHTML =
+      '<button type="button" class="sr-pca-score-title" title="' + group + '">' +
+        '<span>' + group + '</span><i aria-hidden="true"></i>' +
+      '</button><div class="sr-pca-score-plot"></div>';
+    strip.appendChild(card);
+    cards.push(card);
+
+    var dot = document.createElement("button");
+    dot.type = "button";
+    dot.className = "sr-scroll-capsule-dot sr-pca-score-capsule-dot";
+    dot.setAttribute("aria-label", "Go to " + group);
+    dot.setAttribute("title", group);
+    dot.style.setProperty("--sr-dot-colour", groupColors[group]);
+    dot.addEventListener("click", function() {
+      scroller.scrollTo({left: card.offsetLeft, behavior: "smooth"});
+    });
+    capsule.appendChild(dot);
+    dots.push(dot);
+
+    card.querySelector(".sr-pca-score-title").addEventListener("click", function() {
+      highlightPcaGroup(group);
+      setTimeout(function() {
+        var active = document.querySelector('[data-pca-score-group="' +
+          String(group).replace(/"/g, '\\"') + '"]');
+        if (active) {
+          var activeScroller = active.closest(".sr-pca-score-scroller");
+          if (activeScroller) {
+            activeScroller.scrollTo({left: active.offsetLeft, behavior: "smooth"});
+          }
+        }
+      }, 0);
+    });
+
+    var x = idx.map(function(i) {
+      return _PCA_stableCellJitter(_PCA_CELLS[i]);
+    });
+    var custom = idx.map(function(i) {
+      return [_PCA_CELLS[i], _PCA_CLUSTERS[i], _PCA_SAMPLES[i], scores[i], group];
+    });
+    var hover = idx.map(function(i) {
+      var value = typeof scores[i] === "number" ? scores[i].toFixed(3) : "missing";
+      return "Cell: " + _PCA_CELLS[i] +
+        "<br>Cluster: " + _PCA_CLUSTERS[i] +
+        (_PCA_HAS_SAMPLE ? "<br>Sample: " + _PCA_SAMPLES[i] : "") +
+        "<br>" + pc + ": " + value;
+    });
+    var plot = card.querySelector(".sr-pca-score-plot");
+    var plotShapes = [];
+    if (summary) {
+      plotShapes = [
+        {
+          type: "line", x0: 0, x1: 0,
+          y0: summary.lowerWhisker, y1: summary.upperWhisker,
+          line: {color: colour, width: 2}, layer: "below"
+        },
+        {
+          type: "rect", x0: -0.18, x1: 0.18, y0: summary.q1, y1: summary.q3,
+          line: {color: colour, width: 2},
+          fillcolor: "rgba(255,255,255,0.78)", layer: "below"
+        },
+        {
+          type: "line", x0: -0.18, x1: 0.18,
+          y0: summary.median, y1: summary.median,
+          line: {color: colour, width: 3}, layer: "above"
+        },
+        {
+          type: "line", x0: -0.1, x1: 0.1,
+          y0: summary.lowerWhisker, y1: summary.lowerWhisker,
+          line: {color: colour, width: 2}, layer: "above"
+        },
+        {
+          type: "line", x0: -0.1, x1: 0.1,
+          y0: summary.upperWhisker, y1: summary.upperWhisker,
+          line: {color: colour, width: 2}, layer: "above"
+        }
+      ];
+    }
+    Plotly.newPlot(plot, [{
+      x: x, y: values,
+      type: _PCA_USE_WEBGL ? "scattergl" : "scatter",
+      mode: "markers", customdata: custom, text: hover, hoverinfo: "text",
+      marker: {color: colour, size: 3, opacity: 0.86},
+      showlegend: false
+    }], {
+      margin: {l: 4, r: 4, b: 24, t: 4},
+      xaxis: {visible: false, fixedrange: true, range: [-0.42, 0.42]},
+      yaxis: {
+        visible: false, fixedrange: true, range: sharedRange,
+        showgrid: true, zeroline: true
+      },
+      shapes: plotShapes,
+      hovermode: "closest", dragmode: false, showlegend: false,
+      paper_bgcolor: "rgba(0,0,0,0)",
+      plot_bgcolor: "rgba(0,0,0,0)"
+    }, {displayModeBar: false, responsive: true, scrollZoom: false});
+    if (typeof plot.on === "function") {
+      plot.on("plotly_click", function(event) {
+        var point = event && event.points && event.points[0];
+        if (!point || !point.customdata) return;
+        _PCA_scoreDetail(point.customdata, pc, group, values);
+      });
+    }
+  });
+
+  if (window.IntersectionObserver) {
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        var index = cards.indexOf(entry.target);
+        if (index < 0 || !dots[index]) return;
+        dots[index].classList.toggle("in-view", entry.intersectionRatio > 0);
+        dots[index].classList.toggle("mostly-in-view", entry.intersectionRatio >= 0.75);
+      });
+    }, {root: scroller, threshold: [0, 0.01, 0.75, 1]});
+    cards.forEach(function(card) { observer.observe(card); });
+  } else {
+    dots.forEach(function(dot) { dot.classList.add("in-view"); });
+  }
 }
 
 // ---- PC loading / composition table ----
-function renderPcLoading() {
-  var area = document.getElementById("pca-loading-area");
-  var content = document.getElementById("pca-loading-content");
-  if (!area || !content) return;
-
-  area.style.display = "";
+function renderPcLoading(selectedPc) {
+  var content = document.getElementById("sr-pca-loading-table");
+  if (!content) return;
 
   if (!_PCA_LOADING || _PCA_LOADING.length === 0) {
     content.innerHTML = "<p class=\"no-data\">No PCA loading data provided.</p>";
     return;
   }
 
-  var pc = _PCA_SELECTED_PCS[0];
+  var pc = selectedPc || _PCA_SELECTED_PCS[0];
+  if (!pc) {
+    content.innerHTML = '<div class="sr-detail-empty sr-visible-empty">Select a PC to inspect its loadings.</div>';
+    return;
+  }
 
   // Filter to current PC, sort by abs_loading descending
   var rows = [];
   for (var i = 0; i < _PCA_LOADING.length; i++) {
     var r = _PCA_LOADING[i];
-    if (r.PC === pc) rows.push(r);
+    var direction = String(r.direction || (
+      Number(r.loading) >= 0 ? "positive" : "negative"
+    )).toLowerCase();
+    if (r.PC === pc &&
+        (_PCA_LOADING_DIRECTION === "both" ||
+         direction === _PCA_LOADING_DIRECTION)) {
+      rows.push(r);
+    }
   }
 
   if (rows.length === 0) {
-    content.innerHTML = "<p class=\"no-data\">No loading data for " + pc + ".</p>";
+    var directionLabel = _PCA_LOADING_DIRECTION === "both"
+      ? ""
+      : " " + _PCA_LOADING_DIRECTION;
+    content.innerHTML = "<p class=\"no-data\">No" + directionLabel +
+      " loading data for " + pc + ".</p>";
     return;
   }
 
-  rows.sort(function(a, b) { return b.abs_loading - a.abs_loading; });
-  var topN = Math.min(_PCA_LOADING_TOP_N, rows.length);
-  rows = rows.slice(0, topN);
-
+  rows.sort(function(a, b) {
+    var absA = Number.isFinite(Number(a.abs_loading))
+      ? Number(a.abs_loading) : Math.abs(Number(a.loading) || 0);
+    var absB = Number.isFinite(Number(b.abs_loading))
+      ? Number(b.abs_loading) : Math.abs(Number(b.loading) || 0);
+    return absB - absA;
+  });
   var table = document.createElement("table");
   table.className = "pca-loading-table";
 
@@ -331,13 +680,23 @@ function renderPcLoading() {
   content.appendChild(table);
 }
 
+function switchPcaLoadingDirection(direction) {
+  if (["both", "positive", "negative"].indexOf(direction) < 0) return;
+  _PCA_LOADING_DIRECTION = direction;
+  document.querySelectorAll("[data-pca-loading-direction]").forEach(function(button) {
+    button.classList.toggle(
+      "active",
+      button.getAttribute("data-pca-loading-direction") === direction
+    );
+  });
+  renderPcLoading();
+}
+
 // ---- Clear single-PC view (show pair scatter, hide score + loading) ----
 function clearSinglePcView() {
   var single = document.getElementById("pca-single-pc-area");
-  var loading = document.getElementById("pca-loading-area");
   var pair = document.getElementById("pca-pair-area");
   if (single) single.style.display = "none";
-  if (loading) loading.style.display = "none";
   if (pair) pair.style.display = "";
 }
 
@@ -345,6 +704,16 @@ function clearSinglePcView() {
 function togglePcSelection(pc) {
   if (!_SR_isActiveView("pca")) return;
   if (!_PCA_INITIALIZED) return;
+  if (_PCA_SUBVIEW === "score") {
+    _PCA_SELECTED_PCS = [pc];
+    _PCA_HIGHLIGHT = null;
+    clearPcaDetail("Select a cell to inspect its PC score and group distribution.");
+    renderPcSelector();
+    renderPcaGroupList();
+    try { renderPcaPlot(); } catch(e) { console.warn("PCA toggle/render failed:", e); }
+    return;
+  }
+
   var idx = _PCA_SELECTED_PCS.indexOf(pc);
   if (idx >= 0) {
     if (_PCA_SELECTED_PCS.length === 2) {
@@ -376,7 +745,7 @@ function renderPcSelector() {
 
     var check = document.createElement("span");
     check.className = "pca-pc-check";
-    if (selected) check.textContent = "✓";
+    if (selected) check.textContent = "\u2713";
 
     var nameEl = document.createElement("span");
     nameEl.textContent = pc;
@@ -401,9 +770,7 @@ function renderPcaGroupList() {
   list.innerHTML = "";
   for (var i = 0; i < groups.length; i++) {
     var g = groups[i];
-    var color = (_PCA_COLORS && _PCA_COLORS[g])
-      ? _PCA_COLORS[g]
-      : _PCA_PALETTE[i % _PCA_PALETTE.length];
+    var color = pcaGroupColors(groups)[g];
     var active = (_PCA_HIGHLIGHT === g);
 
     var item = document.createElement("div");
@@ -433,12 +800,18 @@ function switchPcaColorMode(mode) {
   try {
   _PCA_COLOR_MODE = mode;
   _PCA_HIGHLIGHT  = null;
+  clearPcaDetail(
+    _PCA_SUBVIEW === "score"
+      ? "Select a cell to inspect its PC score and group distribution."
+      : "Select a cell to inspect its PCA data."
+  );
   var btnC = document.getElementById("pca-cm-cluster");
   var btnS = document.getElementById("pca-cm-sample");
   if (btnC) btnC.classList.toggle("active", mode === "cluster");
   if (btnS) btnS.classList.toggle("active", mode === "sample");
   renderPcaGroupList();
   renderPcaPlot();
+  if (window.SRDesign) window.SRDesign.refreshResolutionContexts();
   } catch(e) { console.warn("PCA switch colour mode failed:", e); }
 }
 
@@ -477,7 +850,11 @@ function initPcaPlot() {
   _PCA_USE_WEBGL  = _PCA_USE_WEBGL;
   _PCA_INIT_MODE  = _PCA_INIT_MODE;
   _PCA_COLORS     = _PCA_COLORS;
-  _PCA_COLOR_MODE = _PCA_INIT_MODE;
+  // PC score is a pre-clustering diagnostic in many workflows. Prefer the
+  // supplied sample identity whenever it is available; cluster remains an
+  // explicit alternative in the left controls.
+  _PCA_COLOR_MODE = (_PCA_SAMPLES.length)
+    ? "sample" : _PCA_INIT_MODE;
   _PCA_HIGHLIGHT  = null;
 
   // Copy PC scores from _PCA_DATA (all PC_* keys) into _PCA_SCORES
@@ -494,16 +871,15 @@ function initPcaPlot() {
   // Build sorted PC list
   _PCA_ALL_PCS = pcaSortPcNames(Object.keys(_PCA_SCORES));
 
-  // Default selection: pair PC_1 + PC_2
-  if (_PCA_ALL_PCS.length >= 2) {
-    _PCA_SELECTED_PCS = ["PC_1", "PC_2"];
-  } else if (_PCA_ALL_PCS.length === 1) {
-    _PCA_SELECTED_PCS = [_PCA_ALL_PCS[0]];
-  }
+  // Elbow is the initial subview and deliberately starts without a selected PC.
+  // PC Score / PCA populate their required one or two PCs on subview entry.
+  _PCA_SELECTED_PCS = [];
 
   // Copy loading data
   _PCA_LOADING = window._PCA_LOADING_DATA || [];
   _PCA_LOADING_TOP_N = window._PCA_LOADING_TOP_N || 10;
+  _PCA_LOADING_DIRECTION = "both";
+  _PCA_SUBVIEW = "elbow";
 
   var btnC = document.getElementById("pca-cm-cluster");
   var btnS = document.getElementById("pca-cm-sample");

@@ -18,7 +18,6 @@
     tags$div(
       class = "cluster-item",
       `data-cluster` = cl_char,
-      onclick = sprintf("toggleCluster(%s)", jsonlite::toJSON(cl_char, auto_unbox = TRUE)),
       tags$span(class = "cluster-check"),
       tags$span(
         class = "cluster-color-dot",
@@ -46,7 +45,6 @@
       tags$div(
         class = "sample-item",
         `data-sample` = s_char,
-        onclick = sprintf("selectSample(%s)", jsonlite::toJSON(s_char, auto_unbox = TRUE)),
         tags$span(class = "sample-dot"),
         tags$span(class = "sample-name", s_char),
         tags$span(
@@ -72,8 +70,10 @@
 
   # ---- Sidebar: tab-based layout ----
   sidebar_tabs <- list(
-    tags$div(class = "sidebar-tab active", id = "tab-clusters",
-             onclick = "switchTab('cluster')", "Clusters")
+    tags$button(
+      type = "button", class = "sidebar-tab active", id = "tab-clusters",
+      `data-umap-mode` = "cluster", "Cluster"
+    )
   )
   sidebar_contents <- list(
     tags$div(class = "sidebar-content", id = "sidebar-clusters",
@@ -83,8 +83,10 @@
 
   if (has_samples) {
     sidebar_tabs <- c(sidebar_tabs, list(
-      tags$div(class = "sidebar-tab", id = "tab-samples",
-               onclick = "switchTab('sample')", "Samples")
+      tags$button(
+        type = "button", class = "sidebar-tab", id = "tab-samples",
+        `data-umap-mode` = "sample", "Sample"
+      )
     ))
     sidebar_contents <- c(sidebar_contents, list(
       tags$div(class = "sidebar-content hidden", id = "sidebar-samples",

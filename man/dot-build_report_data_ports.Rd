@@ -29,7 +29,8 @@
   pca_loading_top_n,
   first_view,
   has_umap,
-  panel_js_extra
+  panel_js_extra,
+  resolution_payload = list()
 )
 }
 \value{

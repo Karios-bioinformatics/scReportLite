@@ -56,21 +56,8 @@
     df$rank[rank_order] <- seq_along(rank_order)
   }
 
-  # Top N variable for output
-  if (nrow(df) > top_n_variable) {
-    df <- with_seed(42, {
-      var_rows <- which(df$variable)
-      nonvar_rows <- which(!df$variable)
-      if (length(var_rows) > top_n_variable) {
-        var_rows <- sort(sample(var_rows, top_n_variable))
-      }
-      nv_keep <- top_n_variable - length(var_rows)
-      if (nv_keep > 0 && length(nonvar_rows) > nv_keep) {
-        nonvar_rows <- sort(sample(nonvar_rows, nv_keep))
-      }
-      df[c(var_rows, nonvar_rows), , drop = FALSE]
-    })
-  }
+  # v0.7.0 transmits every feature. top_n_variable is retained only for API
+  # compatibility; visual emphasis is controlled separately by top_n_label.
 
   # Label top N
   df$label <- FALSE

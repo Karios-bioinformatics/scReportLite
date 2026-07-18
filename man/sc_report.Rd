@@ -9,10 +9,13 @@ sc_report(
   cluster_col = "cluster",
   cell_col = "cell",
   sample_col = NULL,
+  resolution_cols = NULL,
+  active_resolution = NULL,
+  clustree_edges = NULL,
   marker_df = NULL,
   gene_expr_df = NULL,
   pca_df = NULL,
-  pca_color_by = "cluster",
+  pca_color_by = "sample",
   pca_loading_df = NULL,
   pca_loading_top_n = 10,
   qc_df = NULL,
@@ -42,6 +45,18 @@ barcodes or IDs. Default: \code{"cell"}.}
 sample / condition labels. When provided, a "Samples" section appears
 in the sidebar for per-sample highlighting. Default: \code{NULL}.}
 
+\item{resolution_cols}{Optional character vector naming alternative cluster
+assignment columns in \code{umap_df}. These populate the read-only
+resolution selector and share the same UMAP coordinates.}
+
+\item{active_resolution}{Optional initial member of
+\code{resolution_cols}. Defaults to the first naturally sorted member.}
+
+\item{clustree_edges}{Optional data.frame describing cross-resolution edges.
+Supported columns are \code{source_resolution}, \code{source_cluster},
+\code{target_resolution}, \code{target_cluster}, and optional
+\code{count}.}
+
 \item{marker_df}{Optional data.frame of marker gene results.
 Must contain columns: \code{cluster}, \code{gene},
 \code{avg_log2FC}, \code{p_val_adj}. If \code{NULL}, the marker
@@ -58,14 +73,14 @@ Default: \code{NULL}.}
 cell and cluster columns plus at least two columns named \code{PC_1},
 \code{PC_2}, and so on.}
 
-\item{pca_color_by}{Initial PCA grouping column. Defaults to
-\code{"cluster"}; when unavailable, the cluster column is used.}
+\item{pca_color_by}{Initial PCA grouping mode. Defaults to
+\code{"sample"}; when sample metadata are unavailable, cluster is used.}
 
 \item{pca_loading_df}{Optional PCA loading data.frame with columns
 \code{gene}, \code{PC}, and numeric \code{loading}.}
 
-\item{pca_loading_top_n}{Positive integer number of loading genes shown for
-each selected PC. Default: \code{10}.}
+\item{pca_loading_top_n}{Deprecated compatibility argument. v0.7.0 displays
+the complete loading table for the selected PC.}
 
 \item{qc_df}{Optional cell-level QC data.frame containing cell, sample,
 \code{nCount_RNA}, \code{nFeature_RNA}, and \code{percent.mt} columns.}
@@ -90,9 +105,8 @@ Default: \code{0.9}.}
 Used when clusters, samples, or both are selected to dim
 cells that do not match the filter. Default: \code{0.06}.}
 
-\item{marker_n_top}{Number of top marker genes to show per cluster
-(sorted by p_val_adj ascending, then |avg_log2FC| descending).
-Default: \code{20}.}
+\item{marker_n_top}{Deprecated compatibility argument. Since v0.7.0 the
+marker table retains every supplied marker row.}
 
 \item{panels}{Character vector specifying which content sections to
 include and their order. Built-in options: \code{"umap"} (interactive

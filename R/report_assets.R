@@ -68,7 +68,8 @@ report_css <- function() {
     "report_feature.css",
     "report_sidebar.css",
     "report_umap.css",
-    "report_polish.css"
+    "report_polish.css",
+    "report_v070.css"
   ))
 }
 
@@ -78,6 +79,7 @@ report_css <- function() {
 #' @keywords internal
 report_js <- function() {
   .read_report_modules("js", c(
+    "report_design.js",
     "report_core.js",
     "report_qc.js",
     "report_pca.js",

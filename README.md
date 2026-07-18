@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v0.6.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/Version-v0.7.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/Status-Active%20Development-green" alt="Status">
   <img src="https://img.shields.io/badge/Layer-scReport%20Lite-lightgrey" alt="Layer">
   <img src="https://img.shields.io/badge/Focus-Single--cell%20Reporting-purple" alt="Focus">
@@ -26,13 +26,13 @@ scReportLite does **not** replace Seurat, Scanpy, or upstream analysis workflows
 The current development version is:
 
 ```text
-scReportLite v0.6.0
+scReportLite v0.7.0
 ```
 
-This version defines the current four-axis architecture of scReportLite:
+This version defines the current five-page interactive workspace of scReportLite:
 
 ```text
-QC | FEATURE | PCA | UMAP
+PREVIEW | QC | FEATURE | PCA | UMAP
 ```
 
 The latest archived Zenodo release currently remains v0.5.0:
@@ -41,21 +41,27 @@ The latest archived Zenodo release currently remains v0.5.0:
 10.5281/zenodo.21245542
 ```
 
+The v0.6.0 modular refactor and v0.7.0 UI reconstruction are development
+milestones. The next planned unified stable release is **v1.0.0**, after
+real-data acceptance testing, package checks, documentation cleanup, and final
+API stabilization.
+
 ## Project Scope
 
-Starting from **v0.4.0**, scReportLite is organized around a four-axis report architecture:
+Starting from **v0.7.0**, scReportLite is organized as a five-page report workspace:
 
 ```text
-QC | FEATURE | PCA | UMAP
+PREVIEW | QC | FEATURE | PCA | UMAP
 ```
 
-These four directions define the core scope of scReportLite.
+These five pages define the core scope of scReportLite.
 
 ```text
+PREVIEW  → report inputs, sample/cell/cluster summaries, resolutions, and warnings
 QC       → data quality, count structure, and preprocessing-level diagnostics
-FEATURE  → feature-level diagnostics and variable/highly expressed gene inspection
-PCA      → principal component structure, loading inspection, and dimensionality diagnostics
-UMAP     → embedding exploration, cluster/sample highlighting, marker linkage, and gene expression inspection
+FEATURE  → feature relationships, variable features, and highly expressed genes
+PCA      → elbow diagnostics, PC scores, loadings, and pairwise PC exploration
+UMAP     → embedding, resolution, cluster/sample, marker, and gene-expression exploration
 ```
 
 More specialized downstream analyses are intentionally kept outside the core scope of scReportLite. Differential expression reports, volcano plots, enrichment plots, cell-cell communication, trajectory inference, spatial omics, and multi-omics modules are expected to belong to the broader **scReport ecosystem**, rather than being added directly into scReportLite.
@@ -86,8 +92,9 @@ The generated report can be opened directly in a web browser and shared without 
 
 ## Key Features
 
-### Four-axis report structure
+### Five-page report workspace
 
+- `PREVIEW` view for report-level summaries, available inputs, and warnings
 - `QC` view for quality-control diagnostics
 - `FEATURE` view for feature-level diagnostic plots
 - `PCA` view for principal component exploration
@@ -136,8 +143,8 @@ sc_report(
   marker_df = marker_df,
   gene_expr_df = gene_expr_df,
   sample_col = "sample",
-  output = "scReportLite_v060_report.html",
-  title = "scReportLite v0.6.0 report",
+  output = "scReportLite_v070_report.html",
+  title = "scReportLite v0.7.0 report",
   panels = c(
     "qc",
     "feature",
@@ -153,9 +160,9 @@ sc_report(
 
 ---
 
-## Recommended v0.6.0 Panels
+## Recommended v0.7.0 Panels
 
-For a complete v0.6.0 report, use:
+For a complete v0.7.0 report, use:
 
 ```r
 panels = c(
@@ -314,7 +321,8 @@ Required columns:
 
 `gene_expr_df` is used for UMAP gene expression colouring.
 
-For browser performance, it is recommended to provide a focused gene set, such as marker genes, rather than the full expression matrix.
+The report accepts every supplied gene column. The package does not silently
+reduce this input to a fixed Top N subset.
 
 ```r
 genes_use <- unique(marker_df$gene)
@@ -346,7 +354,7 @@ Required structure:
 
 ## Feature Diagnostics
 
-v0.4.0 introduces the first version of the `FEATURE` tab.
+The `FEATURE` page contains three responsibility-specific diagnostic views.
 
 Current modules include:
 
@@ -354,7 +362,6 @@ Current modules include:
 FeatureScatter
 Variable Features
 Highest / Top Expressed Genes
-Elbow Plot
 ```
 
 Feature Diagnostics can be prepared with:
@@ -372,11 +379,12 @@ feature_diag <- build_seurat_feature_diagnostics(
   top_n_variable = 1000,
   top_n_label = 20,
   top_n_expressed = 50,
-  max_points_per_gene = 500,
-  max_scatter_points = 20000,
   dims = 1:30
 )
 ```
+
+The v0.7.0 report contract preserves the complete supplied cell and gene-point
+payload. The report layer does not silently sample or truncate observations.
 
 Then pass the result into `sc_report()`:
 
@@ -398,7 +406,7 @@ sc_report(
     "sample_composition",
     "gene_expression"
   ),
-  output = "scReportLite_v060_report.html"
+  output = "scReportLite_v070_report.html"
 )
 ```
 
@@ -485,31 +493,19 @@ HBA / HBB hemoglobin genes
 
 Important: this panel should be based on raw counts, not normalized data, log-normalized data, scaled data, PCA embeddings, marker tables, or HVG results.
 
-### Elbow Plot
-
-The Elbow Plot panel supports PCA diagnostic inspection.
-
-Available metrics include:
-
-- Standard deviation
-- Variance explained
-- Cumulative variance explained
-
----
-
 ## PCA View
 
 The `PCA` view supports principal component exploration.
 
 Current features include:
 
-- Interactive PCA view
-- PC selector
-- Pairwise PC scatter plot
-- Single-PC score distribution
-- PC loading table
+- Separate Elbow, PC Score, and pairwise PCA subviews
+- Elbow-point inspection with standard deviation, variance explained, and cumulative variance
+- Single-PC grouped score distributions with linked loading data
+- Pairwise PC scatter exploration using two selected PCs
+- PC loading tables with positive, negative, or combined loading directions
 - Cluster or sample colouring
-- Group highlighting and reset controls
+- Group highlighting, reset controls, and resolution-aware cluster state
 
 ---
 
@@ -521,6 +517,9 @@ Current features include:
 
 - Interactive UMAP visualization
 - WebGL support for large datasets
+- Multi-resolution cluster switching
+- Resolution-aware cluster lists, cluster sizes, marker context, and gene summaries
+- Clustree-ready resolution relationship data
 - Cluster highlighting
 - Sample / condition highlighting
 - Gene expression colouring mode
@@ -550,11 +549,16 @@ In the future scReport ecosystem, these modules may be connected through a share
 
 ## UI Design
 
-v0.4.0 introduces a more unified interaction style across the report.
+v0.7.0 reconstructs the report as a unified fixed workspace.
 
 - Rounded rectangular controls
-- Consistent green active / selected states
-- Unified button, selector, tab, and list item styling
+- Main theme colour `#27D3F5` with secondary colour `#E7FAFE`
+- Consistent active, selected, warning, and empty states
+- Fixed title and top-level navigation regions
+- Dedicated left controls, centre plot, right statistics, and bottom detail regions
+- Responsive side drawers when the viewport is narrower than 1600 pixels
+- Fixed plot-linked capsule navigation for multi-plot regions
+- Frozen HSL-based group palette with deterministic shade generation
 - Reduced native browser-style controls
 - Natural sorting for numeric labels such as clusters and PCs
 
@@ -584,22 +588,25 @@ sc_report(
 
 Recommended for datasets containing more than 10,000 cells.
 
-For `gene_expr_df`, avoid embedding too many genes into the report bundle. A focused marker-gene subset is usually more practical for sharing and browser-side interaction.
+`gene_expr_df` may contain the complete set of genes required by the report.
+scReportLite does not impose an arbitrary gene-count cap. Supplying more genes
+increases the generated bundle size and browser memory requirements, so the
+choice remains explicit and belongs to the report author.
 
 Recommended strategy:
 
 ```text
-marker_df: can contain a larger marker table
-gene_expr_df: should contain a focused gene subset for expression colouring
+marker_df: may contain the complete marker table
+gene_expr_df: may contain all expression columns required by the report
 feature_diag: should contain lightweight diagnostic summaries, not full expression matrices
 ```
 
 Very large reports may generate a large HTML entry file and dependency directory. For large datasets, prefer:
 
 - WebGL rendering
-- Focused gene expression matrices
+- Explicitly selected complete gene-expression payloads
 - Pre-computed summary tables
-- Sampled scatter / outlier points where appropriate
+- Complete data ports with WebGL or pre-computed summaries where appropriate
 
 ---
 
@@ -639,35 +646,40 @@ Very large reports may generate a large HTML entry file and dependency directory
 
 ## Roadmap
 
-After v0.4.0, scReportLite development will focus on improving the four core directions rather than expanding into every downstream analysis type.
+After the v0.7.0 UI reconstruction, development will focus on real-data
+acceptance, implementation cleanup, performance, documentation, and API
+stabilization toward v1.0.0 rather than expanding into every downstream
+analysis type.
 
 ### QC
 
-- Filtering threshold previews
-- More sample-level QC summaries
-- Additional count-composition diagnostics
-- Stronger support for large datasets
+- Validate full-cell rendering and pre/post-filter state with real datasets
+- Refine threshold inspection and per-sample statistics
+- Continue large-dataset performance work without silent sampling
 
 ### Feature
 
-- More stable feature-level diagnostics
-- Improved Variable Features extraction
-- Better feature selection and labelling controls
-- Cleaner raw-count diagnostic panels
+- Validate subview state isolation and full gene payloads
+- Refine FeatureScatter metric selection and linked statistics
+- Continue accessibility and browser-interaction acceptance testing
 
 ### PCA
 
-- Improved PC-pair exploration
-- Better PC loading summaries
-- More readable explained-variance diagnostics
-- Stronger sample / cluster comparison tools
+- Validate Elbow, PC Score, and PCA pair views with real PCA payloads
+- Refine loading-table linkage and grouped score inspection
+- Verify resolution-aware cluster colouring across every applicable PCA view
 
 ### UMAP
 
-- More robust gene expression mode
-- Improved marker table linkage
-- Better sample / cluster / annotation interaction
-- More scalable large-data rendering
+- Validate resolution, cluster, sample, marker, and gene-mode state transitions
+- Complete clustree interaction acceptance with real multi-resolution data
+- Continue scalable full-cell rendering and WebGL verification
+
+### Implementation cleanup
+
+- Reduce large-file maintenance cost without changing the accepted UI contract
+- Strengthen module boundaries, data-port contracts, and regression tests
+- Run complete R package checks before the unified v1.0.0 release
 
 ### scReport ecosystem
 
@@ -686,6 +698,25 @@ scReportCore        → shared schemas, plugin protocol, and reusable UI compone
 ---
 
 ## Changelog
+
+### v0.7.0 - Unified interactive workspace
+
+v0.7.0 introduces a fixed five-page report shell:
+
+```text
+PREVIEW | QC | FEATURE | PCA | UMAP
+```
+
+- Adds a report preview dashboard for samples, cells, clusters, resolutions,
+  and input warnings.
+- Uses fixed left, centre, right, and bottom report regions with responsive
+  side drawers below 1600 pixels.
+- Keeps complete per-cell QC and feature payloads; the package does not sample
+  or truncate cells for display.
+- Separates PCA into Elbow, PC Score, and PCA pair views.
+- Adds multi-resolution cluster switching and a clustree-ready data port.
+- Uses the frozen HSL group palette and natural label ordering.
+- Removes inline browser event handlers in favour of delegated module events.
 
 ### v0.6.0 - Modular report framework
 
@@ -800,7 +831,9 @@ Major changes:
 If you use scReportLite in research projects, please cite:
 
 The citation below refers to the latest archived Zenodo release (v0.5.0).
-It should be updated when v0.6.0 is archived.
+The v0.6.0 and v0.7.0 milestones are not separate archived releases; the
+citation and archived artifact will be updated with the planned unified v1.0.0
+release.
 
 > Park, K. K. (2026).  
 > scReportLite v0.5.0.

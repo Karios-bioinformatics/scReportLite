@@ -68,11 +68,8 @@
     }
   }
 
-  # Deterministic sampling for large datasets
-  if (nrow(df) > max_scatter_points) {
-    keep <- with_seed(42, sort(sample(seq_len(nrow(df)), max_scatter_points)))
-    df <- df[keep, , drop = FALSE]
-  }
+  # v0.7.0 keeps every cell. Rendering may use WebGL, but the payload is never
+  # sampled or truncated.
 
   # Determine default axes
   numeric_cols <- names(df)[sapply(df, is.numeric)]

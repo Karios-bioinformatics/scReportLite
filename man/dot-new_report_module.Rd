@@ -28,7 +28,7 @@
 
 \item{layout_class}{HTML class for the module's slot layout.}
 
-\item{slots}{Named list containing any of left, centre, and right tags.}
+\item{slots}{Named list containing any of left, centre, right, and bottom tags.}
 
 \item{style}{Optional inline style for the module container.}
 }
@@ -37,7 +37,7 @@ A report module specification.
 }
 \description{
 A report module owns its view metadata and the tags that dock into the
-framework's left, centre, and right slots. The framework only decides which
+framework's left, centre, right, and bottom slots. The framework only decides which
 modules are available, renders their tabs, and mounts their containers.
 }
 \keyword{internal}

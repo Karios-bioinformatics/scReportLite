@@ -278,38 +278,65 @@ natural_sort <- function(x) {
 
 #' Generate a cluster-color mapping
 #'
-#' Creates a named vector mapping cluster IDs to hex color codes using
-#' a 32-color qualitative palette optimized for distinguishability on white
-#' backgrounds. Colors are recycled with a warning if cluster count exceeds
-#' palette size.
+#' Creates a named vector mapping naturally sorted group IDs to the frozen
+#' v0.7.0 HSL shade-400 palette. Integer hues are distributed evenly around
+#' the colour wheel.
 #'
 #' @param clusters Character vector of unique cluster identifiers
-#' @return Named character vector of hex colors
+#' @return Named character vector of CSS HSL colors
 #'
 #' @keywords internal
 cluster_color_map <- function(clusters) {
   # 32-color qualitative palette — saturated, wide hue spread,
   # tested for pairwise distinguishability on white background.
-  palette <- c(
-    "#E6194B", "#3CB44B", "#FFE119", "#0082C8", "#F58231", "#911EB4",
-    "#46F0F0", "#F032E6", "#BCF60C", "#E6BEFF", "#008080", "#A52A2A",
-    "#AA6E28", "#800000", "#22B14C", "#808000", "#000080", "#808080",
-    "#DC143C", "#0A751C", "#FF6600", "#6200EA", "#B8860B", "#00CED1",
-    "#6A1B9A", "#9E9D24", "#E91E63", "#0288D1", "#388E3C", "#D81B60",
-    "#8D6E63", "#7C4DFF"
-  )
-
+  clusters <- natural_sort(unique(as.character(clusters)))
   n <- length(clusters)
-  if (n > length(palette)) {
+  if (n == 0L) return(stats::setNames(character(), character()))
+  if (n > 360L) {
     warning(
-      "Number of clusters (", n, ") exceeds palette size (",
-      length(palette), "). Colors will be recycled.",
+      "Number of groups (", n, ") exceeds the 360 integer hue positions. ",
+      "Some generated colours may be identical.",
       call. = FALSE
     )
   }
-  colors <- rep(palette, length.out = n)
+  hues <- if (n == 1L) 0L else floor(360 * (seq_len(n) - 1L) / n)
+  colors <- sprintf("hsl(%d 100%% 59%%)", hues)
   names(colors) <- as.character(clusters)
   colors
+}
+
+
+#' Generate the frozen v0.7.0 HSL shade scale
+#'
+#' @param hue Integer hue from 0 to 359.
+#' @param saturation Saturation percentage. Built-in colours use 100.
+#' @param alpha Optional alpha channel from 0 to 1.
+#' @return Named character vector of CSS HSL colours.
+#' @keywords internal
+hsl_shade_scale <- function(hue, saturation = 100, alpha = NULL) {
+  hue <- floor(as.numeric(hue)[1L]) %% 360
+  saturation <- max(0, min(100, as.numeric(saturation)[1L]))
+  levels <- c(
+    `50` = 95, `100` = 86, `200` = 77, `300` = 68, `400` = 59,
+    `500` = 50, `600` = 41, `700` = 32, `800` = 23,
+    `900` = 14, `950` = 5
+  )
+  out <- if (is.null(alpha)) {
+    sprintf("hsl(%d %g%% %g%%)", hue, saturation, levels)
+  } else {
+    alpha <- max(0, min(1, as.numeric(alpha)[1L]))
+    sprintf("hsl(%d %g%% %g%% / %g)", hue, saturation, levels, alpha)
+  }
+  stats::setNames(out, names(levels))
+}
+
+#' Escape text before inserting it into report HTML
+#'
+#' @param x Values used in an HTML text node.
+#' @return Escaped character vector.
+#' @keywords internal
+html_escape <- function(x) {
+  as.character(htmltools::htmlEscape(as.character(x), attribute = FALSE))
 }
 
 

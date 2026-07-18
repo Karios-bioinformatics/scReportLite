@@ -20,6 +20,15 @@
 #' @param sample_col Optional name of the column in \code{umap_df} containing
 #'   sample / condition labels. When provided, a "Samples" section appears
 #'   in the sidebar for per-sample highlighting. Default: \code{NULL}.
+#' @param resolution_cols Optional character vector naming alternative cluster
+#'   assignment columns in \code{umap_df}. These populate the read-only
+#'   resolution selector and share the same UMAP coordinates.
+#' @param active_resolution Optional initial member of
+#'   \code{resolution_cols}. Defaults to the first naturally sorted member.
+#' @param clustree_edges Optional data.frame describing cross-resolution edges.
+#'   Supported columns are \code{source_resolution}, \code{source_cluster},
+#'   \code{target_resolution}, \code{target_cluster}, and optional
+#'   \code{count}.
 #' @param marker_df Optional data.frame of marker gene results.
 #'   Must contain columns: \code{cluster}, \code{gene},
 #'   \code{avg_log2FC}, \code{p_val_adj}. If \code{NULL}, the marker
@@ -33,12 +42,12 @@
 #' @param pca_df Optional cell-level PCA data.frame containing the configured
 #'   cell and cluster columns plus at least two columns named \code{PC_1},
 #'   \code{PC_2}, and so on.
-#' @param pca_color_by Initial PCA grouping column. Defaults to
-#'   \code{"cluster"}; when unavailable, the cluster column is used.
+#' @param pca_color_by Initial PCA grouping mode. Defaults to
+#'   \code{"sample"}; when sample metadata are unavailable, cluster is used.
 #' @param pca_loading_df Optional PCA loading data.frame with columns
 #'   \code{gene}, \code{PC}, and numeric \code{loading}.
-#' @param pca_loading_top_n Positive integer number of loading genes shown for
-#'   each selected PC. Default: \code{10}.
+#' @param pca_loading_top_n Deprecated compatibility argument. v0.7.0 displays
+#'   the complete loading table for the selected PC.
 #' @param qc_df Optional cell-level QC data.frame containing cell, sample,
 #'   \code{nCount_RNA}, \code{nFeature_RNA}, and \code{percent.mt} columns.
 #' @param feature_diag Optional diagnostics list produced by
@@ -55,9 +64,8 @@
 #' @param dim_opacity Opacity for non-highlighted points (0-1).
 #'   Used when clusters, samples, or both are selected to dim
 #'   cells that do not match the filter. Default: \code{0.06}.
-#' @param marker_n_top Number of top marker genes to show per cluster
-#'   (sorted by p_val_adj ascending, then |avg_log2FC| descending).
-#'   Default: \code{20}.
+#' @param marker_n_top Deprecated compatibility argument. Since v0.7.0 the
+#'   marker table retains every supplied marker row.
 #' @param panels Character vector specifying which content sections to
 #'   include and their order. Built-in options: \code{"umap"} (interactive
 #'   UMAP plot), \code{"marker_table"} (marker gene table). Additional
@@ -93,10 +101,13 @@ sc_report <- function(umap_df = NULL,
                        cluster_col   = "cluster",
                        cell_col      = "cell",
                        sample_col    = NULL,
+                       resolution_cols = NULL,
+                       active_resolution = NULL,
+                       clustree_edges = NULL,
                        marker_df     = NULL,
                        gene_expr_df  = NULL,
                        pca_df        = NULL,
-                       pca_color_by  = "cluster",
+                       pca_color_by  = "sample",
                        pca_loading_df = NULL,
                        pca_loading_top_n = 10,
                        qc_df         = NULL,
@@ -309,17 +320,23 @@ sc_report <- function(umap_df = NULL,
   pca_loading_json <- "[]"
   if (!is.null(pca_df) && "pca" %in% panels) {
     message("scReportLite: serializing PCA data for interactive plot...")
-    # Resolve colour mode: warn if requested column missing, fall back to cluster
-    pca_init_mode <- pca_color_by
-    if (!is.null(pca_color_by) && !pca_color_by %in% colnames(pca_df)) {
+    pca_has_sample <- !is.null(sample_col) && sample_col %in% colnames(pca_df)
+    # The browser contract uses semantic modes ("sample" or "cluster"), while
+    # callers may still pass the underlying metadata column for compatibility.
+    if (identical(pca_color_by, "sample") ||
+        (!is.null(sample_col) && identical(pca_color_by, sample_col))) {
+      pca_init_mode <- if (pca_has_sample) "sample" else "cluster"
+    } else if (identical(pca_color_by, "cluster") ||
+               identical(pca_color_by, cluster_col)) {
+      pca_init_mode <- "cluster"
+    } else {
       warning("PCA colour column '", pca_color_by,
               "' not found in pca_df. Falling back to '", cluster_col, "'.",
               call. = FALSE)
-      pca_init_mode <- cluster_col
+      pca_init_mode <- "cluster"
     }
     # Update pca_color_by with resolved value for assemble_report
     pca_color_by <- pca_init_mode
-    pca_has_sample <- !is.null(sample_col) && sample_col %in% colnames(pca_df)
 
     # Dynamically find all PC columns
     pc_cols <- grep("^PC_[0-9]+$", colnames(pca_df), value = TRUE)
@@ -457,6 +474,13 @@ sc_report <- function(umap_df = NULL,
   }
 
   message("scReportLite: assembling HTML report...")
+  resolution_payload <- .build_resolution_payload(
+    umap_df = umap_df,
+    resolution_cols = resolution_cols,
+    active_resolution = active_resolution,
+    clustree_edges = clustree_edges,
+    cell_col = cell_col
+  )
   assemble_report(
     umap_plot     = umap_plot,
     umap_df       = umap_df,
@@ -464,6 +488,7 @@ sc_report <- function(umap_df = NULL,
     cluster_col   = cluster_col,
     cell_col      = cell_col,
     sample_col    = sample_col,
+    resolution_payload = resolution_payload,
     gene_expr_df  = gene_expr_df,
     pca_df        = pca_df,
     qc_payload    = qc_payload,

@@ -34,6 +34,9 @@ function switchTab(mode) {
   applyHighlight();
   updateMarkerPanel();
   updatePanelVisibility();
+  if (window.SRDesign && typeof window.SRDesign.updateUmapRight === "function") {
+    window.SRDesign.updateUmapRight(mode);
+  }
 }
 
 function updatePanelVisibility() {
@@ -162,6 +165,34 @@ function updateGeneSummary(geneName) {
   var sum = allVals.reduce(function(a,b){return a+b;}, 0);
   var mean = (sum / nTotal).toFixed(4);
   var maxV = Math.max.apply(null, allVals).toFixed(4);
+  var resolutionPayload = window._SR_RESOLUTION_DATA || {};
+  var activeResolution = resolutionPayload.resolutions &&
+    resolutionPayload.resolutions[resolutionPayload.active];
+  var assignments = activeResolution && activeResolution.assignments ?
+    activeResolution.assignments : {};
+  var clusterStats = {};
+  Object.keys(assignments).forEach(function(cell) {
+    var cluster = String(assignments[cell]);
+    if (!clusterStats[cluster]) {
+      clusterStats[cluster] = { total: 0, expressing: 0, sum: 0 };
+    }
+    var value = Number(values[cell] || 0);
+    clusterStats[cluster].total += 1;
+    clusterStats[cluster].sum += value;
+    if (value > 0) clusterStats[cluster].expressing += 1;
+  });
+  var clusterRows = Object.keys(clusterStats)
+    .sort(window._SR_naturalCompare)
+    .map(function(cluster) {
+      var stat = clusterStats[cluster];
+      var clusterPct = stat.total ?
+        (stat.expressing / stat.total * 100).toFixed(1) : "0.0";
+      var clusterMean = stat.total ?
+        (stat.sum / stat.total).toFixed(4) : "0.0000";
+      return "<tr><td>Cluster " + escHtml(cluster) + "</td><td>" +
+        stat.expressing + " / " + stat.total + " (" + clusterPct +
+        "%)</td><td>" + clusterMean + "</td></tr>";
+    }).join("");
 
   body.innerHTML =
     "<div style=\"padding:4px 0;\">" +
@@ -172,7 +203,15 @@ function updateGeneSummary(geneName) {
     "<td>" + nExpr + " / " + nTotal + " (" + pct + "%)</td></tr>" +
     "<tr><td style=\"color:#636e72;\">Mean expression</td><td>" + mean + "</td></tr>" +
     "<tr><td style=\"color:#636e72;\">Max expression</td><td>" + maxV + "</td></tr>" +
-    "</table></div>";
+    "</table>" +
+    (clusterRows ?
+      "<div class=\"sr-gene-resolution-summary\">" +
+      "<strong>Expression by cluster · resolution " +
+      escHtml(String(resolutionPayload.active || "")) + "</strong>" +
+      "<table><thead><tr><th>Cluster</th><th>Expressing cells</th>" +
+      "<th>Mean</th></tr></thead><tbody>" + clusterRows +
+      "</tbody></table></div>" : "") +
+    "</div>";
 }
 
 function updateGeneListUI() {
@@ -510,7 +549,7 @@ function updateSidebarUI() {
     if (SELECTED_CLUSTERS.has(cl)) {
       item.classList.add("active");
       var ck = item.querySelector(".cluster-check");
-      if (ck) ck.textContent = "✓";
+      if (ck) ck.textContent = "\u2713";
     } else {
       item.classList.remove("active");
       var ck = item.querySelector(".cluster-check");
@@ -539,6 +578,17 @@ function updateMarkerTable(clusterId) {
   var container = document.getElementById("marker-table-container");
   if (!container) return;
 
+  var resolutionPayload = window._SR_RESOLUTION_DATA || {};
+  if (resolutionPayload.initialResolution &&
+      resolutionPayload.active !== resolutionPayload.initialResolution) {
+    titleEl.textContent = "Cluster " + clusterId + " \u2014 Marker data unavailable";
+    container.innerHTML =
+      "<p class=\"no-data\">Marker genes were not supplied for resolution " +
+      escHtml(resolutionPayload.active) +
+      ". Recalculate markers for this resolution before interpreting this table.</p>";
+    return;
+  }
+
   if (!window._MARKER_DATA || window._MARKER_DATA.length === 0) {
     titleEl.textContent = "Marker Genes";
     container.innerHTML = "<p class=\"no-data\">No marker gene data provided.</p>";
@@ -550,7 +600,7 @@ function updateMarkerTable(clusterId) {
   });
 
   if (markers.length === 0) {
-    titleEl.textContent = "Cluster " + clusterId + " — No markers available";
+    titleEl.textContent = "Cluster " + clusterId + " \u2014 No markers available";
     container.innerHTML =
       "<p class=\"no-data\">No marker genes found for cluster " +
       escHtml(clusterId) + ".</p>";
@@ -563,16 +613,13 @@ function updateMarkerTable(clusterId) {
     return Math.abs(b.avg_log2FC) - Math.abs(a.avg_log2FC);
   });
 
-  var topN = window._MARKER_NTOP || 20;
-  markers = markers.slice(0, topN);
-
   var selInfo = "";
   if (SELECTED_CLUSTERS.size > 1) {
     selInfo = "  (" + SELECTED_CLUSTERS.size + " clusters selected)";
   }
 
   titleEl.textContent = "Cluster " + clusterId +
-    " — Top " + markers.length + " Marker Genes" + selInfo;
+    " \u2014 Top " + markers.length + " Marker Genes" + selInfo;
 
   var html = "<table class=\"marker-table\"><thead><tr>" +
     "<th>#</th><th>Gene</th><th>avg_log2FC</th><th>p_val_adj</th>" +

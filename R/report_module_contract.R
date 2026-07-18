@@ -3,7 +3,7 @@
 #' Create a report view module
 #'
 #' A report module owns its view metadata and the tags that dock into the
-#' framework's left, centre, and right slots. The framework only decides which
+#' framework's left, centre, right, and bottom slots. The framework only decides which
 #' modules are available, renders their tabs, and mounts their containers.
 #'
 #' @param id Stable module identifier.
@@ -12,7 +12,7 @@
 #' @param container_id HTML id for the module view.
 #' @param container_class HTML class for the module view.
 #' @param layout_class HTML class for the module's slot layout.
-#' @param slots Named list containing any of left, centre, and right tags.
+#' @param slots Named list containing any of left, centre, right, and bottom tags.
 #' @param style Optional inline style for the module container.
 #' @return A report module specification.
 #' @keywords internal
@@ -24,7 +24,7 @@
     is.character(label), length(label) == 1L, nzchar(label),
     is.logical(available), length(available) == 1L, !is.na(available),
     is.list(slots),
-    all(names(slots) %in% c("left", "centre", "right"))
+    all(names(slots) %in% c("left", "centre", "right", "bottom"))
   )
 
   structure(
@@ -52,6 +52,17 @@
   if (!isTRUE(module$available)) return(NULL)
 
   slot_tags <- Filter(Negate(is.null), module$slots)
+  slot_tags <- Map(
+    function(tag, slot_name) {
+      tags$section(
+        class = paste("sr-analysis-region", paste0("sr-region-", slot_name)),
+        `data-region` = slot_name,
+        tag
+      )
+    },
+    slot_tags,
+    names(slot_tags)
+  )
   contents <- if (is.null(module$layout_class)) {
     unname(slot_tags)
   } else {
@@ -93,14 +104,14 @@
   tabs <- lapply(
     Filter(function(module) isTRUE(module$available), modules),
     function(module) {
-      tags$div(
+      tags$button(
+        type = "button",
         class = paste0(
           "view-tab",
           if (identical(first_view, module$id)) " active" else ""
         ),
         id = module$tab_id,
         `data-report-view` = module$id,
-        onclick = sprintf("switchView('%s')", module$id),
         module$label
       )
     }

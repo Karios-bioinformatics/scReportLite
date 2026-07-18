@@ -1,7 +1,4 @@
-# Test: build_qc_payload() sampling with max_points_per_group
-#
-# Regression test for a bug where the every-k downsampling code referenced
-# the wrong parameter name (max_points_per_gene instead of max_points_per_group).
+# Test: build_qc_payload() preserves every QC cell
 
 build_qc_payload <- getFromNamespace("build_qc_payload", "scReportLite")
 cluster_color_map <- getFromNamespace("cluster_color_map", "scReportLite")
@@ -20,7 +17,7 @@ make_qc <- function(n_ctrl, n_treat) {
   )
 }
 
-test_that("build_qc_payload handles sample larger than max_points_per_group", {
+test_that("build_qc_payload ignores the legacy cap and keeps every cell", {
   df <- make_qc(n_ctrl = 2000, n_treat = 50)
   max_pts <- 30
 
@@ -29,14 +26,8 @@ test_that("build_qc_payload handles sample larger than max_points_per_group", {
   expect_type(payload, "list")
   expect_true(all(c("samples", "sample_colors", "cells", "point_indices") %in% names(payload)))
 
-  n_idx <- length(payload$point_indices)
-  expected_min <- 60
-  expected_max <- 100
-  expect_true(n_idx >= expected_min && n_idx <= expected_max,
-    info = sprintf("point_indices length %d not in [%d, %d]", n_idx, expected_min, expected_max))
-
-  expect_true(all(payload$point_indices >= 0))
-  expect_true(all(payload$point_indices < nrow(df)))
+  expect_equal(length(payload$point_indices), nrow(df))
+  expect_equal(payload$point_indices, seq.int(0L, nrow(df) - 1L))
 })
 
 test_that("build_qc_payload small data (all cells fit) returns all indices", {
@@ -83,4 +74,14 @@ test_that("build_qc_payload preserves missing QC metrics", {
   expect_false(identical(payload$cells[[idx]]$nCount_RNA, 0))
   json <- jsonlite::toJSON(payload, auto_unbox = TRUE, na = "null")
   expect_match(json, '"nCount_RNA":null', fixed = TRUE)
+})
+
+test_that("build_qc_payload preserves retained and filtered cell status", {
+  df <- make_qc(1L, 1L)
+  df$retained <- c(TRUE, FALSE)
+  payload <- build_qc_payload(df)
+  testthat::expect_identical(
+    vapply(payload$cells, `[[`, character(1), "qc_status"),
+    c("retained", "filtered")
+  )
 })

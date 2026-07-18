@@ -20,9 +20,11 @@
 #' @param cluster_col Name of the cluster column (default "cluster").
 #' @param cell_col Name of the cell/barcode column.
 #' @param sample_col Name of the sample column.
-#' @param max_points_per_group Cap on jitter-point rows per sample×metric group
-#'   sent to the browser.  Violin KDE uses full data; only the overlay points
-#'   are sampled.  Default 1000.
+#' @param max_points_per_group Deprecated compatibility argument. Since v0.7.0,
+#'   every QC cell is sent to the browser and no point sampling is performed.
+#' @param qc_status_col Optional column identifying whether a cell was retained
+#'   or filtered. When omitted, \code{qc_status}, \code{filter_status}, or
+#'   \code{retained} is detected when present.
 #' @return A named list with elements \code{samples}, \code{sample_colors},
 #'   \code{cells} (a list of per-cell records).
 #' @keywords internal
@@ -30,7 +32,8 @@ build_qc_payload <- function(qc_df,
                               cluster_col = "cluster",
                               cell_col    = "cell",
                               sample_col  = "sample",
-                              max_points_per_group = 1000) {
+                              max_points_per_group = 1000,
+                              qc_status_col = NULL) {
 
   required <- c(cell_col, sample_col, "nCount_RNA", "nFeature_RNA", "percent.mt")
   missing <- setdiff(required, colnames(qc_df))
@@ -39,6 +42,16 @@ build_qc_payload <- function(qc_df,
          call. = FALSE)
 
   has_cluster <- cluster_col %in% colnames(qc_df)
+  if (is.null(qc_status_col)) {
+    candidates <- intersect(
+      c("qc_status", "filter_status", "retained"),
+      colnames(qc_df)
+    )
+    qc_status_col <- if (length(candidates)) candidates[[1L]] else NULL
+  }
+  if (!is.null(qc_status_col) && !qc_status_col %in% colnames(qc_df)) {
+    stop("qc_status_col not found in qc_df: ", qc_status_col, call. = FALSE)
+  }
   samples     <- natural_sort(unique(qc_df[[sample_col]]))
   sample_cols <- cluster_color_map(samples)
   # force plain character keys / values
@@ -76,6 +89,15 @@ build_qc_payload <- function(qc_df,
       )
       if (has_cluster)
         rec$cluster <- as.character(df[[cluster_col]][i])
+      raw_status <- if (is.null(qc_status_col)) "retained" else df[[qc_status_col]][i]
+      retained <- if (is.logical(raw_status)) {
+        isTRUE(raw_status)
+      } else {
+        tolower(as.character(raw_status)) %in% c(
+          "retained", "pass", "passed", "keep", "kept", "true", "1"
+        )
+      }
+      rec$qc_status <- if (retained) "retained" else "filtered"
       cells[[i]] <- rec
     }
     cells
@@ -83,22 +105,8 @@ build_qc_payload <- function(qc_df,
 
   cells <- build_cells(qc_df)
 
-  # ---- Point-overlay sampling (keep full data for violins, sample points) ----
-  point_indices <- integer(0)
-  for (s in samples) {
-    idx_s <- which(qc_df[[sample_col]] == s)
-    n_s   <- length(idx_s)
-    if (n_s <= max_points_per_group) {
-      point_indices <- c(point_indices, idx_s)
-    } else {
-      # Deterministic, evenly spaced sample with the requested exact cap.
-      positions <- unique(as.integer(round(seq(
-        1, n_s, length.out = max_points_per_group
-      ))))
-      keep <- idx_s[positions]
-      point_indices <- c(point_indices, keep)
-    }
-  }
+  # v0.7.0 never samples QC cells: every point remains available for decisions.
+  point_indices <- seq_len(nrow(qc_df))
 
   list(
     samples       = as.character(samples),

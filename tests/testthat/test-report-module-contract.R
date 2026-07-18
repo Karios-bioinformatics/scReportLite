@@ -45,6 +45,7 @@ testthat::test_that("report views preserve their module and slot contract", {
   html <- paste(readLines(output, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
 
   view_ids <- c(
+    "sr-view-preview",
     "sr-view-plot",
     "sr-view-feature",
     "sr-view-pca",
@@ -72,7 +73,8 @@ testthat::test_that("report views preserve their module and slot contract", {
   )))
 
   tab_positions <- vapply(
-    c("view-tab-plot", "view-tab-feature", "view-tab-pca", "view-tab-umap"),
+    c("view-tab-preview", "view-tab-plot", "view-tab-feature",
+      "view-tab-pca", "view-tab-umap"),
     function(id) regexpr(id, html, fixed = TRUE)[[1]],
     integer(1)
   )
@@ -109,7 +111,7 @@ testthat::test_that("top-level module order follows panels order", {
   )
   expect_equal(
     vapply(modules, `[[`, character(1), "id"),
-    c("umap", "pca", "plot", "feature")
+    c("preview", "umap", "pca", "plot", "feature")
   )
   expect_equal(modules[[1]]$style, "")
   expect_true(all(vapply(modules[-1], `[[`, character(1), "style") == "display:none;"))
@@ -140,5 +142,8 @@ testthat::test_that("new top-level modules can register without assembly edits",
       panel_sections_html = list()
     )
   )
-  expect_equal(vapply(modules, `[[`, character(1), "id"), c("custom", "plot"))
+  expect_equal(
+    vapply(modules, `[[`, character(1), "id"),
+    c("preview", "custom", "plot")
+  )
 })

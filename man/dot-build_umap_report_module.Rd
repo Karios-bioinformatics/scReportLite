@@ -9,7 +9,8 @@
   hidden,
   sidebar_html,
   umap_tags,
-  panel_sections_html
+  panel_sections_html,
+  resolution_payload = list()
 )
 }
 \arguments{

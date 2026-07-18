@@ -10,12 +10,11 @@ cluster_color_map(clusters)
 \item{clusters}{Character vector of unique cluster identifiers}
 }
 \value{
-Named character vector of hex colors
+Named character vector of CSS HSL colors
 }
 \description{
-Creates a named vector mapping cluster IDs to hex color codes using
-a 32-color qualitative palette optimized for distinguishability on white
-backgrounds. Colors are recycled with a warning if cluster count exceeds
-palette size.
+Creates a named vector mapping naturally sorted group IDs to the frozen
+v0.7.0 HSL shade-400 palette. Integer hues are distributed evenly around
+the colour wheel.
 }
 \keyword{internal}

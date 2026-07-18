@@ -4,7 +4,7 @@
 # build_seurat_feature_diagnostics() extracts lightweight diagnostic data
 # from a Seurat object so it can be passed to sc_report(..., feature_diag = ...).
 # No full expression matrices are returned - only summary statistics and
-# sampled points suitable for interactive HTML rendering.
+# complete cell-level points suitable for interactive HTML rendering.
 
 #' Build Seurat feature diagnostics payload
 #'
@@ -29,10 +29,10 @@
 #'   frontend.  Default 20.
 #' @param top_n_expressed Number of top expressed genes to include in the
 #'   boxplot summary.  Default 50.
-#' @param max_points_per_gene Max jitter points per gene for Top Expressed.
-#'   Default 1000.
-#' @param max_scatter_points Max cells in FeatureScatter output.  Larger
-#'   datasets are deterministically sampled.  Default 50000.
+#' @param max_points_per_gene Deprecated compatibility argument. v0.7.0 keeps
+#'   every Top Expressed point.
+#' @param max_scatter_points Deprecated compatibility argument. v0.7.0 keeps
+#'   every FeatureScatter cell.
 #' @param dims Dimensions to check for PCA (used for fallback and ElbowPlot).
 #'   Default \code{1:50}.
 #' @return A list with elements \code{feature_scatter}, \code{variable_features},

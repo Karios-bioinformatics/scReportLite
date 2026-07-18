@@ -17,8 +17,10 @@
   if (has_genes) {
     gene_names <- setdiff(colnames(gene_expr_df), "cell")
     sidebar_tabs <- c(sidebar_tabs, list(
-      tags$div(class = "sidebar-tab", id = "tab-genes",
-               onclick = "switchTab('gene')", "Genes")
+      tags$button(
+        type = "button", class = "sidebar-tab", id = "tab-genes",
+        `data-umap-mode` = "gene", "Gene"
+      )
     ))
 
     # ---- Determine which gene sources are available ----
@@ -125,8 +127,7 @@
       div_attrs <- list(
         class        = "gene-item",
         `data-gene`  = g,
-        `data-source` = src_attr,
-        onclick      = sprintf("selectGene(%s)", jsonlite::toJSON(g, auto_unbox = TRUE))
+        `data-source` = src_attr
       )
       if (nzchar(cluster_attr)) {
         div_attrs[["data-clusters"]] <- cluster_attr
@@ -139,34 +140,38 @@
     source_switches <- NULL
     if (multi_source) {
       source_btns <- list(
-        tags$div(
+        tags$button(
+          type = "button",
           class = "gene-source-btn active", `data-source` = "all",
-          onclick = "switchGeneSource('all')", "All"
+          `data-gene-source` = "all", "All"
         )
       )
       if (has_marker_src) {
         source_btns <- c(source_btns, list(
-          tags$div(
+          tags$button(
+            type = "button",
             class = "gene-source-btn", `data-source` = "marker",
-            onclick = "switchGeneSource('marker')",
+            `data-gene-source` = "marker",
             paste0("Marker (", length(names(marker_gene_clusters)), ")")
           )
         ))
       }
       if (has_variable_src) {
         source_btns <- c(source_btns, list(
-          tags$div(
+          tags$button(
+            type = "button",
             class = "gene-source-btn", `data-source` = "variable",
-            onclick = "switchGeneSource('variable')",
+            `data-gene-source` = "variable",
             paste0("Variable (", length(variable_genes), ")")
           )
         ))
       }
       if (has_top_src) {
         source_btns <- c(source_btns, list(
-          tags$div(
+          tags$button(
+            type = "button",
             class = "gene-source-btn", `data-source` = "top",
-            onclick = "switchGeneSource('top')",
+            `data-gene-source` = "top",
             paste0("Top expr (", length(top_genes), ")")
           )
         ))
@@ -182,7 +187,7 @@
         id    = "gene-cluster-filter",
         tags$select(
           id = "gene-cluster-select",
-          onchange = "filterGenesByCluster(this.value)",
+          `data-gene-cluster-filter` = "true",
           c(list(tags$option(value = "all", "All clusters")),
             lapply(marker_clusters, function(cl) {
               cl_char <- as.character(cl)
@@ -205,7 +210,7 @@
       tags$div(class = "gene-search",
         tags$input(type = "text", id = "gene-search-input",
                    placeholder = "Filter genes...",
-                   oninput = "filterGenes(this.value)")
+                   `data-gene-search` = "true")
       ),
       tags$div(class = "gene-list", gene_html)
     ))

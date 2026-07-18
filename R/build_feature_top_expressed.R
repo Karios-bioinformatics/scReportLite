@@ -48,6 +48,37 @@
     return(NULL)
   }
 
+  # Stable cell metadata for the outlier detail card. Missing fields remain
+  # explicit NA values; the browser must never infer Sample or Cluster.
+  cell_meta <- tryCatch(obj[[]], error = function(e) NULL)
+  sample_values <- rep(NA_character_, n_cells)
+  cluster_values <- rep(NA_character_, n_cells)
+  if (!is.null(cell_meta)) {
+    cell_meta <- cell_meta[cell_names, , drop = FALSE]
+    sample_candidates <- c("sample", "Sample", "orig.ident", "sample_id")
+    sample_col <- sample_candidates[
+      sample_candidates %in% colnames(cell_meta)
+    ][1]
+    if (length(sample_col) == 1L && !is.na(sample_col)) {
+      sample_values <- as.character(cell_meta[[sample_col]])
+    }
+  }
+  ident_values <- tryCatch(
+    as.character(Seurat::Idents(obj)[cell_names]),
+    error = function(e) NULL
+  )
+  if (!is.null(ident_values) && length(ident_values) == n_cells) {
+    cluster_values <- ident_values
+  } else if (!is.null(cell_meta)) {
+    cluster_candidates <- c("cluster", "Cluster", "seurat_clusters")
+    cluster_col <- cluster_candidates[
+      cluster_candidates %in% colnames(cell_meta)
+    ][1]
+    if (length(cluster_col) == 1L && !is.na(cluster_col)) {
+      cluster_values <- as.character(cell_meta[[cluster_col]])
+    }
+  }
+
   # Sparse column scaling: pct[i,j] = counts[i,j] / cell_total[j] * 100
   scale_factor <- 100 / cell_total
   pct_mat <- counts %*% Matrix::Diagonal(x = scale_factor)
@@ -89,6 +120,7 @@
     upper_whisker <- if (any(v <= upper_limit))
       max(v[v <= upper_limit]) else q3
 
+    is_outlier <- v > upper_limit
     summary_list[[i]] <- data.frame(
       gene                     = g,
       rank                     = i,
@@ -100,21 +132,19 @@
       upper_whisker_percent    = round(upper_whisker, 4),
       max_percent              = round(max(v), 4),
       detection_rate           = detection_rate,
+      outlier_count             = sum(is_outlier),
       stringsAsFactors = FALSE
     )
 
-    # Outlier sampling (> upper_whisker; percent can't be < 0)
-    is_outlier <- v > upper_limit
+    # Retain every outlier (> upper_whisker; percent cannot be below zero).
     if (any(is_outlier)) {
       out_idx <- which(is_outlier)
-      n_out <- length(out_idx)
-      if (n_out > max_points_per_gene) {
-        out_idx <- with_seed(42, sort(sample(out_idx, max_points_per_gene)))
-      }
       outlier_list[[i]] <- data.frame(
         gene    = rep(g, length(out_idx)),
         percent = round(v[out_idx], 4),
         cell    = cell_names[out_idx],
+        sample  = sample_values[out_idx],
+        cluster = cluster_values[out_idx],
         stringsAsFactors = FALSE
       )
     }

@@ -9,7 +9,8 @@ build_qc_payload(
   cluster_col = "cluster",
   cell_col = "cell",
   sample_col = "sample",
-  max_points_per_group = 1000
+  max_points_per_group = 1000,
+  qc_status_col = NULL
 )
 }
 \arguments{
@@ -21,9 +22,12 @@ build_qc_payload(
 
 \item{sample_col}{Name of the sample column.}
 
-\item{max_points_per_group}{Cap on jitter-point rows per sample×metric group
-sent to the browser.  Violin KDE uses full data; only the overlay points
-are sampled.  Default 1000.}
+\item{max_points_per_group}{Deprecated compatibility argument. Since v0.7.0,
+every QC cell is sent to the browser and no point sampling is performed.}
+
+\item{qc_status_col}{Optional column identifying whether a cell was retained
+or filtered. When omitted, \code{qc_status}, \code{filter_status}, or
+\code{retained} is detected when present.}
 }
 \value{
 A named list with elements \code{samples}, \code{sample_colors},

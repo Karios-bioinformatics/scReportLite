@@ -19,6 +19,9 @@
 #' @keywords internal
 assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
                              cluster_col, cell_col, sample_col,
+                             resolution_payload = list(
+                               resolutions = list(), active = NULL, edges = list()
+                             ),
                              gene_expr_df = NULL,
                              pca_df = NULL,
                              pca_data_json = "null",
@@ -136,13 +139,37 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
   panel_js_extra  <- collect_panel_js(non_umap_panels)
   # ---- Build independently composable modules in caller-requested order ----
   report_modules <- .build_registered_report_modules(
-    panels,
+    c("preview", panels),
     list(
+      n_total = n_total,
+      n_clusters = length(clusters),
+      preview_samples = if (has_samples) {
+        natural_sort(unique(as.character(umap_df[[sample_col]])))
+      } else if (!is.null(qc_payload$samples)) {
+        natural_sort(as.character(qc_payload$samples))
+      } else {
+        character()
+      },
+      preview_resolutions = if (length(resolution_payload$resolutions)) {
+        lapply(resolution_payload$resolutions, function(item) {
+          list(name = item$label %||% item$id, clusters = length(item$clusters))
+        })
+      } else {
+        list(list(name = "Active", clusters = length(clusters)))
+      },
+      preview_warnings = c(
+        if (is.null(qc_payload)) "QC data were not supplied." else character(),
+        if (is.null(feature_diag)) "Feature diagnostics were not supplied." else character(),
+        if (is.null(pca_df)) "PCA data were not supplied." else character(),
+        if (is.null(umap_df)) "UMAP data were not supplied." else character(),
+        if (is.null(marker_df) || nrow(marker_df) == 0L) "Marker results were not supplied." else character()
+      ),
       has_plot = has_plot,
       has_feature = has_feature,
       has_pca = has_pca,
       pca_has_sample = pca_has_sample,
       has_umap = has_umap,
+      resolution_payload = resolution_payload,
       sidebar_html = sidebar_html,
       umap_tags = umap_tags,
       panel_sections_html = panel_sections_html
@@ -177,6 +204,7 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
     first_view = first_view,
     has_umap = has_umap,
     panel_js_extra = panel_js_extra
+    , resolution_payload = resolution_payload
   )
 
 

@@ -24,6 +24,7 @@ const tabs = ids.map((id) => ({
 }));
 const nodes = views.concat(tabs);
 const document = {
+  addEventListener() {},
   querySelectorAll(selector) {
     if (selector === ".sr-report-view") return views;
     if (selector === "[data-report-view]") return tabs;
@@ -65,5 +66,13 @@ context.switchView("pca");
 assert.equal(views.find((view) => view.id === "sr-view-pca").style.display, "");
 assert.equal(tabs.find((tab) => tab.id === "view-tab-pca").classList.active, true);
 assert.equal(views.find((view) => view.id === "sr-view-plot").style.display, "none");
+
+const modebar = context._SR_standardModebarConfig();
+assert.equal(modebar.displayModeBar, true);
+assert.equal(modebar.displaylogo, false);
+assert.deepEqual(
+  Array.from(modebar.modeBarButtonsToRemove),
+  ["sendDataToCloud", "lasso2d", "select2d", "autoScale2d", "toggleSpikelines"]
+);
 
 console.log("report_core production behavior: PASS");

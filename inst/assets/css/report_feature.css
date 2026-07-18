@@ -78,7 +78,7 @@
 #feature-active-canvas {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }

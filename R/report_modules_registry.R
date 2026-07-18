@@ -17,14 +17,25 @@ register_report_module <- function(id, panel_names, build) {
 }
 
 .ensure_builtin_report_modules <- function() {
+  register_report_module("preview", "preview", function(x) {
+    build_preview_module(x)
+  })
   register_report_module("plot", "qc", function(x) {
     .build_qc_report_module(x$has_plot)
   })
   register_report_module("feature", "feature", function(x) {
-    .build_feature_report_module(x$has_feature, active = FALSE)
+    .build_feature_report_module(
+      x$has_feature,
+      active = FALSE,
+      resolution_payload = x$resolution_payload
+    )
   })
   register_report_module("pca", "pca", function(x) {
-    .build_pca_report_module(x$has_pca, x$pca_has_sample)
+    .build_pca_report_module(
+      x$has_pca,
+      x$pca_has_sample,
+      resolution_payload = x$resolution_payload
+    )
   })
   register_report_module(
     "umap",
@@ -35,7 +46,8 @@ register_report_module <- function(id, panel_names, build) {
         hidden = TRUE,
         sidebar_html = x$sidebar_html,
         umap_tags = x$umap_tags,
-        panel_sections_html = x$panel_sections_html
+        panel_sections_html = x$panel_sections_html,
+        resolution_payload = x$resolution_payload
       )
     }
   )
@@ -44,7 +56,7 @@ register_report_module <- function(id, panel_names, build) {
 
 .build_registered_report_modules <- function(panels, context) {
   .ensure_builtin_report_modules()
-  module_ids <- character()
+  module_ids <- "preview"
   definitions <- as.list.environment(.srl_report_modules, all.names = TRUE)
   for (panel in panels) {
     matched <- names(Filter(
