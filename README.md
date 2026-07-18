@@ -61,7 +61,7 @@ PREVIEW  → report inputs, sample/cell/cluster summaries, resolutions, and warn
 QC       → data quality, count structure, and preprocessing-level diagnostics
 FEATURE  → feature relationships, variable features, and highly expressed genes
 PCA      → elbow diagnostics, PC scores, loadings, and pairwise PC exploration
-UMAP     → embedding, resolution, cluster/sample, marker, and gene-expression exploration
+UMAP     → embedding, cluster/sample, marker, and gene-expression exploration
 ```
 
 More specialized downstream analyses are intentionally kept outside the core scope of scReportLite. Differential expression reports, volcano plots, enrichment plots, cell-cell communication, trajectory inference, spatial omics, and multi-omics modules are expected to belong to the broader **scReport ecosystem**, rather than being added directly into scReportLite.
@@ -505,7 +505,7 @@ Current features include:
 - Pairwise PC scatter exploration using two selected PCs
 - PC loading tables with positive, negative, or combined loading directions
 - Cluster or sample colouring
-- Group highlighting, reset controls, and resolution-aware cluster state
+- Group highlighting, reset controls, and `cluster_col`-backed cluster state
 
 ---
 
@@ -666,7 +666,7 @@ analysis type.
 
 - Validate Elbow, PC Score, and PCA pair views with real PCA payloads
 - Refine loading-table linkage and grouped score inspection
-- Verify resolution-aware cluster colouring across every applicable PCA view
+- Verify `cluster_col`-backed cluster colouring across every applicable PCA view
 
 ### UMAP
 
