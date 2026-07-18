@@ -9,34 +9,8 @@
 #' @param panel_sections_html Additional content panels.
 #' @return A report module specification.
 #' @keywords internal
-.build_resolution_capsule <- function(resolution_payload, capsule_id) {
-  resolution_items <- lapply(
-    resolution_payload$resolutions %||% list(),
-    function(item) {
-      tags$button(
-        type = "button",
-        class = paste(
-          "sr-resolution-dot",
-          if (identical(item$id, resolution_payload$active)) "active" else ""
-        ),
-        `data-resolution` = item$id,
-        title = item$id,
-        item$label %||% item$id
-      )
-    }
-  )
-  if (!length(resolution_items)) return(NULL)
-  tags$div(
-    class = "sr-resolution-capsule",
-    id = capsule_id,
-    `data-resolution-context` = capsule_id,
-    resolution_items
-  )
-}
-
 .build_umap_report_module <- function(available, hidden, sidebar_html,
-                                      umap_tags, panel_sections_html,
-                                      resolution_payload = list()) {
+                                      umap_tags, panel_sections_html) {
   .new_report_module(
     id = "umap",
     label = "UMAP",
@@ -48,10 +22,6 @@
     slots = list(
       left = tags$div(class = "sidebar", sidebar_html),
       centre = tags$div(class = "content-area",
-        .build_resolution_capsule(
-          resolution_payload,
-          "sr-resolution-capsule-umap"
-        ),
         list(
           tags$div(class = "umap-section", id = "umap-section",
             tags$div(class = "section-title",

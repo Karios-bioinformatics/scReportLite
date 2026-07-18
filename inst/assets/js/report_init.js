@@ -10,12 +10,13 @@ onPlotlyReady(function(gd) {
     return t.marker ? t.marker.color : null;
   });
 
-  // ---- Build _TRACE_CELLS and _CELL_SAMPLE from customdata ----
+  // ---- Build immutable cell metadata from the cluster_col-backed customdata ----
   // customdata[i][j] = [cell_id, cluster, sample, UMAP_1, UMAP_2]
   _TRACE_CELLS = gd.data.map(function(trace) {
     var cd = trace.customdata || [];
     return cd.map(function(row) {
       var cid = String(row[0]);
+      _CELL_CLUSTER[cid] = String(row[1] || "");
       _CELL_SAMPLE[cid] = String(row[2] || "");
       return cid;
     });

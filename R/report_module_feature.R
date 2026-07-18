@@ -6,8 +6,7 @@
 #' @param active Whether this is the initially active module.
 #' @return A report module specification.
 #' @keywords internal
-.build_feature_report_module <- function(available, active,
-                                         resolution_payload = list()) {
+.build_feature_report_module <- function(available, active) {
   .new_report_module(
     id = "feature",
     label = "Feature",
@@ -38,10 +37,6 @@
         tags$div(id = "feature-controls-dynamic")
       ),
       centre = tags$div(class = "feature-main", id = "feature-main",
-        .build_resolution_capsule(
-          resolution_payload,
-          "sr-resolution-capsule-feature"
-        ),
         tags$div(id = "feature-active-canvas",
           style = "flex:1;min-height:0;display:flex;flex-direction:column;")
       ),

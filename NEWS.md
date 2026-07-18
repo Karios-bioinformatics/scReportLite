@@ -21,10 +21,10 @@
 
 ## Multi-resolution clustering
 
-- Added `resolution_cols`, `active_resolution`, and `clustree_edges` report
-  inputs.
-- Added resolution switching with state clearing and a clustree-ready overlay
-  data port.
+- Kept `resolution_cols`, `active_resolution`, and `clustree_edges` report
+  inputs for compatibility and read-only Preview summaries.
+- Deferred interactive resolution switching and clustree rendering to a later
+  release; all report plots and cluster statistics use `cluster_col`.
 
 ## Colour system
 

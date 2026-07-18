@@ -13,8 +13,7 @@
                                      has_pca, pca_data_json, pca_has_sample,
                                      pca_color_by, pca_all_pcs_json,
                                      pca_loading_json, pca_loading_top_n,
-                                     first_view, has_umap, panel_js_extra,
-                                     resolution_payload = list()) {
+                                     first_view, has_umap, panel_js_extra) {
   # Every serialized payload crosses the same HTML <script> boundary. Escape at
   # this final boundary so individual builders cannot accidentally omit it.
   marker_json <- .escape_json_for_script(marker_json)
@@ -45,13 +44,6 @@
     tags$script(htmltools::HTML(sprintf(
       "window._CLUSTER_COLORS = %s;",
       cluster_colors_json
-    ))),
-    tags$script(htmltools::HTML(paste0(
-      "window._SR_RESOLUTION_DATA = ",
-      .escape_json_for_script(jsonlite::toJSON(
-        resolution_payload, auto_unbox = TRUE, dataframe = "rows", na = "null"
-      )),
-      ";"
     ))),
     tags$script(htmltools::HTML(sprintf(
       "window._GENE_EXPR_DATA = %s;",

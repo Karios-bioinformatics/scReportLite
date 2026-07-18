@@ -517,9 +517,8 @@ Current features include:
 
 - Interactive UMAP visualization
 - WebGL support for large datasets
-- Multi-resolution cluster switching
-- Resolution-aware cluster lists, cluster sizes, marker context, and gene summaries
-- Clustree-ready resolution relationship data
+- Read-only multi-resolution counts in the Preview overview
+- Cluster lists, sizes, marker context, and gene summaries driven by `cluster_col`
 - Cluster highlighting
 - Sample / condition highlighting
 - Gene expression colouring mode
@@ -671,8 +670,8 @@ analysis type.
 
 ### UMAP
 
-- Validate resolution, cluster, sample, marker, and gene-mode state transitions
-- Complete clustree interaction acceptance with real multi-resolution data
+- Validate cluster, sample, marker, and gene-mode state transitions
+- Revisit multi-resolution interaction and clustree acceptance in a later release
 - Continue scalable full-cell rendering and WebGL verification
 
 ### Implementation cleanup
@@ -714,7 +713,7 @@ PREVIEW | QC | FEATURE | PCA | UMAP
 - Keeps complete per-cell QC and feature payloads; the package does not sample
   or truncate cells for display.
 - Separates PCA into Elbow, PC Score, and PCA pair views.
-- Adds multi-resolution cluster switching and a clustree-ready data port.
+- Keeps multi-resolution data read-only in Preview; report plots use `cluster_col`.
 - Uses the frozen HSL group palette and natural label ordering.
 - Removes inline browser event handlers in favour of delegated module events.
 

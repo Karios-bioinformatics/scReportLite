@@ -20,49 +20,22 @@ testthat::test_that("v0.7.0 HSL palette is natural, stable, and complete", {
   )
 })
 
-testthat::test_that("resolution payload retains every assignment and optional edges", {
+testthat::test_that("resolution payload is a read-only Preview summary", {
   umap <- data.frame(
     cell = c("c1", "c2", "c3"),
     res_0.2 = c("0", "0", "1"),
     res_0.4 = c("0", "1", "2"),
     check.names = FALSE,
-    stringsAsFactors = FALSE
-  )
-  edges <- data.frame(
-    source_resolution = "res_0.2",
-    source_cluster = "0",
-    target_resolution = "res_0.4",
-    target_cluster = "1",
     stringsAsFactors = FALSE
   )
   payload <- .build_resolution_payload(
     umap,
     resolution_cols = c("res_0.2", "res_0.4"),
-    active_resolution = "res_0.4",
-    clustree_edges = edges
+    active_resolution = "res_0.4"
   )
-  testthat::expect_identical(payload$active, "res_0.4")
-  testthat::expect_length(payload$resolutions$res_0.2$assignments, 3L)
-  testthat::expect_true("count" %in% names(payload$edges[[1L]]))
-})
-
-testthat::test_that("resolution payload derives consecutive clustree edges", {
-  umap <- data.frame(
-    cell = c("c1", "c2", "c3"),
-    res_0.2 = c("0", "0", "1"),
-    res_0.4 = c("0", "1", "2"),
-    check.names = FALSE,
-    stringsAsFactors = FALSE
-  )
-  payload <- .build_resolution_payload(
-    umap,
-    resolution_cols = c("res_0.2", "res_0.4")
-  )
-  testthat::expect_length(payload$edges, 3L)
-  testthat::expect_identical(
-    sort(vapply(payload$edges, `[[`, integer(1), "count")),
-    c(1L, 1L, 1L)
-  )
+  testthat::expect_identical(payload$resolutions$res_0.2$clusters, c("0", "1"))
+  testthat::expect_false("assignments" %in% names(payload$resolutions$res_0.2))
+  testthat::expect_false(any(c("active", "edges") %in% names(payload)))
 })
 
 testthat::test_that("v0.7.0 source assets use delegated events", {
@@ -358,7 +331,7 @@ testthat::test_that("interactive UI symbols use encoding-stable escapes", {
   )
 })
 
-testthat::test_that("resolution changes synchronize every cluster consumer", {
+testthat::test_that("interactive resolution switching is absent from v0.7", {
   root <- file.path(testthat::test_path(), "..", "..")
   module_paths <- file.path(
     root, "R",
@@ -378,15 +351,7 @@ testthat::test_that("resolution changes synchronize every cluster consumer", {
     paste(readLines(path, warn = FALSE, encoding = "UTF-8"),
       collapse = "\n")
   }, character(1))
-  testthat::expect_true(any(grepl(
-    "sr-resolution-capsule-feature", modules, fixed = TRUE
-  )))
-  testthat::expect_true(any(grepl(
-    "sr-resolution-capsule-pca", modules, fixed = TRUE
-  )))
-  testthat::expect_true(any(grepl(
-    "sr-resolution-capsule-umap", modules, fixed = TRUE
-  )))
+  testthat::expect_false(any(grepl("resolution-capsule", modules, fixed = TRUE)))
 
   design <- paste(readLines(design_path, warn = FALSE, encoding = "UTF-8"),
     collapse = "\n")
@@ -394,25 +359,17 @@ testthat::test_that("resolution changes synchronize every cluster consumer", {
     collapse = "\n")
   umap <- paste(readLines(umap_path, warn = FALSE, encoding = "UTF-8"),
     collapse = "\n")
-  testthat::expect_match(
-    design, "function rebuildUmapClusterSidebar", fixed = TRUE
-  )
-  testthat::expect_match(
-    design, "function syncResolutionConsumers", fixed = TRUE
-  )
-  testthat::expect_match(
-    design, "window._PCA_DATA.cluster", fixed = TRUE
-  )
-  testthat::expect_match(design, "row.cluster = String(value)", fixed = TRUE)
+  testthat::expect_false(grepl("_SR_RESOLUTION_DATA", design, fixed = TRUE))
+  testthat::expect_false(grepl("changeResolution", design, fixed = TRUE))
+  testthat::expect_false(grepl("clustree", design, ignore.case = TRUE))
+  testthat::expect_false(grepl("_FEATURE_resolutionChanged", feature, fixed = TRUE))
   testthat::expect_match(
     feature, "window._CLUSTER_COLORS[String(group)]", fixed = TRUE
   )
   testthat::expect_match(
-    umap, "Expression by cluster · resolution", fixed = TRUE
+    umap, "Expression by cluster</strong>", fixed = TRUE
   )
-  testthat::expect_match(
-    umap, "Marker data unavailable", fixed = TRUE
-  )
+  testthat::expect_false(grepl("_SR_RESOLUTION_DATA", umap, fixed = TRUE))
 })
 
 testthat::test_that("v0.7 report consumers retain cluster and colour contracts", {

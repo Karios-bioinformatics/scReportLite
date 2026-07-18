@@ -2,7 +2,7 @@
 % Please edit documentation in R/build_resolution.R
 \name{.build_resolution_payload}
 \alias{.build_resolution_payload}
-\title{Build a multi-resolution clustering payload}
+\title{Build a read-only multi-resolution summary for Preview}
 \usage{
 .build_resolution_payload(
   umap_df,
@@ -17,14 +17,14 @@
 
 \item{resolution_cols}{Character vector of clustering columns.}
 
-\item{active_resolution}{Column used as the active clustering.}
+\item{active_resolution}{Deprecated compatibility input.}
 
-\item{clustree_edges}{Optional edge table.}
+\item{clustree_edges}{Deprecated compatibility input.}
 }
 \value{
 JSON-ready list.
 }
 \description{
-Build a multi-resolution clustering payload
+Build a read-only multi-resolution summary for Preview
 }
 \keyword{internal}

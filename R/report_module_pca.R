@@ -6,8 +6,7 @@
 #' @param has_sample Whether sample colouring is available.
 #' @return A report module specification.
 #' @keywords internal
-.build_pca_report_module <- function(available, has_sample,
-                                     resolution_payload = list()) {
+.build_pca_report_module <- function(available, has_sample) {
   .new_report_module(
     id = "pca",
     label = "PCA",
@@ -57,10 +56,6 @@
         )
       ),
       centre = tags$div(class = "pca-plot-area", id = "pca-plot-area",
-        .build_resolution_capsule(
-          resolution_payload,
-          "sr-resolution-capsule-pca"
-        ),
         tags$div(class = "pca-elbow-area", id = "pca-elbow-area",
           tags$div(class = "section-title", "PCA variance overview"),
           tags$div(class = "pca-container", id = "pca-elbow-container")

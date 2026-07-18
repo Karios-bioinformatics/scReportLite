@@ -76,48 +76,6 @@ function syncModuleSwitcherMarkup() {
     .replaceAll("<span class=\"feature-nav-dot\"></span>", "");
 }
 
-function syncResolutionCapsuleMarkup() {
-  const legacyId = "sr-resolution-capsule";
-  const umapId = "sr-resolution-capsule-umap";
-  const featureId = "sr-resolution-capsule-feature";
-  const pcaId = "sr-resolution-capsule-pca";
-
-  html = html.replace(`id="${legacyId}"`, `id="${umapId}"`);
-
-  const sourceMatch = html.match(
-    /<div class="sr-resolution-capsule" id="sr-resolution-capsule-umap">[\s\S]*?<\/div>/
-  );
-  if (!sourceMatch) {
-    throw new Error("UMAP resolution capsule markup was not found");
-  }
-
-  function capsuleFor(id) {
-    return sourceMatch[0]
-      .replace(`id="${umapId}"`, `id="${id}"`)
-      .replace(/class="sr-resolution-dot active"/g, "class=\"sr-resolution-dot active\"");
-  }
-
-  if (!html.includes(`id="${featureId}"`)) {
-    const anchor = '<div class="feature-main" id="feature-main">';
-    const insertAt = html.indexOf(anchor);
-    if (insertAt < 0) throw new Error(`Feature capsule anchor not found: ${anchor}`);
-    const afterAnchor = insertAt + anchor.length;
-    html = html.slice(0, afterAnchor) +
-      `\n                ${capsuleFor(featureId)}` +
-      html.slice(afterAnchor);
-  }
-
-  if (!html.includes(`id="${pcaId}"`)) {
-    const anchor = '<div class="pca-plot-area" id="pca-plot-area">';
-    const insertAt = html.indexOf(anchor);
-    if (insertAt < 0) throw new Error(`PCA capsule anchor not found: ${anchor}`);
-    const afterAnchor = insertAt + anchor.length;
-    html = html.slice(0, afterAnchor) +
-      `\n                ${capsuleFor(pcaId)}` +
-      html.slice(afterAnchor);
-  }
-}
-
 replaceEmbeddedAsset(
   "/* scReportLite v0.7.0 fixed-shell design system */",
   "</style>",
@@ -141,7 +99,6 @@ replaceEmbeddedAsset(
 );
 upsertRuntimeBundle();
 syncModuleSwitcherMarkup();
-syncResolutionCapsuleMarkup();
 
 [
   "function _SR_naturalCompare",
@@ -150,14 +107,25 @@ syncResolutionCapsuleMarkup();
   "function initPcaPlot",
   "function switchTab",
   "onPlotlyReady(function",
-  "id=\"sr-resolution-capsule-feature\"",
-  "id=\"sr-resolution-capsule-pca\"",
-  "id=\"sr-resolution-capsule-umap\"",
+  "Resolution overview",
+  "sr-qc-overview-capsule",
+  "sr-top-expressed-capsule",
+  "sr-pca-score-capsule",
   "/* smoke injected: report runtime start */",
   "/* smoke injected: report runtime end */"
 ].forEach((contractMarker) => {
   if (!html.includes(contractMarker)) {
     throw new Error(`Refreshed smoke report is missing: ${contractMarker}`);
+  }
+});
+
+[
+  "resolution-capsule",
+  "sr-clustree-overlay",
+  "_SR_RESOLUTION_DATA"
+].forEach((removedMarker) => {
+  if (html.includes(removedMarker)) {
+    throw new Error(`Refreshed smoke report retains removed marker: ${removedMarker}`);
   }
 });
 

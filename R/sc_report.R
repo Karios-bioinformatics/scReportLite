@@ -21,14 +21,12 @@
 #'   sample / condition labels. When provided, a "Samples" section appears
 #'   in the sidebar for per-sample highlighting. Default: \code{NULL}.
 #' @param resolution_cols Optional character vector naming alternative cluster
-#'   assignment columns in \code{umap_df}. These populate the read-only
-#'   resolution selector and share the same UMAP coordinates.
-#' @param active_resolution Optional initial member of
-#'   \code{resolution_cols}. Defaults to the first naturally sorted member.
-#' @param clustree_edges Optional data.frame describing cross-resolution edges.
-#'   Supported columns are \code{source_resolution}, \code{source_cluster},
-#'   \code{target_resolution}, \code{target_cluster}, and optional
-#'   \code{count}.
+#'   assignment columns in \code{umap_df}. These are used only for the
+#'   read-only Resolution overview on Preview.
+#' @param active_resolution Deprecated compatibility input used only while
+#'   validating the static Preview resolution summary.
+#' @param clustree_edges Deprecated compatibility input. v0.7.0 does not
+#'   render or consume interactive clustree data.
 #' @param marker_df Optional data.frame of marker gene results.
 #'   Must contain columns: \code{cluster}, \code{gene},
 #'   \code{avg_log2FC}, \code{p_val_adj}. If \code{NULL}, the marker

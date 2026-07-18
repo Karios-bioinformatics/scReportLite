@@ -7,6 +7,7 @@ var DEFAULT_OPACITY = 0.9;
 var DIM_COLOR = "#D0D0D0";
 var ORIG_COLORS = [];
 var _HAS_SAMPLES = false;
+var _CELL_CLUSTER = {};  // immutable cluster_col assignment by cell
 var _CELL_SAMPLE = {};   // cellId → sample (built from customdata)
 var _TRACE_CELLS = [];   // per-trace cell ID arrays (built from customdata)
 var _ACTIVE_MODE = "cluster";  // "cluster" or "sample" — controls panel visibility

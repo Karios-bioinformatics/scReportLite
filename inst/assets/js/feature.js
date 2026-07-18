@@ -1553,18 +1553,6 @@ function _FEATURE_selectView(subView) {
   _FEATURE_updateNav(subView);
   _FEATURE_resetModuleRegions(subView);
   _FEATURE_renderCurrentState();
-  if (window.SRDesign) window.SRDesign.refreshResolutionContexts();
-}
-
-function _FEATURE_resolutionChanged() {
-  if (!_FEATURE_STATE.initialized) return;
-  _FEATURE_STATE.scatter.highlightGroup = null;
-  _FEATURE_updateNav(_FEATURE_STATE.activeModule);
-  _FEATURE_renderControls();
-  if (_FEATURE_STATE.activeModule === "scatter" &&
-      _FEATURE_STATE.scatter.colorBy === "cluster") {
-    _FEATURE_renderCurrentState();
-  }
 }
 
 function _FEATURE_updateNav(activeView) {
@@ -1701,7 +1689,6 @@ function _FEATURE_ensureInit() {
 window._FEATURE_selectView = _FEATURE_selectView;
 window._FEATURE_selectGeneFromList = _FEATURE_selectGeneFromList;
 window._FEATURE_ensureInit = _FEATURE_ensureInit;
-window._FEATURE_resolutionChanged = _FEATURE_resolutionChanged;
 window._FEATURE_STATE = _FEATURE_STATE;
 
 if (!window._FEATURE_NAV_BOUND) {

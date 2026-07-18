@@ -165,14 +165,9 @@ function updateGeneSummary(geneName) {
   var sum = allVals.reduce(function(a,b){return a+b;}, 0);
   var mean = (sum / nTotal).toFixed(4);
   var maxV = Math.max.apply(null, allVals).toFixed(4);
-  var resolutionPayload = window._SR_RESOLUTION_DATA || {};
-  var activeResolution = resolutionPayload.resolutions &&
-    resolutionPayload.resolutions[resolutionPayload.active];
-  var assignments = activeResolution && activeResolution.assignments ?
-    activeResolution.assignments : {};
   var clusterStats = {};
-  Object.keys(assignments).forEach(function(cell) {
-    var cluster = String(assignments[cell]);
+  Object.keys(_CELL_CLUSTER || {}).forEach(function(cell) {
+    var cluster = String(_CELL_CLUSTER[cell]);
     if (!clusterStats[cluster]) {
       clusterStats[cluster] = { total: 0, expressing: 0, sum: 0 };
     }
@@ -205,9 +200,8 @@ function updateGeneSummary(geneName) {
     "<tr><td style=\"color:#636e72;\">Max expression</td><td>" + maxV + "</td></tr>" +
     "</table>" +
     (clusterRows ?
-      "<div class=\"sr-gene-resolution-summary\">" +
-      "<strong>Expression by cluster · resolution " +
-      escHtml(String(resolutionPayload.active || "")) + "</strong>" +
+      "<div class=\"sr-gene-cluster-summary\">" +
+      "<strong>Expression by cluster</strong>" +
       "<table><thead><tr><th>Cluster</th><th>Expressing cells</th>" +
       "<th>Mean</th></tr></thead><tbody>" + clusterRows +
       "</tbody></table></div>" : "") +
@@ -577,17 +571,6 @@ function updateMarkerTable(clusterId) {
   var titleEl = document.getElementById("marker-title");
   var container = document.getElementById("marker-table-container");
   if (!container) return;
-
-  var resolutionPayload = window._SR_RESOLUTION_DATA || {};
-  if (resolutionPayload.initialResolution &&
-      resolutionPayload.active !== resolutionPayload.initialResolution) {
-    titleEl.textContent = "Cluster " + clusterId + " \u2014 Marker data unavailable";
-    container.innerHTML =
-      "<p class=\"no-data\">Marker genes were not supplied for resolution " +
-      escHtml(resolutionPayload.active) +
-      ". Recalculate markers for this resolution before interpreting this table.</p>";
-    return;
-  }
 
   if (!window._MARKER_DATA || window._MARKER_DATA.length === 0) {
     titleEl.textContent = "Marker Genes";

@@ -169,7 +169,6 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
       has_pca = has_pca,
       pca_has_sample = pca_has_sample,
       has_umap = has_umap,
-      resolution_payload = resolution_payload,
       sidebar_html = sidebar_html,
       umap_tags = umap_tags,
       panel_sections_html = panel_sections_html
@@ -204,7 +203,6 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
     first_view = first_view,
     has_umap = has_umap,
     panel_js_extra = panel_js_extra
-    , resolution_payload = resolution_payload
   )
 
 
