@@ -593,12 +593,18 @@ _FEATURE_CONTROL_REGISTRY.fsFeatures = {
       button.type = "button";
       button.className = "sr-metric-item" +
         (state.selectedFeatures.indexOf(name) >= 0 ? " active" : "");
-      button.disabled = state.selectedFeatures[other] === name;
       button.textContent = name;
-      button.title = button.disabled ? "X and Y cannot use the same metric" : name;
+      button.title = name;
       button.addEventListener("click", function() {
         var slot = state.activeSlot;
-        state.selectedFeatures[slot] = name;
+        var otherSlot = slot === 0 ? 1 : 0;
+        if (state.selectedFeatures[otherSlot] === name) {
+          var previous = state.selectedFeatures[slot];
+          state.selectedFeatures[slot] = name;
+          state.selectedFeatures[otherSlot] = previous;
+        } else {
+          state.selectedFeatures[slot] = name;
+        }
         state.activeSlot = slot === 0 ? 1 : 0;
         _FEATURE_renderControls();
         _FEATURE_renderCurrentState();
@@ -971,7 +977,7 @@ function _FEATURE_highlightGenePoint(plotDiv, point) {
     hoverinfo: "skip", showlegend: false,
     marker: {
       size: 16, color: "rgba(0,0,0,0)",
-      line: {color: "hsl(262 100% 23% / 0.5)", width: 4}
+      line: {color: "hsla(262,100%,23%,0.5)", width: 4}
     }
   };
   var existing = plotDiv.data && plotDiv.data.length;
@@ -1379,7 +1385,7 @@ function _FEATURE_renderTopExpressedV070() {
     var high = _FEATURE_topNumber(row, "upper_whisker_percent", q3);
     var geneOutliers = outlierIdx[row.gene] || [];
     var trace = {
-      type: geneOutliers.length > 500 ? "scattergl" : "scatter",
+      type: "scatter",
       mode: "markers",
       x: geneOutliers.map(function(item) { return Number(item.percent); }),
       y: geneOutliers.map(function() { return 0; }),

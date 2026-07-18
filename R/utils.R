@@ -300,7 +300,7 @@ cluster_color_map <- function(clusters) {
     )
   }
   hues <- if (n == 1L) 0L else floor(360 * (seq_len(n) - 1L) / n)
-  colors <- sprintf("hsl(%d 100%% 59%%)", hues)
+  colors <- sprintf("hsl(%d,100%%,59%%)", hues)
   names(colors) <- as.character(clusters)
   colors
 }
@@ -322,10 +322,10 @@ hsl_shade_scale <- function(hue, saturation = 100, alpha = NULL) {
     `900` = 14, `950` = 5
   )
   out <- if (is.null(alpha)) {
-    sprintf("hsl(%d %g%% %g%%)", hue, saturation, levels)
+    sprintf("hsl(%d,%g%%,%g%%)", hue, saturation, levels)
   } else {
     alpha <- max(0, min(1, as.numeric(alpha)[1L]))
-    sprintf("hsl(%d %g%% %g%% / %g)", hue, saturation, levels, alpha)
+    sprintf("hsla(%d,%g%%,%g%%,%g)", hue, saturation, levels, alpha)
   }
   stats::setNames(out, names(levels))
 }

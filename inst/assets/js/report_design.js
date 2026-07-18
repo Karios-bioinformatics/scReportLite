@@ -12,8 +12,11 @@
       hue = Math.floor(Number(hue) || 0) % 360;
       saturation = saturation == null ? 100 : Math.max(0, Math.min(100, Number(saturation)));
       var lightness = SR_LIGHTNESS[level] == null ? SR_LIGHTNESS[400] : SR_LIGHTNESS[level];
-      var suffix = alpha == null ? "" : " / " + Math.max(0, Math.min(1, Number(alpha)));
-      return "hsl(" + hue + " " + saturation + "% " + lightness + "%" + suffix + ")";
+      if (alpha == null) {
+        return "hsl(" + hue + "," + saturation + "%," + lightness + "%)";
+      }
+      return "hsla(" + hue + "," + saturation + "%," + lightness + "%," +
+        Math.max(0, Math.min(1, Number(alpha))) + ")";
     },
     palette: function(count, level) {
       count = Math.max(0, Math.floor(Number(count) || 0));
@@ -26,7 +29,7 @@
     shadeFrom: function(colour, level, alpha) {
       var value = String(colour || "").trim();
       var hsl = value.match(
-        /^hsl\(\s*([0-9.]+)(?:deg)?[\s,]+([0-9.]+)%[\s,]+([0-9.]+)%(?:\s*\/\s*([0-9.]+))?\s*\)$/i
+        /^hsla?\(\s*([0-9.]+)(?:deg)?[\s,]+([0-9.]+)%[\s,]+([0-9.]+)%(?:(?:\s*\/\s*|\s*,\s*)([0-9.]+))?\s*\)$/i
       );
       if (hsl) {
         return this.shade(Number(hsl[1]), level, Number(hsl[2]), alpha);

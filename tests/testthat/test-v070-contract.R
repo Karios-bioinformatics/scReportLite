@@ -6,11 +6,11 @@ testthat::test_that("v0.7.0 HSL palette is natural, stable, and complete", {
   )
   testthat::expect_identical(
     unname(palette),
-    c("hsl(0 100% 59%)", "hsl(120 100% 59%)", "hsl(240 100% 59%)")
+    c("hsl(0,100%,59%)", "hsl(120,100%,59%)", "hsl(240,100%,59%)")
   )
   testthat::expect_identical(
     unname(cluster_color_map("only")),
-    "hsl(0 100% 59%)"
+    "hsl(0,100%,59%)"
   )
   testthat::expect_length(cluster_color_map(character()), 0L)
   testthat::expect_identical(
@@ -413,4 +413,43 @@ testthat::test_that("resolution changes synchronize every cluster consumer", {
   testthat::expect_match(
     umap, "Marker data unavailable", fixed = TRUE
   )
+})
+
+testthat::test_that("v0.7 report consumers retain cluster and colour contracts", {
+  root <- file.path(testthat::test_path(), "..", "..")
+  sidebar_path <- file.path(root, "R", "report_module_umap_sidebar.R")
+  feature_path <- file.path(root, "inst", "assets", "js", "feature.js")
+  design_path <- file.path(root, "inst", "assets", "js", "report_design.js")
+  qc_path <- file.path(root, "inst", "assets", "js", "report_qc.js")
+  testthat::skip_if_not(
+    all(file.exists(c(sidebar_path, feature_path, design_path, qc_path))),
+    "source report assets unavailable in installed-package checks"
+  )
+
+  sidebar <- paste(readLines(sidebar_path, warn = FALSE, encoding = "UTF-8"),
+    collapse = "\n")
+  feature <- paste(readLines(feature_path, warn = FALSE, encoding = "UTF-8"),
+    collapse = "\n")
+  design <- paste(readLines(design_path, warn = FALSE, encoding = "UTF-8"),
+    collapse = "\n")
+  qc <- paste(readLines(qc_path, warn = FALSE, encoding = "UTF-8"),
+    collapse = "\n")
+
+  testthat::expect_false(grepl(
+    "clusters <- gene_sidebar$clusters", sidebar, fixed = TRUE
+  ))
+  testthat::expect_false(grepl(
+    'type: geneOutliers.length > 500 ? "scattergl" : "scatter"',
+    feature, fixed = TRUE
+  ))
+  testthat::expect_false(grepl(
+    "button.disabled = state.selectedFeatures[other] === name",
+    feature, fixed = TRUE
+  ))
+  testthat::expect_match(feature, "state.selectedFeatures[otherSlot] = previous",
+    fixed = TRUE)
+  testthat::expect_match(design, 'return "hsl(" + hue + ","',
+    fixed = TRUE)
+  testthat::expect_match(qc, 'return "hsl(" + Math.floor(Number(match[1])) + ","',
+    fixed = TRUE)
 })

@@ -108,7 +108,6 @@
   gene_expr_json <- gene_sidebar$gene_expr_json
   marker_gene_clusters_json <- gene_sidebar$marker_gene_clusters_json
   all_gene_sources_json <- gene_sidebar$all_gene_sources_json
-  clusters <- gene_sidebar$clusters
 
   # ---- Sidebar assembly ----
   sidebar_html <- c(

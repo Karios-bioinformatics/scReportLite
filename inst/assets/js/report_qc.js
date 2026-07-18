@@ -62,12 +62,12 @@ function _PLOT_metricSummary(values) {
 
 function _PLOT_shade(color, shade) {
   var match = String(color || "").match(
-    /^hsl\(\s*([0-9.]+)\s+([0-9.]+)%\s+([0-9.]+)%\s*\)$/i
+    /^hsl\(\s*([0-9.]+)(?:deg)?[\s,]+([0-9.]+)%[\s,]+([0-9.]+)%\s*\)$/i
   );
   if (!match) return color || "#055E70";
   var lightness = {400: 59, 600: 41, 700: 32, 800: 23}[shade] || 59;
-  return "hsl(" + Math.floor(Number(match[1])) + " " +
-    Number(match[2]) + "% " + lightness + "%)";
+  return "hsl(" + Math.floor(Number(match[1])) + "," +
+    Number(match[2]) + "%," + lightness + "%)";
 }
 
 function _PLOT_pointColor(color) {

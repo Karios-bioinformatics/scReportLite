@@ -3,8 +3,25 @@
 # ---- Internal: FeatureScatter data extraction ----
 .build_feature_scatter <- function(obj, assay, scatter_features,
                                     scatter_gene_features,
-                                    max_scatter_points) {
+                                    max_scatter_points,
+                                    cluster_col = NULL,
+                                    sample_col = NULL) {
   meta <- obj[[]]  # meta.data as data.frame
+
+  validate_group_column <- function(column, argument) {
+    if (is.null(column)) return(NULL)
+    if (length(column) != 1L || is.na(column) || !nzchar(column)) {
+      stop(argument, " must be NULL or one non-empty metadata column name.",
+           call. = FALSE)
+    }
+    if (!column %in% colnames(meta)) {
+      stop(argument, " '", column, "' was not found in Seurat meta.data.",
+           call. = FALSE)
+    }
+    column
+  }
+  cluster_col <- validate_group_column(cluster_col, "cluster_col")
+  sample_col <- validate_group_column(sample_col, "sample_col")
 
   # Determine available metadata columns
   avail_cols <- intersect(scatter_features, colnames(meta))
@@ -17,8 +34,10 @@
   cells <- colnames(obj)
   df <- data.frame(cell = cells, stringsAsFactors = FALSE)
 
-  # cluster
-  if (requireNamespace("Seurat", quietly = TRUE)) {
+  # cluster: an explicit metadata mapping takes precedence over active Idents.
+  if (!is.null(cluster_col)) {
+    idents <- as.character(meta[[cluster_col]])
+  } else if (requireNamespace("Seurat", quietly = TRUE)) {
     idents <- tryCatch(as.character(Seurat::Idents(obj)),
                        error = function(e) NULL)
   } else {
@@ -29,8 +48,10 @@
     df$cluster <- idents
   }
 
-  # sample (orig.ident)
-  if ("orig.ident" %in% colnames(meta)) {
+  # sample: an explicit metadata mapping takes precedence over orig.ident.
+  if (!is.null(sample_col)) {
+    df$sample <- as.character(meta[[sample_col]])
+  } else if ("orig.ident" %in% colnames(meta)) {
     df$sample <- as.character(meta[["orig.ident"]])
   } else {
     # Try active.ident as fallback for sample

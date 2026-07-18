@@ -23,6 +23,11 @@
 #'   "percent.mt")}.  Columns that don't exist are silently skipped.
 #' @param scatter_gene_features Optional character vector of gene names whose
 #'   expression should be included in FeatureScatter data. Default \code{NULL}.
+#' @param cluster_col Optional metadata column containing the cluster assignment
+#'   to use for FeatureScatter grouping. If \code{NULL}, current Seurat
+#'   identities are used.
+#' @param sample_col Optional metadata column containing sample identities. If
+#'   \code{NULL}, \code{orig.ident} is used when available.
 #' @param top_n_variable Max number of variable-feature rows to include in the
 #'   output.  Default 2000.
 #' @param top_n_label Number of top variable genes to mark as "label" for the
@@ -55,6 +60,8 @@ build_seurat_feature_diagnostics <- function(
     reduction             = "pca",
     scatter_features      = c("nCount_RNA", "nFeature_RNA", "percent.mt"),
     scatter_gene_features = NULL,
+    cluster_col           = NULL,
+    sample_col            = NULL,
     top_n_variable        = 2000,
     top_n_label           = 20,
     top_n_expressed       = 50,
@@ -81,7 +88,7 @@ build_seurat_feature_diagnostics <- function(
   message("build_seurat_feature_diagnostics: building FeatureScatter data...")
   fs_data <- .build_feature_scatter(
     seurat_obj, assay, scatter_features, scatter_gene_features,
-    max_scatter_points
+    max_scatter_points, cluster_col, sample_col
   )
 
   # ---- B. VariableFeaturePlot data ----
