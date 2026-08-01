@@ -231,7 +231,8 @@ body { background: var(--sr-canvas); }
   color: #fff; font-weight: 600;
 }
 .sr-pca-loading-panel, .sr-umap-stat-panel {
-  height: 100%; padding: 12px; overflow-y: auto;
+  box-sizing: border-box; height: 100%; min-height: 0;
+  padding: 12px; overflow-y: auto;
 }
 .sr-pca-loading-direction {
   position: sticky; top: 0; z-index: 4;
@@ -554,10 +555,17 @@ body { background: var(--sr-canvas); }
   width: 100%; height: 100%; min-height: 0; max-height: none;
   margin: 0; overflow: hidden;
 }
-.sr-umap-stat-panel.sr-showing-marker { overflow: hidden; }
+.sr-umap-stat-panel.sr-showing-marker {
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.sr-umap-stat-panel.sr-showing-marker .sr-umap-result-panels {
+  flex: 1 1 auto; width: 100%; height: auto; min-height: 0; overflow: hidden;
+}
 .sr-umap-stat-panel .marker-section .section-title { flex: 0 0 auto; }
 .sr-umap-stat-panel #marker-table-container {
-  flex: 1 1 auto; width: 100%; min-height: 0; overflow: auto;
+  flex: 1 1 auto; width: 100%; min-height: 0;
+  overflow-x: scroll; overflow-y: scroll;
+  scrollbar-gutter: stable;
 }
 .sr-metric-slots { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
 .sr-metric-slot {

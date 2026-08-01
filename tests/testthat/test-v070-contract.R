@@ -472,6 +472,9 @@ testthat::test_that("UMAP marker table fills the right panel without wrapping va
   testthat::expect_match(css, "width: max-content", fixed = TRUE)
   testthat::expect_match(css, "white-space: nowrap", fixed = TRUE)
   testthat::expect_match(css, "min-width: 148px", fixed = TRUE)
+  testthat::expect_match(css, "overflow-x: scroll", fixed = TRUE)
+  testthat::expect_match(css, "overflow-y: scroll", fixed = TRUE)
+  testthat::expect_match(css, "scrollbar-gutter: stable", fixed = TRUE)
   testthat::expect_match(
     design, 'classList.toggle("sr-showing-marker", showMarker)', fixed = TRUE
   )
