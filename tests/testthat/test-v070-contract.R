@@ -451,3 +451,28 @@ testthat::test_that("v0.7 report consumers retain cluster and colour contracts",
   testthat::expect_match(qc, 'return "hsl(" + Math.floor(Number(match[1])) + ","',
     fixed = TRUE)
 })
+
+testthat::test_that("UMAP marker table fills the right panel without wrapping values", {
+  root <- file.path(testthat::test_path(), "..", "..")
+  css_paths <- file.path(root, "inst", "assets", "css",
+    c("report_umap.css", "report_v070.css"))
+  design_path <- file.path(root, "inst", "assets", "js", "report_design.js")
+  testthat::skip_if_not(
+    all(file.exists(c(css_paths, design_path))),
+    "source report assets unavailable in installed-package checks"
+  )
+
+  css <- paste(vapply(css_paths, function(path) {
+    paste(readLines(path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+  }, character(1)), collapse = "\n")
+  design <- paste(readLines(design_path, warn = FALSE, encoding = "UTF-8"),
+    collapse = "\n")
+
+  testthat::expect_match(css, "max-height: none", fixed = TRUE)
+  testthat::expect_match(css, "width: max-content", fixed = TRUE)
+  testthat::expect_match(css, "white-space: nowrap", fixed = TRUE)
+  testthat::expect_match(css, "min-width: 148px", fixed = TRUE)
+  testthat::expect_match(
+    design, 'classList.toggle("sr-showing-marker", showMarker)', fixed = TRUE
+  )
+})

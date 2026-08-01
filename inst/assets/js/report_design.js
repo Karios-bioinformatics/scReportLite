@@ -266,6 +266,7 @@
     if (stat) stat.style.display = mode === "gene" ? "none" : "";
     if (mode === "gene") return;
     var showMarker = mode === "cluster" && selectedClusterCount === 1 && !!marker;
+    if (stat) stat.classList.toggle("sr-showing-marker", showMarker);
     if (title) {
       title.style.display = showMarker ? "none" : "";
       title.textContent = mode === "sample" && SELECTED_SAMPLE
