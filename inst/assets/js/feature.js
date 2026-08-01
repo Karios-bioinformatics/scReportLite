@@ -1352,6 +1352,11 @@ function _FEATURE_renderTopExpressedV070() {
       return window.SRColor ? window.SRColor.shade(hue, level, 100, alpha) :
         (level >= 600 ? "#055E70" : "#27D3F5");
     };
+    var plotShade = function(level, alpha) {
+      var colour = shade(level, alpha);
+      return window.SRColor && typeof window.SRColor.plotly === "function"
+        ? window.SRColor.plotly(colour) : colour;
+    };
     var geneRow = document.createElement("section");
     geneRow.className = "sr-top-gene-row";
     geneRow.setAttribute("data-top-gene", String(row.gene));
@@ -1399,7 +1404,7 @@ function _FEATURE_renderTopExpressedV070() {
           "<br>Percent: " + Number(item.percent).toFixed(4) + "%";
       }),
       hoverinfo: "text", showlegend: false,
-      marker: {size: 5, color: shade(400), opacity: 0.75}
+      marker: {size: 5, color: plotShade(400), opacity: 0.75}
     };
     Plotly.newPlot(plot, [trace], {
       height: 92,
@@ -1408,15 +1413,15 @@ function _FEATURE_renderTopExpressedV070() {
       yaxis: {range: [-1, 1], visible: false, fixedrange: true},
       shapes: [
         {type: "line", x0: low, x1: high, y0: 0, y1: 0,
-          line: {color: shade(400), width: 2}},
+          line: {color: plotShade(400), width: 2}},
         {type: "rect", x0: q1, x1: q3, y0: -0.34, y1: 0.34,
-          fillcolor: shade(50), line: {color: shade(400), width: 2}},
+          fillcolor: plotShade(50), line: {color: plotShade(400), width: 2}},
         {type: "line", x0: med, x1: med, y0: -0.34, y1: 0.34,
-          line: {color: shade(800), width: 3}},
+          line: {color: plotShade(800), width: 3}},
         {type: "line", x0: low, x1: low, y0: -0.18, y1: 0.18,
-          line: {color: shade(400), width: 2}},
+          line: {color: plotShade(400), width: 2}},
         {type: "line", x0: high, x1: high, y0: -0.18, y1: 0.18,
-          line: {color: shade(400), width: 2}}
+          line: {color: plotShade(400), width: 2}}
       ],
       paper_bgcolor: "rgba(0,0,0,0)",
       plot_bgcolor: "rgba(0,0,0,0)",

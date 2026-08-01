@@ -66,8 +66,15 @@ function _PLOT_shade(color, shade) {
   );
   if (!match) return color || "#055E70";
   var lightness = {400: 59, 600: 41, 700: 32, 800: 23}[shade] || 59;
-  return "hsl(" + Math.floor(Number(match[1])) + "," +
+  var shaded = "hsl(" + Math.floor(Number(match[1])) + "," +
     Number(match[2]) + "%," + lightness + "%)";
+  return window.SRColor && typeof window.SRColor.plotly === "function"
+    ? window.SRColor.plotly(shaded) : shaded;
+}
+
+function _PLOT_plotColor(color) {
+  return window.SRColor && typeof window.SRColor.plotly === "function"
+    ? window.SRColor.plotly(color) : color;
 }
 
 function _PLOT_pointColor(color) {
@@ -613,7 +620,8 @@ function _PLOT_renderOvMetric(d) {
         x: new Array(yVals.length).fill(si),
         y: yVals,
         type: "violin", points: false, name: s, showlegend: false,
-        fillcolor: fillCol, line: {color: fillCol, width: 1.2},
+        fillcolor: _PLOT_plotColor(fillCol),
+        line: {color: _PLOT_plotColor(fillCol), width: 1.2},
         opacity: op.v, hoverinfo: "all", width: 0.6, spanmode: "hard", span: [0, null]
       });
       // Point trace (complete per-cell overlay)
@@ -754,7 +762,8 @@ function _PLOT_renderOvSample(d) {
       traces.push({
         x: new Array(yVals.length).fill(0),
         y: yVals, type: "violin", points: false, name: mLabels[mi], showlegend: false,
-        fillcolor: fillCol, line: {color: fillCol, width: 1.2},
+        fillcolor: _PLOT_plotColor(fillCol),
+        line: {color: _PLOT_plotColor(fillCol), width: 1.2},
         opacity: op.v, hoverinfo: "all", width: 0.6, spanmode: "hard", span: [0, null]
       });
       if (op.p > 0.001) {
@@ -830,7 +839,8 @@ function _PLOT_renderSmMetric(d) {
     traces.push({
       x: new Array(yVals.length).fill(si), y: yVals,
       type:"violin", points:false, name:s, showlegend:false,
-      fillcolor:fillCol, line:{color:fillCol, width:1.5},
+      fillcolor:_PLOT_plotColor(fillCol),
+      line:{color:_PLOT_plotColor(fillCol), width:1.5},
       opacity:op.v, hoverinfo:"all", width:0.6, spanmode:"hard", span:[0,null]
     });
     if (op.p > 0.001) {
@@ -933,7 +943,8 @@ function _PLOT_renderSmSample(d) {
     traces.push({
       x: new Array(yVals.length).fill(0), y: yVals,
       type:"violin", points:false, name:mLabels[mi], showlegend:false,
-      fillcolor:fillCol, line:{color:fillCol, width:1.5},
+      fillcolor:_PLOT_plotColor(fillCol),
+      line:{color:_PLOT_plotColor(fillCol), width:1.5},
       opacity:op.v, hoverinfo:"all", width:0.6, spanmode:"hard", span:[0,null]
     });
     if (op.p > 0.001) {
@@ -1014,7 +1025,8 @@ function _PLOT_renderScatter(d) {
       type:"scatter", mode:"markers", hoverinfo:"text",
       marker:{
         color:records.map(function(record) {
-          return record.qc_status === "filtered" ? "#a8a8a8" : fillCol;
+          return record.qc_status === "filtered"
+            ? "#a8a8a8" : _PLOT_plotColor(fillCol);
         }),
         size:3, opacity:opac
       },

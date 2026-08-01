@@ -29,11 +29,31 @@
     plotly: function(colour) {
       var value = String(colour || "").trim();
       var hsl = value.match(
-        /^hsl\(\s*([0-9.]+)(?:deg)?[\s,]+([0-9.]+)%[\s,]+([0-9.]+)%\s*\)$/i
+        /^hsla?\(\s*(-?[0-9.]+)(?:deg)?[\s,]+([0-9.]+)%[\s,]+([0-9.]+)%(?:(?:\s*\/\s*|\s*,\s*)([0-9.]+))?\s*\)$/i
       );
       if (!hsl) return value;
-      return "hsl(" + Math.floor(Number(hsl[1])) + "," +
-        Number(hsl[2]) + "%," + Number(hsl[3]) + "%)";
+      var hue = ((Number(hsl[1]) % 360) + 360) % 360;
+      var saturation = Math.max(0, Math.min(100, Number(hsl[2]))) / 100;
+      var lightness = Math.max(0, Math.min(100, Number(hsl[3]))) / 100;
+      var chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+      var section = hue / 60;
+      var secondary = chroma * (1 - Math.abs((section % 2) - 1));
+      var red = 0, green = 0, blue = 0;
+      if (section < 1) { red = chroma; green = secondary; }
+      else if (section < 2) { red = secondary; green = chroma; }
+      else if (section < 3) { green = chroma; blue = secondary; }
+      else if (section < 4) { green = secondary; blue = chroma; }
+      else if (section < 5) { red = secondary; blue = chroma; }
+      else { red = chroma; blue = secondary; }
+      var offset = lightness - chroma / 2;
+      var channels = [red, green, blue].map(function(channel) {
+        return Math.round((channel + offset) * 255);
+      });
+      if (hsl[4] != null) {
+        return "rgba(" + channels.join(",") + "," +
+          Math.max(0, Math.min(1, Number(hsl[4]))) + ")";
+      }
+      return "rgb(" + channels.join(",") + ")";
     },
     shadeFrom: function(colour, level, alpha) {
       var value = String(colour || "").trim();

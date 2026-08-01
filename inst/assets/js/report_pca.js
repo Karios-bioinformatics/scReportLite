@@ -378,7 +378,7 @@ function renderPcaPairScatter() {
     }
 
     var mc = (_PCA_HIGHLIGHT !== null && g !== _PCA_HIGHLIGHT)
-      ? "#D0D0D0" : groupColors[g];
+      ? "#D0D0D0" : _PCA_plotColor(groupColors[g]);
 
     traces.push({
       x: x, y: y,

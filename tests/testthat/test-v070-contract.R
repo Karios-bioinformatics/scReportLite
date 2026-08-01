@@ -267,16 +267,26 @@ testthat::test_that("v0.7 colours are normalized and selected metrics use theme 
   root <- file.path(testthat::test_path(), "..", "..")
   design_path <- file.path(root, "inst", "assets", "js", "report_design.js")
   feature_path <- file.path(root, "inst", "assets", "js", "feature.js")
+  pca_path <- file.path(root, "inst", "assets", "js", "report_pca.js")
+  qc_path <- file.path(root, "inst", "assets", "js", "report_qc.js")
   css_path <- file.path(root, "inst", "assets", "css", "report_v070.css")
-  sources <- vapply(c(design_path, feature_path, css_path), function(path) {
+  sources <- vapply(c(design_path, feature_path, pca_path, qc_path, css_path), function(path) {
     paste(readLines(path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
   }, character(1))
 
   testthat::expect_match(sources[[1]], "plotly: function(colour)", fixed = TRUE)
+  testthat::expect_match(
+    sources[[1]], 'return "rgb(" + channels.join(",") + ")"', fixed = TRUE
+  )
   testthat::expect_match(sources[[2]], "SRColor.plotly(colour)", fixed = TRUE)
+  testthat::expect_match(sources[[2]], "var plotShade = function", fixed = TRUE)
+  testthat::expect_match(
+    sources[[3]], "_PCA_plotColor(groupColors[g])", fixed = TRUE
+  )
+  testthat::expect_match(sources[[4]], "function _PLOT_plotColor(color)", fixed = TRUE)
   testthat::expect_match(sources[[2]], 'color: "#FF0000"', fixed = TRUE)
-  testthat::expect_false(grepl("--sr-primary", sources[[3]], fixed = TRUE))
-  testthat::expect_false(grepl("--sr-secondary", sources[[3]], fixed = TRUE))
+  testthat::expect_false(grepl("--sr-primary", sources[[5]], fixed = TRUE))
+  testthat::expect_false(grepl("--sr-secondary", sources[[5]], fixed = TRUE))
 })
 
 testthat::test_that("UMAP right region uses explicit counts and single-cluster markers", {
@@ -448,7 +458,7 @@ testthat::test_that("v0.7 report consumers retain cluster and colour contracts",
     fixed = TRUE)
   testthat::expect_match(design, 'return "hsl(" + hue + ","',
     fixed = TRUE)
-  testthat::expect_match(qc, 'return "hsl(" + Math.floor(Number(match[1])) + ","',
+  testthat::expect_match(qc, "window.SRColor.plotly(shaded)",
     fixed = TRUE)
 })
 
