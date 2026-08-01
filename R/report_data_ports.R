@@ -4,7 +4,8 @@
 #'
 #' @return A list of script tags in dependency order.
 #' @keywords internal
-.build_report_data_ports <- function(marker_json, clusters_json, marker_n_top,
+.build_report_data_ports <- function(marker_json, clusters_json,
+                                     cluster_counts_json, marker_n_top,
                                      dim_opacity, has_samples, sample_comp_json,
                                      cluster_colors_json, gene_expr_json,
                                      marker_gene_clusters_json,
@@ -18,6 +19,7 @@
   # this final boundary so individual builders cannot accidentally omit it.
   marker_json <- .escape_json_for_script(marker_json)
   clusters_json <- .escape_json_for_script(clusters_json)
+  cluster_counts_json <- .escape_json_for_script(cluster_counts_json)
   sample_comp_json <- .escape_json_for_script(sample_comp_json)
   cluster_colors_json <- .escape_json_for_script(cluster_colors_json)
   gene_expr_json <- .escape_json_for_script(gene_expr_json)
@@ -30,9 +32,10 @@
 
   list(
     tags$script(htmltools::HTML(sprintf(
-      "window._MARKER_DATA = %s;\nwindow._CLUSTERS = %s;\nwindow._MARKER_NTOP = %d;\nwindow._DIM_OPACITY = %s;\nwindow._HAS_SAMPLES = %s;",
+      "window._MARKER_DATA = %s;\nwindow._CLUSTERS = %s;\nwindow._CLUSTER_COUNTS = %s;\nwindow._MARKER_NTOP = %d;\nwindow._DIM_OPACITY = %s;\nwindow._HAS_SAMPLES = %s;",
       marker_json,
       clusters_json,
+      cluster_counts_json,
       marker_n_top,
       dim_opacity,
       if (has_samples) "true" else "false"

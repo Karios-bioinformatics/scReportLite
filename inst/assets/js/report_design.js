@@ -26,6 +26,15 @@
       }
       return out;
     },
+    plotly: function(colour) {
+      var value = String(colour || "").trim();
+      var hsl = value.match(
+        /^hsl\(\s*([0-9.]+)(?:deg)?[\s,]+([0-9.]+)%[\s,]+([0-9.]+)%\s*\)$/i
+      );
+      if (!hsl) return value;
+      return "hsl(" + Math.floor(Number(hsl[1])) + "," +
+        Number(hsl[2]) + "%," + Number(hsl[3]) + "%)";
+    },
     shadeFrom: function(colour, level, alpha) {
       var value = String(colour || "").trim();
       var hsl = value.match(
@@ -204,41 +213,82 @@
     });
   }
 
-  function renderGlobalClusterSizes() {
-    var target = document.getElementById("sr-umap-stat-content");
-    var gd = document.querySelector("#umap-container .js-plotly-plot");
-    if (!target || !gd || !gd.data) return;
-    var rows = gd.data.map(function(trace, index) {
-      var label = String(trace.name || index).replace(/^cluster_/, "");
-      return { label: label, count: (trace.x || []).length };
-    }).sort(function(a, b) {
-      return window._SR_naturalCompare(a.label, b.label);
+  function renderClusterSizes(sampleId) {
+    var target = document.getElementById("sr-umap-cluster-size-plot");
+    if (!target || typeof Plotly === "undefined") return;
+    var clusters = (window._CLUSTERS || []).map(String)
+      .sort(window._SR_naturalCompare);
+    var source = sampleId && window._SAMPLE_COMP_DATA
+      ? window._SAMPLE_COMP_DATA[String(sampleId)] : window._CLUSTER_COUNTS;
+    source = source || {};
+    var counts = clusters.map(function(cluster) {
+      return Number(source[cluster]) || 0;
     });
-    target.innerHTML = rows.map(function(row) {
-      return '<div class="sr-cluster-stat"><span>Cluster ' +
-        row.label + '</span><strong>' + row.count + '</strong></div>';
-    }).join("");
+    var labels = clusters.map(function(cluster) { return "Cluster " + cluster; });
+    var colours = clusters.map(function(cluster) {
+      var colour = window._CLUSTER_COLORS && window._CLUSTER_COLORS[cluster]
+        ? window._CLUSTER_COLORS[cluster] : "#888888";
+      return window.SRColor && typeof window.SRColor.plotly === "function"
+        ? window.SRColor.plotly(colour) : colour;
+    });
+    var hover = clusters.map(function(cluster, index) {
+      return "Cluster " + cluster + "<br>" + counts[index] + " cells" +
+        (sampleId ? "<br>Sample: " + sampleId : "");
+    });
+    Plotly.react(target, [{
+      x: counts, y: labels, type: "bar", orientation: "h",
+      marker: {color: colours}, text: counts.map(String),
+      textposition: "auto", textfont: {color: "#111111"},
+      hovertext: hover, hoverinfo: "text", cliponaxis: false
+    }], {
+      margin: {l: 82, r: 18, b: 16, t: 38},
+      xaxis: {
+        title: "Number of cells", side: "top", rangemode: "tozero",
+        fixedrange: true, showgrid: true, zeroline: true
+      },
+      yaxis: {
+        title: "Cluster", type: "category", categoryorder: "array",
+        categoryarray: labels, autorange: "reversed", fixedrange: true
+      },
+      height: Math.max(320, clusters.length * 30 + 70),
+      showlegend: false, bargap: 0.2,
+      paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)"
+    }, {displayModeBar: false, displaylogo: false, responsive: true});
   }
 
   function updateUmapRight(mode) {
     var stat = document.getElementById("sr-umap-stat-panel");
     var title = stat ? stat.querySelector(".section-title") : null;
+    var chart = document.getElementById("sr-umap-stat-content");
+    var marker = document.querySelector(".marker-section");
+    var selectedClusterCount = typeof SELECTED_CLUSTERS !== "undefined"
+      ? SELECTED_CLUSTERS.size : 0;
     if (stat) stat.style.display = mode === "gene" ? "none" : "";
-    if (title) title.textContent = mode === "sample" ?
-      "Sample cluster composition" : "Cluster size";
-    if (mode === "cluster") renderGlobalClusterSizes();
+    if (mode === "gene") return;
+    var showMarker = mode === "cluster" && selectedClusterCount === 1 && !!marker;
+    if (title) {
+      title.style.display = showMarker ? "none" : "";
+      title.textContent = mode === "sample" && SELECTED_SAMPLE
+        ? "Cluster size \u2014 " + SELECTED_SAMPLE : "Cluster size";
+    }
+    if (chart) chart.style.display = showMarker ? "none" : "";
+    if (marker) marker.style.display = showMarker ? "" : "none";
+    if (!showMarker) {
+      renderClusterSizes(mode === "sample" ? SELECTED_SAMPLE : null);
+    }
   }
 
   document.addEventListener("DOMContentLoaded", function() {
     prepareDrawers();
     bindSharedControls();
     window.setTimeout(function() {
-      renderGlobalClusterSizes();
+      renderClusterSizes(null);
       updateUmapRight("cluster");
     }, 0);
   });
   window.SRDesign = {
     updateUmapRight: updateUmapRight,
-    renderGlobalClusterSizes: renderGlobalClusterSizes
+    renderGlobalClusterSizes: function() { renderClusterSizes(null); },
+    renderClusterSizes: renderClusterSizes
   };
 })();

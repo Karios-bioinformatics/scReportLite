@@ -151,11 +151,15 @@ function _FEATURE_getColor(i, count) {
 }
 
 function _FEATURE_groupColor(group, index, count, colorBy) {
+  var colour;
   if (colorBy === "cluster" && window._CLUSTER_COLORS &&
       window._CLUSTER_COLORS[String(group)]) {
-    return window._CLUSTER_COLORS[String(group)];
+    colour = window._CLUSTER_COLORS[String(group)];
+  } else {
+    colour = _FEATURE_getColor(index, count);
   }
-  return _FEATURE_getColor(index, count);
+  return window.SRColor && typeof window.SRColor.plotly === "function"
+    ? window.SRColor.plotly(colour) : colour;
 }
 
 // === Canvas helpers ===
@@ -799,7 +803,7 @@ function _FEATURE_renderVarFeatures() {
   var labelN = _FEATURE_STATE.varfeat.labelTopN;
   var ranked = vf.slice().filter(function(row) {
     var value = yMetric === "variance" ? row.variance : row.variance_standardized;
-    return typeof value === "number" && isFinite(value);
+    return !!row.variable && typeof value === "number" && isFinite(value);
   }).sort(function(a, b) {
     var av = yMetric === "variance" ? a.variance : a.variance_standardized;
     var bv = yMetric === "variance" ? b.variance : b.variance_standardized;
@@ -851,8 +855,8 @@ function _FEATURE_renderVarFeatures() {
       x: varXs, y: varYs, text: varTexts,
       customdata: varData,
       type: "scatter", mode: "markers", hoverinfo: "text",
-      marker: {color: "#b8b8b8", size: 3, opacity: 0.65, line: {width: 0}},
-      name: "Variable", showlegend: false
+      marker: {color: "#FF0000", size: 4, opacity: 0.78, line: {width: 0}},
+      name: "Variable features", showlegend: false
     });
   }
   if (topXs.length > 0) {

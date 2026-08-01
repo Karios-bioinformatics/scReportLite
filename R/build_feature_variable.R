@@ -56,8 +56,14 @@
     df$rank[rank_order] <- seq_along(rank_order)
   }
 
-  # v0.7.0 transmits every feature. top_n_variable is retained only for API
-  # compatibility; visual emphasis is controlled separately by top_n_label.
+  # Keep all feature rows for context, but cap the emphasized variable-feature
+  # layer to the requested Top N using the active Seurat variability score.
+  if (length(vf_idx) > top_n_variable) {
+    df$variable[] <- FALSE
+    df$variable[rank_order[seq_len(top_n_variable)]] <- TRUE
+    df$rank[] <- NA_integer_
+    df$rank[rank_order[seq_len(top_n_variable)]] <- seq_len(top_n_variable)
+  }
 
   # Label top N
   df$label <- FALSE

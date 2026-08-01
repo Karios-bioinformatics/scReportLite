@@ -243,6 +243,9 @@ testthat::test_that("PC Score uses fixed-axis grouped strip and fixed capsule", 
   testthat::expect_match(pca_js, "lowerWhisker", fixed = TRUE)
   testthat::expect_match(pca_js, "upperWhisker", fixed = TRUE)
   testthat::expect_match(pca_js, "shapes: plotShapes", fixed = TRUE)
+  testthat::expect_match(pca_js, "refreshVisibleCards", fixed = TRUE)
+  testthat::expect_match(pca_js, "card._srPurge", fixed = TRUE)
+  testthat::expect_match(pca_js, "renderQueue.sort", fixed = TRUE)
   testthat::expect_match(
     pca_js, '_PCA_SUBVIEW === "score"', fixed = TRUE
   )
@@ -258,6 +261,41 @@ testthat::test_that("PC Score uses fixed-axis grouped strip and fixed capsule", 
   testthat::expect_false(grepl(
     "k \\* 37", pca_js, fixed = FALSE
   ))
+})
+
+testthat::test_that("v0.7 colours are normalized and selected metrics use theme tokens", {
+  root <- file.path(testthat::test_path(), "..", "..")
+  design_path <- file.path(root, "inst", "assets", "js", "report_design.js")
+  feature_path <- file.path(root, "inst", "assets", "js", "feature.js")
+  css_path <- file.path(root, "inst", "assets", "css", "report_v070.css")
+  sources <- vapply(c(design_path, feature_path, css_path), function(path) {
+    paste(readLines(path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+  }, character(1))
+
+  testthat::expect_match(sources[[1]], "plotly: function(colour)", fixed = TRUE)
+  testthat::expect_match(sources[[2]], "SRColor.plotly(colour)", fixed = TRUE)
+  testthat::expect_match(sources[[2]], 'color: "#FF0000"', fixed = TRUE)
+  testthat::expect_false(grepl("--sr-primary", sources[[3]], fixed = TRUE))
+  testthat::expect_false(grepl("--sr-secondary", sources[[3]], fixed = TRUE))
+})
+
+testthat::test_that("UMAP right region uses explicit counts and single-cluster markers", {
+  root <- file.path(testthat::test_path(), "..", "..")
+  design_path <- file.path(root, "inst", "assets", "js", "report_design.js")
+  umap_path <- file.path(root, "inst", "assets", "js", "report_umap.js")
+  ports_path <- file.path(root, "R", "report_data_ports.R")
+  design <- paste(readLines(design_path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+  umap <- paste(readLines(umap_path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+  ports <- paste(readLines(ports_path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+
+  testthat::expect_match(ports, "window._CLUSTER_COUNTS", fixed = TRUE)
+  testthat::expect_match(design, "function renderClusterSizes(sampleId)", fixed = TRUE)
+  testthat::expect_match(design, 'orientation: "h"', fixed = TRUE)
+  testthat::expect_match(design, 'side: "top"', fixed = TRUE)
+  testthat::expect_match(design, "selectedClusterCount === 1", fixed = TRUE)
+  testthat::expect_match(design, "window._SAMPLE_COMP_DATA[String(sampleId)]", fixed = TRUE)
+  testthat::expect_false(grepl("gd.data.map", design, fixed = TRUE))
+  testthat::expect_false(grepl("showMultiClusterMessage", umap, fixed = TRUE))
 })
 
 testthat::test_that("PCA loading direction controls are wired to source assets", {
@@ -324,7 +362,10 @@ testthat::test_that("interactive UI symbols use encoding-stable escapes", {
     sources[["report_pca.js"]], "\\u2014", fixed = TRUE
   )
   testthat::expect_match(
-    sources[["report_design.js"]], "\\u00d7", fixed = TRUE
+    sources[["report_design.js"]], "\\u203A", fixed = TRUE
+  )
+  testthat::expect_match(
+    sources[["report_design.js"]], "\\u2039", fixed = TRUE
   )
   testthat::expect_match(
     sources[["report_umap.js"]], "\\u2713", fixed = TRUE

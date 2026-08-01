@@ -102,6 +102,18 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
 
   # ---- Cluster colours as JSON (for JS-driven charts) ----
   cluster_colors_json <- jsonlite::toJSON(as.list(cluster_cols), auto_unbox = TRUE)
+  cluster_counts_json <- "{}"
+  if (has_umap) {
+    cluster_counts <- table(factor(
+      as.character(umap_df[[cluster_col]]), levels = as.character(clusters)
+    ))
+    cluster_counts_json <- jsonlite::toJSON(
+      as.list(stats::setNames(
+        as.integer(cluster_counts), as.character(clusters)
+      )),
+      auto_unbox = TRUE
+    )
+  }
 
   # ---- Build panel sections for content area ----
   non_umap_panels  <- setdiff(panels, c("umap", "pca", "qc", "feature"))
@@ -119,7 +131,9 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
   )
 
   # Render each non-UMAP panel section
-  panel_sections_html <- lapply(non_umap_panels, function(pn) {
+  integrated_umap_panels <- c("cluster_size", "sample_composition")
+  rendered_panels <- setdiff(non_umap_panels, integrated_umap_panels)
+  panel_sections_html <- lapply(rendered_panels, function(pn) {
     if (pn == "marker_table") {
       tags$div(class = "panel-section marker-section",
         tags$div(class = "section-title", id = "marker-title",
@@ -136,8 +150,8 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
   })
 
   # Collect extra CSS and JS from panels
-  panel_css_extra <- collect_panel_css(non_umap_panels)
-  panel_js_extra  <- collect_panel_js(non_umap_panels)
+  panel_css_extra <- collect_panel_css(rendered_panels)
+  panel_js_extra  <- collect_panel_js(rendered_panels)
   # ---- Build independently composable modules in caller-requested order ----
   report_modules <- .build_registered_report_modules(
     c("preview", panels),
@@ -181,6 +195,7 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
   data_port_tags <- .build_report_data_ports(
     marker_json = marker_json,
     clusters_json = clusters_json,
+    cluster_counts_json = cluster_counts_json,
     marker_n_top = marker_n_top,
     dim_opacity = dim_opacity,
     has_samples = has_samples,

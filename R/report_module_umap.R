@@ -38,7 +38,7 @@
         id = "sr-umap-stat-panel",
         tags$div(class = "section-title", "Cluster size"),
         tags$div(id = "sr-umap-stat-content",
-          tags$div(class = "sr-detail-empty", "Global cluster statistics appear here.")
+          tags$div(class = "sr-umap-cluster-size-plot", id = "sr-umap-cluster-size-plot")
         ),
         tags$div(class = "sr-umap-result-panels", panel_sections_html)
       ),

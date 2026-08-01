@@ -41,22 +41,15 @@ function switchTab(mode) {
 
 function updatePanelVisibility() {
   var panels = {
-    "cluster": document.querySelector(".marker-section"),
-    "sample":  document.getElementById("srl-panel-sample_composition"),
+    "marker": document.querySelector(".marker-section"),
+    "sample": document.getElementById("srl-panel-sample_composition"),
+    "clusterSize": document.getElementById("srl-panel-cluster_size"),
     "gene":    document.getElementById("srl-panel-gene_expression")
   };
-  for (var mode in panels) {
-    var panel = panels[mode];
-    if (panel) panel.style.display = (mode === _ACTIVE_MODE) ? "" : "none";
-  }
-  // Resize any newly visible plotly chart
-  if (_ACTIVE_MODE === "sample") {
-    var scPanel = document.getElementById("srl-panel-sample_composition");
-    if (scPanel) {
-      var scBody = scPanel.querySelector(".panel-body");
-      if (scBody) Plotly.Plots.resize(scBody);
-    }
-  }
+  if (panels.marker) panels.marker.style.display = "none";
+  if (panels.sample) panels.sample.style.display = "none";
+  if (panels.clusterSize) panels.clusterSize.style.display = "none";
+  if (panels.gene) panels.gene.style.display = _ACTIVE_MODE === "gene" ? "" : "none";
 }
 
 // =========================================================================
@@ -450,19 +443,9 @@ function updateMarkerPanel() {
   if (SELECTED_CLUSTERS.size === 1) {
     var selected = Array.from(SELECTED_CLUSTERS)[0];
     updateMarkerTable(selected);
-  } else if (SELECTED_CLUSTERS.size === 0) {
-    clearMarkerTable();
   } else {
-    showMultiClusterMessage();
+    clearMarkerTable();
   }
-}
-
-function showMultiClusterMessage() {
-  var container = document.getElementById("marker-table-container");
-  if (!container) return;
-  document.getElementById("marker-title").textContent = "Marker Genes";
-  container.innerHTML =
-    "<p class=\"no-data\">Marker genes are shown only when exactly one cluster is selected.</p>";
 }
 
 // =========================================================================
@@ -487,6 +470,9 @@ function toggleCluster(clusterId) {
   updateSidebarUI();
   applyHighlight();
   updateMarkerPanel();
+  if (window.SRDesign && typeof window.SRDesign.updateUmapRight === "function") {
+    window.SRDesign.updateUmapRight("cluster");
+  }
 }
 
 // =========================================================================
@@ -512,6 +498,9 @@ function selectSample(sampleId) {
   if (SELECTED_SAMPLE) {
     updateSampleComposition(SELECTED_SAMPLE);
   }
+  if (window.SRDesign && typeof window.SRDesign.updateUmapRight === "function") {
+    window.SRDesign.updateUmapRight("sample");
+  }
 }
 
 // =========================================================================
@@ -529,6 +518,9 @@ function resetAll() {
   hideCellInfo();
   updateGeneSummary(null);
   updateGeneListUI();
+  if (window.SRDesign && typeof window.SRDesign.updateUmapRight === "function") {
+    window.SRDesign.updateUmapRight("cluster");
+  }
 }
 
 // =========================================================================

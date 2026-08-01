@@ -89,6 +89,9 @@ function pcaGroupColors(groups) {
 }
 
 function _PCA_plotColor(color) {
+  if (window.SRColor && typeof window.SRColor.plotly === "function") {
+    return window.SRColor.plotly(color);
+  }
   var match = String(color || "").match(
     /^hsl\(\s*([0-9.]+)\s+([0-9.]+)%\s+([0-9.]+)%\s*\)$/i
   );
@@ -499,8 +502,9 @@ function renderSinglePcPlot() {
     card.querySelector(".sr-pca-score-title").addEventListener("click", function() {
       highlightPcaGroup(group);
       setTimeout(function() {
-        var active = document.querySelector('[data-pca-score-group="' +
-          String(group).replace(/"/g, '\\"') + '"]');
+        var active = cards.find(function(candidate) {
+          return candidate.getAttribute("data-pca-score-group") === String(group);
+        });
         if (active) {
           var activeScroller = active.closest(".sr-pca-score-scroller");
           if (activeScroller) {
@@ -554,38 +558,120 @@ function renderSinglePcPlot() {
         }
       ];
     }
-    Plotly.newPlot(plot, [{
-      x: x, y: values,
-      type: _PCA_USE_WEBGL ? "scattergl" : "scatter",
-      mode: "markers", customdata: custom, text: hover, hoverinfo: "text",
-      marker: {color: colour, size: 3, opacity: 0.86},
-      showlegend: false
-    }], {
-      margin: {l: 4, r: 4, b: 24, t: 4},
-      xaxis: {visible: false, fixedrange: true, range: [-0.42, 0.42]},
-      yaxis: {
-        visible: false, fixedrange: true, range: sharedRange,
-        showgrid: true, zeroline: true
-      },
-      shapes: plotShapes,
-      hovermode: "closest", dragmode: false, showlegend: false,
-      paper_bgcolor: "rgba(0,0,0,0)",
-      plot_bgcolor: "rgba(0,0,0,0)"
-    }, {displayModeBar: false, responsive: true, scrollZoom: false});
-    if (typeof plot.on === "function") {
-      plot.on("plotly_click", function(event) {
-        var point = event && event.points && event.points[0];
-        if (!point || !point.customdata) return;
-        _PCA_scoreDetail(point.customdata, pc, group, values);
-      });
-    }
+    card._srRendered = false;
+    card._srRendering = false;
+    card._srQueued = false;
+    card._srRender = function() {
+      if (card._srRendered || card._srRendering) return Promise.resolve();
+      card._srRendering = true;
+      return Plotly.newPlot(plot, [{
+        x: x, y: values,
+        type: _PCA_USE_WEBGL ? "scattergl" : "scatter",
+        mode: "markers", customdata: custom, text: hover, hoverinfo: "text",
+        marker: {color: colour, size: 3, opacity: 0.86},
+        showlegend: false
+      }], {
+        margin: {l: 4, r: 4, b: 24, t: 4},
+        xaxis: {visible: false, fixedrange: true, range: [-0.42, 0.42]},
+        yaxis: {
+          visible: false, fixedrange: true, range: sharedRange,
+          showgrid: true, zeroline: true
+        },
+        shapes: plotShapes,
+        hovermode: "closest", dragmode: false, showlegend: false,
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)"
+      }, {displayModeBar: false, responsive: true, scrollZoom: false})
+        .then(function() {
+          card._srRendering = false;
+          card._srRendered = true;
+          if (typeof plot.on === "function") {
+            plot.on("plotly_click", function(event) {
+              var point = event && event.points && event.points[0];
+              if (!point || !point.customdata) return;
+              _PCA_scoreDetail(point.customdata, pc, group, values);
+            });
+          }
+        }, function(error) {
+          card._srRendering = false;
+          card._srRendered = false;
+          throw error;
+        });
+    };
+    card._srPurge = function() {
+      if (!card._srRendered || card._srRendering) return;
+      Plotly.purge(plot);
+      plot.innerHTML = "";
+      card._srRendered = false;
+    };
   });
+
+  var renderQueue = [];
+  var rendering = false;
+  function enqueueCard(card) {
+    if (!card || card._srRendered || card._srQueued) return;
+    card._srQueued = true;
+    renderQueue.push(card);
+    renderQueue.sort(function(a, b) { return cards.indexOf(a) - cards.indexOf(b); });
+    drainQueue();
+  }
+  function drainQueue() {
+    if (rendering || renderQueue.length === 0) return;
+    rendering = true;
+    var card = renderQueue.shift();
+    card._srQueued = false;
+    var viewport = scroller.getBoundingClientRect();
+    var rect = card.getBoundingClientRect();
+    if (rect.right < viewport.left - 520 || rect.left > viewport.right + 520) {
+      rendering = false;
+      drainQueue();
+      return;
+    }
+    var run = function() {
+      card._srRender().then(function() {
+        rendering = false;
+        drainQueue();
+      }, function(error) {
+        card._srRendered = false;
+        rendering = false;
+        if (window.console && console.error) {
+          console.error("PC Score group render failed", error);
+        }
+        drainQueue();
+      });
+    };
+    if (window.requestAnimationFrame) requestAnimationFrame(run);
+    else window.setTimeout(run, 0);
+  }
+  function refreshVisibleCards() {
+    var viewport = scroller.getBoundingClientRect();
+    var buffer = 520;
+    cards.forEach(function(card) {
+      var rect = card.getBoundingClientRect();
+      var near = rect.right >= viewport.left - buffer &&
+        rect.left <= viewport.right + buffer;
+      if (near) enqueueCard(card);
+      else if (card._srRendered) card._srPurge();
+    });
+  }
+  var refreshPending = false;
+  scroller.addEventListener("scroll", function() {
+    if (refreshPending) return;
+    refreshPending = true;
+    var refresh = function() {
+      refreshPending = false;
+      refreshVisibleCards();
+    };
+    if (window.requestAnimationFrame) requestAnimationFrame(refresh);
+    else window.setTimeout(refresh, 0);
+  }, {passive: true});
 
   if (window.IntersectionObserver) {
     var observer = new IntersectionObserver(function(entries) {
       entries.forEach(function(entry) {
         var index = cards.indexOf(entry.target);
         if (index < 0 || !dots[index]) return;
+        if (entry.isIntersecting) enqueueCard(entry.target);
         dots[index].classList.toggle("in-view", entry.intersectionRatio > 0);
         dots[index].classList.toggle("mostly-in-view", entry.intersectionRatio >= 0.75);
       });
@@ -594,6 +680,7 @@ function renderSinglePcPlot() {
   } else {
     dots.forEach(function(dot) { dot.classList.add("in-view"); });
   }
+  refreshVisibleCards();
 }
 
 // ---- PC loading / composition table ----

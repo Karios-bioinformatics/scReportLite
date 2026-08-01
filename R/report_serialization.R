@@ -18,12 +18,9 @@
     stop("json must be one non-missing serialized JSON string", call. = FALSE)
   }
 
-  replacements <- c(
-    "<" = "\\u003c",
-    ">" = "\\u003e",
-    "&" = "\\u0026",
-    "\u2028" = "\\u2028",
-    "\u2029" = "\\u2029"
+  replacements <- stats::setNames(
+    c("\\u003c", "\\u003e", "\\u0026", "\\u2028", "\\u2029"),
+    c("<", ">", "&", intToUtf8(8232L), intToUtf8(8233L))
   )
   for (needle in names(replacements)) {
     json <- gsub(needle, replacements[[needle]], json, fixed = TRUE)
