@@ -10,6 +10,8 @@ build_seurat_feature_diagnostics(
   reduction = "pca",
   scatter_features = c("nCount_RNA", "nFeature_RNA", "percent.mt"),
   scatter_gene_features = NULL,
+  cluster_col = NULL,
+  sample_col = NULL,
   top_n_variable = 2000,
   top_n_label = 20,
   top_n_expressed = 50,
@@ -33,6 +35,13 @@ in the FeatureScatter data. Default: \code{c("nCount_RNA", "nFeature_RNA",
 
 \item{scatter_gene_features}{Optional character vector of gene names whose
 expression should be included in FeatureScatter data. Default \code{NULL}.}
+
+\item{cluster_col}{Optional metadata column containing the cluster assignment
+to use for FeatureScatter grouping. If \code{NULL}, current Seurat
+identities are used.}
+
+\item{sample_col}{Optional metadata column containing sample identities. If
+\code{NULL}, \code{orig.ident} is used when available.}
 
 \item{top_n_variable}{Max number of variable-feature rows to include in the
 output.  Default 2000.}

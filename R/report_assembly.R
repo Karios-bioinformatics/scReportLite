@@ -113,6 +113,7 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
     cluster_col    = cluster_col,
     cell_col       = cell_col,
     sample_col     = sample_col,
+    gene_expr_df   = gene_expr_df,
     cluster_colors = cluster_cols,
     n_total        = n_total
   )

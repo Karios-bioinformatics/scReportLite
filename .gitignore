@@ -18,6 +18,12 @@
 # Output files from R CMD check
 /*.Rcheck/
 
+# Generated manual smoke report
+/v070_smoke.html
+/v070_smoke_files/
+/v070_acceptance.html
+/v070_acceptance_files/
+
 # RStudio files
 .Rproj.user/
 
