@@ -119,6 +119,36 @@ testthat::test_that("QC Feature and PCA share the module switcher contract", {
   testthat::expect_match(core, "function _SR_bindCapsulePager", fixed = TRUE)
 })
 
+testthat::test_that("UMAP mode buttons share the module switcher contract", {
+  root <- file.path(testthat::test_path(), "..", "..")
+  sidebar_paths <- file.path(root, "R", c(
+    "report_module_umap_sidebar.R", "report_module_gene_sidebar.R"
+  ))
+  css_path <- file.path(root, "inst", "assets", "css", "report_v070.css")
+  testthat::skip_if_not(
+    all(file.exists(c(sidebar_paths, css_path))),
+    "source UMAP switcher assets unavailable in installed-package checks"
+  )
+  sidebar <- paste(vapply(sidebar_paths, function(path) {
+    paste(readLines(path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+  }, character(1)), collapse = "\n")
+  css <- paste(readLines(css_path, warn = FALSE, encoding = "UTF-8"),
+    collapse = "\n")
+
+  testthat::expect_equal(
+    lengths(regmatches(sidebar, gregexpr(
+      "sidebar-tab sr-module-view-button", sidebar, fixed = TRUE
+    ))),
+    3L
+  )
+  testthat::expect_match(
+    css, ".sidebar-tab.sr-module-view-button.active", fixed = TRUE
+  )
+  testthat::expect_false(grepl(
+    "box-shadow: inset 4px 0 0 var(--sr-accent)", css, fixed = TRUE
+  ))
+})
+
 testthat::test_that("all bottom detail cards keep their identity header visible", {
   root <- file.path(testthat::test_path(), "..", "..")
   css_path <- file.path(root, "inst", "assets", "css", "report_v070.css")
@@ -247,6 +277,12 @@ testthat::test_that("PC Score uses fixed-axis grouped strip and fixed capsule", 
   testthat::expect_match(pca_js, "card._srPurge", fixed = TRUE)
   testthat::expect_match(pca_js, "renderQueue.sort", fixed = TRUE)
   testthat::expect_match(
+    pca_js, 'browser\'s limited WebGL contexts', fixed = TRUE
+  )
+  testthat::expect_match(
+    pca_js, 'type: "scatter",\n        mode: "markers"', fixed = TRUE
+  )
+  testthat::expect_match(
     pca_js, '_PCA_SUBVIEW === "score"', fixed = TRUE
   )
   testthat::expect_match(
@@ -329,7 +365,7 @@ testthat::test_that("PCA loading direction controls are wired to source assets",
   testthat::expect_match(design_js, "data-pca-loading-direction", fixed = TRUE)
 })
 
-testthat::test_that("PC Score titles use the 800 shade and horizontal edge", {
+testthat::test_that("PC Score titles and box lines use the 800 shade", {
   root <- file.path(testthat::test_path(), "..", "..")
   pca_path <- file.path(root, "inst", "assets", "js", "report_pca.js")
   css_path <- file.path(root, "inst", "assets", "css", "report_v070.css")
@@ -344,6 +380,12 @@ testthat::test_that("PC Score titles use the 800 shade and horizontal edge", {
 
   testthat::expect_match(
     pca_js, "shadeFrom(groupColors[group], 800)", fixed = TRUE
+  )
+  testthat::expect_match(
+    pca_js, "_PCA_plotColor(titleColour)", fixed = TRUE
+  )
+  testthat::expect_match(
+    pca_js, "line: {color: lineColour, width: 3}", fixed = TRUE
   )
   testthat::expect_match(
     css, "grid-template-rows: minmax(0, 1fr) 5px", fixed = TRUE

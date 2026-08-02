@@ -18,7 +18,8 @@
     gene_names <- setdiff(colnames(gene_expr_df), "cell")
     sidebar_tabs <- c(sidebar_tabs, list(
       tags$button(
-        type = "button", class = "sidebar-tab", id = "tab-genes",
+        type = "button", class = "sidebar-tab sr-module-view-button",
+        id = "tab-genes",
         `data-umap-mode` = "gene", "Gene"
       )
     ))

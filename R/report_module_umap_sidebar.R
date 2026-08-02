@@ -71,7 +71,8 @@
   # ---- Sidebar: tab-based layout ----
   sidebar_tabs <- list(
     tags$button(
-      type = "button", class = "sidebar-tab active", id = "tab-clusters",
+      type = "button", class = "sidebar-tab sr-module-view-button active",
+      id = "tab-clusters",
       `data-umap-mode` = "cluster", "Cluster"
     )
   )
@@ -84,7 +85,8 @@
   if (has_samples) {
     sidebar_tabs <- c(sidebar_tabs, list(
       tags$button(
-        type = "button", class = "sidebar-tab", id = "tab-samples",
+        type = "button", class = "sidebar-tab sr-module-view-button",
+        id = "tab-samples",
         `data-umap-mode` = "sample", "Sample"
       )
     ))

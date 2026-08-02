@@ -472,14 +472,16 @@ function renderSinglePcPlot() {
     var summary = _PCA_scoreSummary(values);
     var colour = (_PCA_HIGHLIGHT !== null && group !== _PCA_HIGHLIGHT)
       ? "#D0D0D0" : _PCA_plotColor(groupColors[group]);
+    var titleColour = window.SRColor && typeof window.SRColor.shadeFrom === "function"
+      ? window.SRColor.shadeFrom(groupColors[group], 800)
+      : groupColors[group];
+    var lineColour = (_PCA_HIGHLIGHT !== null && group !== _PCA_HIGHLIGHT)
+      ? "#8A8A8A" : _PCA_plotColor(titleColour);
     var card = document.createElement("section");
     card.className = "sr-pca-score-card";
     card.setAttribute("data-pca-score-group", group);
     card.style.setProperty("--sr-pca-group-colour", groupColors[group]);
-    card.style.setProperty("--sr-pca-title-colour",
-      window.SRColor && typeof window.SRColor.shadeFrom === "function"
-        ? window.SRColor.shadeFrom(groupColors[group], 800)
-        : groupColors[group]);
+    card.style.setProperty("--sr-pca-title-colour", titleColour);
     card.innerHTML =
       '<button type="button" class="sr-pca-score-title" title="' + group + '">' +
         '<span>' + group + '</span><i aria-hidden="true"></i>' +
@@ -534,27 +536,27 @@ function renderSinglePcPlot() {
         {
           type: "line", x0: 0, x1: 0,
           y0: summary.lowerWhisker, y1: summary.upperWhisker,
-          line: {color: colour, width: 2}, layer: "below"
+          line: {color: lineColour, width: 2}, layer: "below"
         },
         {
           type: "rect", x0: -0.18, x1: 0.18, y0: summary.q1, y1: summary.q3,
-          line: {color: colour, width: 2},
+          line: {color: lineColour, width: 2},
           fillcolor: "rgba(255,255,255,0.78)", layer: "below"
         },
         {
           type: "line", x0: -0.18, x1: 0.18,
           y0: summary.median, y1: summary.median,
-          line: {color: colour, width: 3}, layer: "above"
+          line: {color: lineColour, width: 3}, layer: "above"
         },
         {
           type: "line", x0: -0.1, x1: 0.1,
           y0: summary.lowerWhisker, y1: summary.lowerWhisker,
-          line: {color: colour, width: 2}, layer: "above"
+          line: {color: lineColour, width: 2}, layer: "above"
         },
         {
           type: "line", x0: -0.1, x1: 0.1,
           y0: summary.upperWhisker, y1: summary.upperWhisker,
-          line: {color: colour, width: 2}, layer: "above"
+          line: {color: lineColour, width: 2}, layer: "above"
         }
       ];
     }
@@ -566,7 +568,9 @@ function renderSinglePcPlot() {
       card._srRendering = true;
       return Plotly.newPlot(plot, [{
         x: x, y: values,
-        type: _PCA_USE_WEBGL ? "scattergl" : "scatter",
+        // Each sample owns a separate small plot. SVG avoids exhausting the
+        // browser's limited WebGL contexts while retaining every cell.
+        type: "scatter",
         mode: "markers", customdata: custom, text: hover, hoverinfo: "text",
         marker: {color: colour, size: 3, opacity: 0.86},
         showlegend: false
