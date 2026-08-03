@@ -35,7 +35,9 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
                              feature_diag_json = "null",
                              use_webgl = TRUE,
                              output, title, dim_opacity, marker_n_top,
-                             panels = c("umap", "marker_table")) {
+                             panels = c("umap", "marker_table"),
+                             report_warnings = character(),
+                             report_context = list()) {
 
   has_umap     <- !is.null(umap_df) && "umap" %in% panels
   has_pca      <- !is.null(pca_df) && "pca" %in% panels
@@ -55,6 +57,8 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
     has_samples  <- FALSE
     if (!is.null(pca_df))  n_total <- nrow(pca_df)
     if (!is.null(qc_payload$cells)) n_total <- length(qc_payload$cells)
+    if (!is.null(report_context$n_total)) n_total <- as.integer(report_context$n_total)
+    if (!is.null(report_context$clusters)) clusters <- natural_sort(report_context$clusters)
   }
 
   # ---- Build the UMAP module's sidebar and data ports ----
@@ -160,7 +164,9 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
       n_clusters = length(clusters),
       preview_samples = if (has_samples) {
         natural_sort(unique(as.character(umap_df[[sample_col]])))
-      } else if (!is.null(qc_payload$samples)) {
+      } else if (!is.null(report_context$samples)) {
+        natural_sort(as.character(report_context$samples))
+      } else if (!is.null(qc_payload$samples) && isTRUE(qc_payload$has_sample)) {
         natural_sort(as.character(qc_payload$samples))
       } else {
         character()
@@ -173,6 +179,7 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
         list(list(name = "Active", clusters = length(clusters)))
       },
       preview_warnings = c(
+        report_warnings,
         if (is.null(qc_payload)) "QC data were not supplied." else character(),
         if (is.null(feature_diag)) "Feature diagnostics were not supplied." else character(),
         if (is.null(pca_df)) "PCA data were not supplied." else character(),
@@ -186,7 +193,13 @@ assemble_report <- function(umap_plot = NULL, umap_df = NULL, marker_df,
       has_umap = has_umap,
       sidebar_html = sidebar_html,
       umap_tags = umap_tags,
-      panel_sections_html = panel_sections_html
+      panel_sections_html = panel_sections_html,
+      empty_reasons = list(
+        qc = "No usable QC metrics were supplied. No QC values were calculated by scReportLite.",
+        feature = "Feature diagnostics were unavailable. No preprocessing was run by scReportLite.",
+        pca = "No PCA reduction was supplied or found. PCA was not calculated by scReportLite.",
+        umap = "No UMAP reduction was supplied or found. UMAP was not calculated by scReportLite."
+      )
     )
   )
   first_view <- .first_report_module(report_modules)

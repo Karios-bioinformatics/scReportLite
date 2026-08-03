@@ -32,6 +32,16 @@ function _PLOT_isFiniteMetric(value) {
   return typeof value === "number" && isFinite(value);
 }
 
+function _PLOT_metrics(d) {
+  return d && Array.isArray(d.metrics) && d.metrics.length
+    ? d.metrics.slice() : ["nCount_RNA", "nFeature_RNA", "percent_mt"];
+}
+
+function _PLOT_metricLabel(d, metric) {
+  return d && d.metric_labels && d.metric_labels[metric]
+    ? d.metric_labels[metric] : (metric === "percent_mt" ? "percent.mt" : metric);
+}
+
 function _PLOT_formatMetric(value, digits) {
   return _PLOT_isFiniteMetric(value) ? value.toFixed(digits || 0) : "missing";
 }
@@ -86,14 +96,20 @@ function _PLOT_renderSummary(sample, metric, values, selectedValue) {
   if (!panel) return;
   var summary = _PLOT_metricSummary(values);
   if (!summary) {
-    panel.innerHTML = '<div class="sr-warning-card">QC data are missing for this sample and metric.</div>';
+    panel.innerHTML = '<div class="sr-warning-card">All values are missing for this sample and metric. No values were imputed.</div>';
     return;
   }
   var metricName = metric === "percent_mt" ? "percent.mt" : metric;
+  var allCells = window._QC_DATA && Array.isArray(window._QC_DATA.cells)
+    ? window._QC_DATA.cells.filter(function(cell) {
+        return String(cell.sample) === String(sample);
+      }) : [];
+  var missingCount = Math.max(0, allCells.length - summary.count);
   var rows = [
     ["Sample", sample],
     ["Metric", metricName],
-    ["Cells", summary.count],
+    ["Valid values", summary.count],
+    ["Missing values", missingCount],
     ["Minimum", _PLOT_formatMetric(summary.minimum, 2)],
     ["Q1", _PLOT_formatMetric(summary.q1, 2)],
     ["Median", _PLOT_formatMetric(summary.median, 2)],
@@ -311,11 +327,15 @@ function _PLOT_mkSelect(value, onchange) {
 var _PLOT_CONTROL_REGISTRY = {
   viewMode: {
     render: function(container) {
+      var d = window._QC_DATA || {};
       var g = _PLOT_mkGroup("View mode");
-      g.appendChild(_PLOT_mkToggleRow([
-        _PLOT_mkToggleBtn("By metric", _PLOT_STATE.overview.mode === "metric", function() { _PLOT_setOvMode("metric"); }),
+      var buttons = [
+        _PLOT_mkToggleBtn("By metric", _PLOT_STATE.overview.mode === "metric", function() { _PLOT_setOvMode("metric"); })
+      ];
+      if (d.has_sample !== false) buttons.push(
         _PLOT_mkToggleBtn("By sample", _PLOT_STATE.overview.mode === "sample", function() { _PLOT_setOvMode("sample"); })
-      ]));
+      );
+      g.appendChild(_PLOT_mkToggleRow(buttons));
       container.appendChild(g);
     }
   },
@@ -335,12 +355,16 @@ var _PLOT_CONTROL_REGISTRY = {
 
   comparisonMode: {
     render: function(container) {
+      var d = window._QC_DATA || {};
       var g = _PLOT_mkGroup("Comparison mode");
       var m = _PLOT_STATE.single.mode;
-      g.appendChild(_PLOT_mkToggleRow([
-        _PLOT_mkToggleBtn("By metric", m === "metric", function() { _PLOT_setSmMode("metric"); }),
+      var buttons = [
+        _PLOT_mkToggleBtn("By metric", m === "metric", function() { _PLOT_setSmMode("metric"); })
+      ];
+      if (d.has_sample !== false) buttons.push(
         _PLOT_mkToggleBtn("By sample", m === "sample", function() { _PLOT_setSmMode("sample"); })
-      ]));
+      );
+      g.appendChild(_PLOT_mkToggleRow(buttons));
       container.appendChild(g);
     }
   },
@@ -354,9 +378,9 @@ var _PLOT_CONTROL_REGISTRY = {
       if (mode === "metric") {
         var g = _PLOT_mkGroup("Metric");
         var sel = _PLOT_mkSelect(_PLOT_STATE.single.metric, function(v) { _PLOT_setSmMetric(v); });
-        ["nCount_RNA","nFeature_RNA","percent_mt"].forEach(function(v) {
+        _PLOT_metrics(d).forEach(function(v) {
           var o = document.createElement("option");
-          o.value = v; o.textContent = v === "percent_mt" ? "percent.mt" : v;
+          o.value = v; o.textContent = _PLOT_metricLabel(d, v);
           sel.appendChild(o);
         });
         sel.value = _PLOT_STATE.single.metric;
@@ -553,10 +577,10 @@ function _PLOT_renderOvMetric(d) {
   if (!canvas) return;
 
   var op = _PLOT_focusOpacities(_PLOT_STATE.overview.focus);
-  _PLOT_STATE._activeCanvasIds = ["plot-ov-metric-0","plot-ov-metric-1","plot-ov-metric-2"];
+  var metrics = _PLOT_metrics(d);
+  _PLOT_STATE._activeCanvasIds = metrics.map(function(_, i) { return "plot-ov-metric-" + i; });
   var samples = d.samples;
-  var metrics = ["nCount_RNA","nFeature_RNA","percent_mt"];
-  var yLabels = ["nCount_RNA","nFeature_RNA","percent_mt"];
+  var yLabels = metrics.map(function(metric) { return _PLOT_metricLabel(d, metric); });
 
   // Build 3 stacked containers
   var overviewFrame = _PLOT_buildOverviewFrame(canvas, "vertical");
@@ -608,9 +632,8 @@ function _PLOT_renderOvMetric(d) {
         cellRecords.push(d.cells[ci]);
         hoverTexts.push("Cell: " + d.cells[ci].cell +
           "<br>Sample: " + s +
-          "<br>nCount: " + d.cells[ci].nCount_RNA +
-          "<br>nFeature: " + d.cells[ci].nFeature_RNA +
-          "<br>%MT: " + _PLOT_formatMetric(d.cells[ci].percent_mt, 2));
+          "<br>" + _PLOT_metricLabel(d, metric) + ": " +
+          _PLOT_formatMetric(d.cells[ci][metric], 2));
       }
       if (!yVals.length) continue;
 
@@ -671,8 +694,8 @@ function _PLOT_renderOvSample(d) {
 
   var op = _PLOT_focusOpacities(_PLOT_STATE.overview.focus);
   var samples = d.samples;
-  var metrics = ["nCount_RNA","nFeature_RNA","percent_mt"];
-  var mLabels = ["nCount_RNA","nFeature_RNA","percent.mt"];
+  var metrics = _PLOT_metrics(d);
+  var mLabels = metrics.map(function(metric) { return _PLOT_metricLabel(d, metric); });
 
   // ---- Compute per-metric global y-ranges (same metric shares range across samples) ----
   var metricRanges = {};
@@ -888,8 +911,8 @@ function _PLOT_renderSmSample(d) {
   var sample = _PLOT_STATE.single.sample;
   if (!sample) return;
 
-  var metrics = ["nCount_RNA","nFeature_RNA","percent_mt"];
-  var mLabels = ["nCount_RNA","nFeature_RNA","percent.mt"];
+  var metrics = _PLOT_metrics(d);
+  var mLabels = metrics.map(function(metric) { return _PLOT_metricLabel(d, metric); });
   var fillCol = _PLOT_getSampleColor(sample);
 
   // ---- Compute per-metric y-ranges for this sample ----
@@ -1107,6 +1130,11 @@ function _PLOT_init() {
 
   // Set default single sample (first in natural order)
   _PLOT_STATE.single.sample = d.samples[0];
+  _PLOT_STATE.single.metric = _PLOT_metrics(d)[0];
+  if (d.has_sample === false) {
+    _PLOT_STATE.overview.mode = "metric";
+    _PLOT_STATE.single.mode = "metric";
+  }
 
   // Trigger initial render (controls rendered by _PLOT_renderControls)
   _PLOT_scheduleRender();

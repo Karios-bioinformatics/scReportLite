@@ -21,26 +21,26 @@ register_report_module <- function(id, panel_names, build) {
     build_preview_module(x)
   })
   register_report_module("plot", "qc", function(x) {
-    .build_qc_report_module(x$has_plot)
+    if (x$has_plot) .build_qc_report_module(TRUE) else
+      .build_empty_report_module("plot", "QC", x$empty_reasons$qc)
   })
   register_report_module("feature", "feature", function(x) {
-    .build_feature_report_module(
-      x$has_feature,
-      active = FALSE
-    )
+    if (x$has_feature) .build_feature_report_module(TRUE, active = FALSE) else
+      .build_empty_report_module("feature", "Feature", x$empty_reasons$feature)
   })
   register_report_module("pca", "pca", function(x) {
-    .build_pca_report_module(
-      x$has_pca,
-      x$pca_has_sample
-    )
+    if (x$has_pca) .build_pca_report_module(TRUE, x$pca_has_sample) else
+      .build_empty_report_module("pca", "PCA", x$empty_reasons$pca)
   })
   register_report_module(
     "umap",
     unique(c("umap", "marker_table", list_panels())),
     function(x) {
+      if (!x$has_umap) return(.build_empty_report_module(
+        "umap", "UMAP", x$empty_reasons$umap
+      ))
       .build_umap_report_module(
-        x$has_umap,
+        TRUE,
         hidden = TRUE,
         sidebar_html = x$sidebar_html,
         umap_tags = x$umap_tags,

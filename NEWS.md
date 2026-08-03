@@ -1,3 +1,18 @@
+# scReportLite 1.0.0
+
+- Added `sc_report(object = ...)` as the simple Seurat-first reporting entry.
+- Added `sc_report_data()` as the explicit advanced prepared-table interface,
+  while retaining compatibility with named legacy `sc_report()` table calls.
+- Added deterministic UMAP/PCA reduction selection, active-identity clustering,
+  optional sample mode, explicit assay/layer expression provenance, and
+  user-supplied marker normalization without marker calculation.
+- Added timestamped report bundle directories, overwrite protection, optional
+  browser opening, and explained empty pages with Preview warnings.
+- Generalized QC to custom numeric metrics and missing-value accounting; Inf and
+  NaN are reported and treated as missing rather than imputed.
+- Updated authorship, ORCID, copyright, development-assistance disclosure,
+  privacy guidance, and package metadata for the first stable release.
+
 # scReportLite 0.7.0
 
 ## Report workspace

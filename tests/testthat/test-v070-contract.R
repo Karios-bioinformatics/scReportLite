@@ -306,6 +306,10 @@ testthat::test_that("v0.7 colours are normalized and selected metrics use theme 
   pca_path <- file.path(root, "inst", "assets", "js", "report_pca.js")
   qc_path <- file.path(root, "inst", "assets", "js", "report_qc.js")
   css_path <- file.path(root, "inst", "assets", "css", "report_v070.css")
+  testthat::skip_if_not(
+    all(file.exists(c(design_path, feature_path, pca_path, qc_path, css_path))),
+    "source assets unavailable in installed-package checks"
+  )
   sources <- vapply(c(design_path, feature_path, pca_path, qc_path, css_path), function(path) {
     paste(readLines(path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
   }, character(1))
@@ -330,6 +334,10 @@ testthat::test_that("UMAP right region uses explicit counts and single-cluster m
   design_path <- file.path(root, "inst", "assets", "js", "report_design.js")
   umap_path <- file.path(root, "inst", "assets", "js", "report_umap.js")
   ports_path <- file.path(root, "R", "report_data_ports.R")
+  testthat::skip_if_not(
+    all(file.exists(c(design_path, umap_path, ports_path))),
+    "source UMAP assets unavailable in installed-package checks"
+  )
   design <- paste(readLines(design_path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
   umap <- paste(readLines(umap_path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
   ports <- paste(readLines(ports_path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")

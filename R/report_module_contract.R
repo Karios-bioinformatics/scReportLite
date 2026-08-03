@@ -43,6 +43,24 @@
   )
 }
 
+.build_empty_report_module <- function(id, label, reason) {
+  .new_report_module(
+    id = id,
+    label = label,
+    available = TRUE,
+    container_id = paste0("sr-view-", id),
+    container_class = paste0("sr-view-", id, " sr-view-empty"),
+    layout_class = NULL,
+    slots = list(
+      centre = tags$div(
+        class = "sr-empty-module",
+        tags$div(class = "section-title", paste(label, "unavailable")),
+        tags$p(class = "sr-warning-card", reason)
+      )
+    )
+  )
+}
+
 #' Render one report view module
 #'
 #' @param module A report module specification.

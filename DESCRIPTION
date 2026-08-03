@@ -1,16 +1,20 @@
 Package: scReportLite
 Type: Package
 Title: Single-Cell Interactive HTML Report Generator
-Version: 0.7.0
-Authors@R: person(given = "Kee-gong Karios",
+Version: 1.0.0
+Authors@R: person(given = "Kee-gong",
                   family = "Park",
                   email = "karioslion0517@gmail.com",
-                  role = c("aut", "cre"))
+                  role = c("aut", "cre", "cph"),
+                  comment = c(ORCID = "0009-0000-6485-5399"))
 Description: Generate portable interactive HTML report bundles from single-cell
-    RNA-seq analysis results. Accepts UMAP coordinates, cluster assignments, and
-    marker gene tables, producing an HTML entry file plus its dependency folder
-    with interactive cluster highlighting and marker table display.
+    RNA-seq analysis results without performing biological analysis. Reads
+    existing Seurat results or prepared tables and produces an HTML entry file
+    plus its dependency folder with cell-level exploration, quality-control,
+    feature, principal-component, embedding, and marker-result views.
 License: MIT + file LICENSE
+URL: https://github.com/Karios-bioinformatics/scReportLite
+BugReports: https://github.com/Karios-bioinformatics/scReportLite/issues
 Encoding: UTF-8
 Imports:
     Matrix,

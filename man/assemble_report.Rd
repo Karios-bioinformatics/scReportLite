@@ -28,7 +28,9 @@ assemble_report(
   title,
   dim_opacity,
   marker_n_top,
-  panels = c("umap", "marker_table")
+  panels = c("umap", "marker_table"),
+  report_warnings = character(),
+  report_context = list()
 )
 }
 \arguments{
@@ -51,6 +53,10 @@ assemble_report(
 \item{dim_opacity}{Opacity for non-highlighted points (0-1)}
 
 \item{marker_n_top}{Number of top marker genes to show per cluster}
+
+\item{report_warnings}{Additional messages shown on Preview.}
+
+\item{report_context}{Optional report-level cell, cluster, and sample summaries.}
 }
 \value{
 Invisibly, the path to the output file

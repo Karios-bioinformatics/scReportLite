@@ -20,6 +20,8 @@
 #' @param cluster_col Name of the cluster column (default "cluster").
 #' @param cell_col Name of the cell/barcode column.
 #' @param sample_col Name of the sample column.
+#' @param qc_metrics Optional character vector of numeric QC columns. When
+#'   omitted, numeric non-identifier columns are inferred.
 #' @param max_points_per_group Deprecated compatibility argument. Since v0.7.0,
 #'   every QC cell is sent to the browser and no point sampling is performed.
 #' @param qc_status_col Optional column identifying whether a cell was retained
@@ -32,10 +34,11 @@ build_qc_payload <- function(qc_df,
                               cluster_col = "cluster",
                               cell_col    = "cell",
                               sample_col  = "sample",
+                              qc_metrics = NULL,
                               max_points_per_group = 1000,
                               qc_status_col = NULL) {
 
-  required <- c(cell_col, sample_col, "nCount_RNA", "nFeature_RNA", "percent.mt")
+  required <- c(cell_col, if (!is.null(sample_col)) sample_col)
   missing <- setdiff(required, colnames(qc_df))
   if (length(missing) > 0)
     stop("qc_df is missing required columns: ", paste(missing, collapse = ", "),
@@ -52,8 +55,8 @@ build_qc_payload <- function(qc_df,
   if (!is.null(qc_status_col) && !qc_status_col %in% colnames(qc_df)) {
     stop("qc_status_col not found in qc_df: ", qc_status_col, call. = FALSE)
   }
-  samples     <- natural_sort(unique(qc_df[[sample_col]]))
-  sample_cols <- cluster_color_map(samples)
+  samples <- if (is.null(sample_col)) "All cells" else natural_sort(unique(qc_df[[sample_col]]))
+  sample_cols <- if (length(samples)) cluster_color_map(samples) else character()
   # force plain character keys / values
   sample_cols <- stats::setNames(unname(sample_cols), names(sample_cols))
 
@@ -61,7 +64,14 @@ build_qc_payload <- function(qc_df,
           nrow(qc_df), " cells")
 
   # Validate QC metric columns
-  qc_cols <- c("nCount_RNA", "nFeature_RNA", "percent.mt")
+  excluded <- unique(c(cell_col, sample_col, cluster_col, qc_status_col,
+                       "qc_status", "filter_status", "retained"))
+  if (is.null(qc_metrics)) {
+    qc_cols <- setdiff(names(qc_df)[vapply(qc_df, is.numeric, logical(1))], excluded)
+  } else {
+    qc_cols <- intersect(as.character(qc_metrics), names(qc_df))
+  }
+  if (!length(qc_cols)) stop("qc_df contains no usable numeric QC metrics", call. = FALSE)
   for (col in qc_cols) {
     vals <- qc_df[[col]]
     if (!is.numeric(vals)) {
@@ -70,8 +80,9 @@ build_qc_payload <- function(qc_df,
     }
     bad <- is.nan(vals) | is.infinite(vals)
     if (any(bad, na.rm = TRUE)) {
-      stop("qc_df column '", col, "' contains Inf or NaN values",
-           call. = FALSE)
+      warning("qc_df column '", col, "' contains Inf or NaN; these values are treated as missing.",
+              call. = FALSE)
+      qc_df[[col]][bad] <- NA_real_
     }
   }
 
@@ -80,13 +91,12 @@ build_qc_payload <- function(qc_df,
     n <- nrow(df)
     cells <- vector("list", n)
     for (i in seq_len(n)) {
-      rec <- list(
-        cell        = as.character(df[[cell_col]][i]),
-        sample      = as.character(df[[sample_col]][i]),
-        nCount_RNA  = df[["nCount_RNA"]][i],
-        nFeature_RNA= df[["nFeature_RNA"]][i],
-        percent_mt  = df[["percent.mt"]][i]
-      )
+      rec <- list(cell = as.character(df[[cell_col]][i]))
+      rec$sample <- if (is.null(sample_col)) "All cells" else as.character(df[[sample_col]][i])
+      for (metric in qc_cols) {
+        key <- if (identical(metric, "percent.mt")) "percent_mt" else metric
+        rec[[key]] <- df[[metric]][i]
+      }
       if (has_cluster)
         rec$cluster <- as.character(df[[cluster_col]][i])
       raw_status <- if (is.null(qc_status_col)) "retained" else df[[qc_status_col]][i]
@@ -111,6 +121,10 @@ build_qc_payload <- function(qc_df,
   list(
     samples       = as.character(samples),
     sample_colors = sample_cols,
+    metrics       = as.character(ifelse(qc_cols == "percent.mt", "percent_mt", qc_cols)),
+    metric_labels = stats::setNames(as.character(qc_cols),
+                                    as.character(ifelse(qc_cols == "percent.mt", "percent_mt", qc_cols))),
+    has_sample    = !is.null(sample_col),
     cells         = cells,
     point_indices = point_indices - 1L  # 0-based for JS
   )

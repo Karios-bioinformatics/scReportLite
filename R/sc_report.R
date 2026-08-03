@@ -72,6 +72,11 @@
 #' @param use_webgl Use plotly WebGL (scattergl) rendering instead of SVG
 #'   (scatter). Recommended for datasets with >10k cells to avoid
 #'   browser slowdown. Default: \code{TRUE}.
+#' @param qc_metrics Optional numeric QC columns. Numeric non-identifier columns
+#'   are inferred when omitted.
+#' @param report_warnings Additional messages shown on Preview.
+#' @param report_context Optional report-level cell, cluster, and sample summary
+#'   used when an analysis module is unavailable.
 #'
 #' @return Invisibly, the path to the output HTML file.
 #' @export
@@ -95,7 +100,7 @@
 #' marker_df <- read.csv("markers.csv")
 #' sc_report(umap_df, marker_df = marker_df, sample_col = "condition")
 #' }
-sc_report <- function(umap_df = NULL,
+sc_report_data <- function(umap_df = NULL,
                        cluster_col   = "cluster",
                        cell_col      = "cell",
                        sample_col    = NULL,
@@ -117,7 +122,10 @@ sc_report <- function(umap_df = NULL,
                        dim_opacity   = 0.06,
                        marker_n_top  = 20,
                        panels        = c("umap", "marker_table"),
-                       use_webgl     = TRUE) {
+                       use_webgl     = TRUE,
+                       qc_metrics    = NULL,
+                       report_warnings = character(),
+                       report_context = list()) {
 
   validate_sc_report_parameters(
     cluster_col = cluster_col,
@@ -142,39 +150,31 @@ sc_report <- function(umap_df = NULL,
 
   if (needs_umap) {
     if (is.null(umap_df)) {
-      stop("'umap' panel requested but umap_df is NULL. Provide a UMAP data frame or remove 'umap' from panels.",
-           call. = FALSE)
+      warning("UMAP panel requested but umap_df is NULL. The UMAP page will explain why it is empty.",
+              call. = FALSE)
+    } else {
+      validate_inputs(umap_df, marker_df, cluster_col, cell_col, sample_col)
+      umap_df[[cell_col]] <- as.character(umap_df[[cell_col]])
     }
-    validate_inputs(umap_df, marker_df, cluster_col, cell_col, sample_col)
-    umap_df[[cell_col]] <- as.character(umap_df[[cell_col]])
   }
 
   # Validate gene expression data — requires UMAP for highlight overlay
   if (!is.null(gene_expr_df)) {
     if (is.null(umap_df)) {
-      stop("gene_expr_df requires umap_df for gene expression overlay on UMAP. ",
-           "Either provide umap_df or set gene_expr_df = NULL.",
-           call. = FALSE)
+      warning("gene_expr_df cannot be displayed without UMAP coordinates and will be ignored.",
+              call. = FALSE)
+      gene_expr_df <- NULL
     }
-    if ("cell" %in% colnames(gene_expr_df)) {
+    if (!is.null(gene_expr_df) && "cell" %in% colnames(gene_expr_df)) {
       gene_expr_df[["cell"]] <- as.character(gene_expr_df[["cell"]])
     }
-    validate_gene_expr_df(gene_expr_df, umap_df, cell_col)
+    if (!is.null(gene_expr_df)) validate_gene_expr_df(gene_expr_df, umap_df, cell_col)
   }
 
   # Handle UMAP-dependent panels when UMAP is absent
   if (is.null(umap_df) && length(umap_dependent_panels) > 0) {
-    remaining_panels <- setdiff(panels, umap_dependent_panels)
-    if (length(intersect(remaining_panels, c("pca", "qc", "feature"))) == 0L) {
-      stop(
-        "No viewable panels selected after removing UMAP-dependent panels",
-        call. = FALSE
-      )
-    }
-    warning("Panels ", paste(umap_dependent_panels, collapse = ", "),
-            " require UMAP data but umap_df is NULL. They will be skipped.",
+    warning("UMAP-dependent content is unavailable because umap_df is NULL.",
             call. = FALSE)
-    panels <- remaining_panels
   }
 
   # Validate PCA data if provided (v0.2.2)
@@ -216,15 +216,9 @@ sc_report <- function(umap_df = NULL,
     if (!is.data.frame(qc_df)) {
       stop("qc_df must be a data.frame or NULL", call. = FALSE)
     }
-    qc_sample_default <- if (!is.null(sample_col)) sample_col else "sample"
-    qc_required <- c(cell_col, qc_sample_default, "nCount_RNA", "nFeature_RNA", "percent.mt")
-    qc_missing <- setdiff(qc_required, colnames(qc_df))
-    if (length(qc_missing) > 0) {
-      warning("QC panel requested but qc_df is missing required columns: ",
-              paste(qc_missing, collapse = ", "),
-              ".  Need at least: ", cell_col, ", sample, nCount_RNA, nFeature_RNA, percent.mt.",
-              "  Skipping Plot view.",
-              call. = FALSE)
+    if (!cell_col %in% colnames(qc_df)) {
+      warning("QC panel requested but qc_df is missing the cell column '", cell_col,
+              "'. The QC page will be empty.", call. = FALSE)
       qc_df <- NULL
     } else {
       validate_cell_ids(qc_df[[cell_col]], "qc_df", cell_col)
@@ -283,7 +277,7 @@ sc_report <- function(umap_df = NULL,
 
   # ---- Build plots ----
   umap_plot <- NULL
-  if (needs_umap) {
+  if (needs_umap && !is.null(umap_df)) {
     message("scReportLite: building interactive UMAP plot...")
     umap_plot <- build_umap_plotly(
       umap_df, cluster_col, cell_col, sample_col,
@@ -299,15 +293,15 @@ sc_report <- function(umap_df = NULL,
     } else if ("sample" %in% colnames(qc_df)) {
       "sample"
     } else {
-      stop("qc_df must have a sample column (either 'sample' or the value of sample_col)",
-           call. = FALSE)
+      NULL
     }
     message("scReportLite: building QC diagnostic plots...")
     qc_payload <- build_qc_payload(
       qc_df,
       cluster_col = cluster_col,
       cell_col    = cell_col,
-      sample_col  = qc_sample_col
+      sample_col  = qc_sample_col,
+      qc_metrics  = qc_metrics
     )
   }
 
@@ -503,6 +497,8 @@ sc_report <- function(umap_df = NULL,
     title         = title,
     dim_opacity   = dim_opacity,
     marker_n_top  = marker_n_top,
-    panels        = panels
+    panels        = panels,
+    report_warnings = report_warnings,
+    report_context = report_context
   )
 }

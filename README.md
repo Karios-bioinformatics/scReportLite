@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Version-v0.7.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/Version-v1.0.0-blue" alt="Version">
   <img src="https://img.shields.io/badge/Status-Active%20Development-green" alt="Status">
   <img src="https://img.shields.io/badge/Layer-scReport%20Lite-lightgrey" alt="Layer">
   <img src="https://img.shields.io/badge/Focus-Single--cell%20Reporting-purple" alt="Focus">
@@ -26,7 +26,7 @@ scReportLite does **not** replace Seurat, Scanpy, or upstream analysis workflows
 The current development version is:
 
 ```text
-scReportLite v0.7.0
+scReportLite v1.0.0
 ```
 
 This version defines the current five-page interactive workspace of scReportLite:
@@ -41,14 +41,12 @@ The latest archived Zenodo release currently remains v0.5.0:
 10.5281/zenodo.21245542
 ```
 
-The v0.6.0 modular refactor and v0.7.0 UI reconstruction are development
-milestones. The next planned unified stable release is **v1.0.0**, after
-real-data acceptance testing, package checks, documentation cleanup, and final
-API stabilization.
+Version 1.0.0 is the first stable product release of the reconstructed
+five-page reporting workspace.
 
 ## Project Scope
 
-Starting from **v0.7.0**, scReportLite is organized as a five-page report workspace:
+Starting from **v1.0.0**, scReportLite is organized as a five-page report workspace:
 
 ```text
 PREVIEW | QC | FEATURE | PCA | UMAP
@@ -111,7 +109,8 @@ The generated report can be opened directly in a web browser and shared without 
 ### Seurat-first workflow
 
 - Designed around Seurat-style single-cell workflows
-- Accepts pre-computed data frames for report construction
+- Accepts an existing Seurat object through the simple interface
+- Retains a pre-computed data-frame interface through `sc_report_data()`
 - Provides a Seurat helper for building Feature Diagnostics data
 - Avoids re-running the full single-cell analysis pipeline inside the report
 
@@ -135,28 +134,17 @@ remotes::install_github(
 library(scReportLite)
 
 sc_report(
-  qc_df = qc_df,
-  feature_diag = feature_diag,
-  pca_df = pca_df,
-  pca_loading_df = pca_loading_df,
-  umap_df = umap_df,
-  marker_df = marker_df,
-  gene_expr_df = gene_expr_df,
-  sample_col = "sample",
-  output = "scReportLite_v070_report.html",
-  title = "scReportLite v0.7.0 report",
-  panels = c(
-    "qc",
-    "feature",
-    "pca",
-    "umap",
-    "marker_table",
-    "sample_composition",
-    "gene_expression"
-  ),
-  use_webgl = TRUE
+  object = seu,
+  markers = markers
 )
 ```
+
+This reads existing results only. `markers` is optional and is never calculated
+by scReportLite. When `output_dir` is omitted, the report is written to a
+local-time-stamped folder containing `index.html` and `index_files/`.
+
+Advanced users can call `sc_report_data()` with prepared UMAP, PCA, QC, feature,
+marker, and expression tables.
 
 ---
 
@@ -856,15 +844,28 @@ BibTeX:
 
 ## License
 
-MIT License
+MIT License. Copyright (c) 2026 Kee-gong Park.
+
+## Authorship and development statement
+
+scReportLite was independently initiated, designed, directed, reviewed, tested,
+and maintained by Kee-gong Park. DeepSeek v4 Pro and OpenAI Codex were used
+solely to assist software code implementation. Product scope, scientific scope,
+data contracts, user-interface requirements, acceptance criteria, testing
+decisions, and release decisions are human-directed.
+
+scReportLite is a reporting package, not an analysis package. It does not run
+normalization, feature selection, dimensional reduction, clustering, batch
+correction, marker discovery, differential expression, or cell annotation.
+
+Reports may contain cell identifiers and cell-level metadata. Review the bundle
+before sharing it and apply the privacy and data-governance requirements of the
+source project.
 
 ---
 
 ## Author
 
-Kee-gong Karios Park
-
-Bioinformatics Undergraduate  
-Jilin Agricultural University
+Kee-gong Park
 
 ORCID: [https://orcid.org/0009-0000-6485-5399](https://orcid.org/0009-0000-6485-5399)

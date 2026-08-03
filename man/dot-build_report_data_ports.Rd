@@ -7,6 +7,7 @@
 .build_report_data_ports(
   marker_json,
   clusters_json,
+  cluster_counts_json,
   marker_n_top,
   dim_opacity,
   has_samples,
@@ -29,8 +30,7 @@
   pca_loading_top_n,
   first_view,
   has_umap,
-  panel_js_extra,
-  resolution_payload = list()
+  panel_js_extra
 )
 }
 \value{

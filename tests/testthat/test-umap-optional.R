@@ -72,19 +72,22 @@ test_that("PCA-only report generates HTML and Plotly libdir", {
   unlink(libdir, recursive = TRUE)
 })
 
-test_that("umap panel with NULL umap_df errors clearly", {
-  expect_error(
-    sc_report(umap_df = NULL, panels = "umap", output = file.path(tempdir(), "tmp.html")),
-    "umap_df is NULL"
-  )
+test_that("umap panel with NULL umap_df remains as an explained empty page", {
+  out <- file.path(tempdir(), "test_empty_umap.html")
+  expect_warning(sc_report(umap_df = NULL, panels = "umap", output = out),
+                 "UMAP panel requested")
+  expect_true(file.exists(out))
+  expect_match(paste(readLines(out, warn = FALSE), collapse = "\n"),
+               "UMAP was not calculated by scReportLite", fixed = TRUE)
+  unlink(out)
 })
 
-test_that("gene_expr_df without umap_df errors clearly", {
+test_that("gene_expr_df without umap_df is ignored with a warning", {
   ge <- data.frame(cell = "c1", GENE = 1.5, stringsAsFactors = FALSE)
-  expect_error(
+  expect_warning(
     sc_report(umap_df = NULL, gene_expr_df = ge, panels = "qc",
               qc_df = make_qc(10), output = file.path(tempdir(), "tmp.html")),
-    "gene_expr_df requires umap_df"
+    "cannot be displayed without UMAP"
   )
 })
 
@@ -94,7 +97,7 @@ test_that("marker_table with NULL umap_df warns and still generates with QC", {
   expect_warning(
     sc_report(umap_df = NULL, qc_df = qc, panels = c("qc", "marker_table"),
               output = out),
-    "marker_table"
+    "UMAP-dependent content"
   )
   expect_true(file.exists(out))
   unlink(out)

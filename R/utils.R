@@ -1,5 +1,7 @@
 # scReportLite: Utility functions ------------------------------------------------
 
+`%||%` <- function(x, y) if (is.null(x)) y else x
+
 #' Execute expression with a local random seed
 #'
 #' Runs \code{expr} with \code{set.seed(seed)} and restores the

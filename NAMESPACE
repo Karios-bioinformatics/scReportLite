@@ -2,4 +2,5 @@
 
 export(build_seurat_feature_diagnostics)
 export(sc_report)
+export(sc_report_data)
 importFrom(htmltools,tags)

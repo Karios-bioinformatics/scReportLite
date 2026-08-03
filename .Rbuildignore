@@ -11,3 +11,4 @@
 ^inst/test_sort\.R$
 ^inst/verify_args\.R$
 ^inst/verify_fixes\.R$
+^LICENSE\.md$

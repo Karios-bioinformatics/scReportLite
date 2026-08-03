@@ -39,26 +39,37 @@ test_that("build_qc_payload small data (all cells fit) returns all indices", {
 })
 
 test_that("build_qc_payload with missing columns errors clearly", {
-  df <- data.frame(cell = "a", sample = "b", stringsAsFactors = FALSE)
+  df <- data.frame(sample = "b", value = 1, stringsAsFactors = FALSE)
   expect_error(build_qc_payload(df), "missing required columns")
 })
 
 test_that("build_qc_payload rejects non-numeric QC columns", {
   df <- make_qc(5, 5)
   df$nCount_RNA <- c("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
-  expect_error(build_qc_payload(df), "must be numeric")
+  expect_error(build_qc_payload(df, qc_metrics = "nCount_RNA"), "must be numeric")
 })
 
-test_that("build_qc_payload rejects Inf in QC columns", {
+test_that("build_qc_payload treats Inf as missing with a warning", {
   df <- make_qc(5, 5)
   df$nCount_RNA[1] <- Inf
-  expect_error(build_qc_payload(df), "contains Inf or NaN")
+  expect_warning(payload <- build_qc_payload(df), "treated as missing")
+  expect_true(is.na(payload$cells[[1]]$nCount_RNA))
 })
 
-test_that("build_qc_payload rejects NaN in QC columns", {
+test_that("build_qc_payload treats NaN as missing with a warning", {
   df <- make_qc(5, 5)
   df$nFeature_RNA[2] <- NaN
-  expect_error(build_qc_payload(df), "contains Inf or NaN")
+  expect_warning(payload <- build_qc_payload(df), "treated as missing")
+  expect_true(is.na(payload$cells[[2]]$nFeature_RNA))
+})
+
+test_that("build_qc_payload supports custom metrics and no sample column", {
+  df <- data.frame(cell = c("a", "b"), cluster = c("1", "2"), custom_qc = c(1, 2))
+  payload <- build_qc_payload(df, sample_col = NULL)
+  expect_identical(payload$metrics, "custom_qc")
+  expect_false(payload$has_sample)
+  expect_identical(payload$samples, "All cells")
+  expect_equal(payload$cells[[2]]$custom_qc, 2)
 })
 
 test_that("build_qc_payload preserves missing QC metrics", {
