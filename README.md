@@ -6,7 +6,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Version-v1.0.0-blue" alt="Version">
-  <img src="https://img.shields.io/badge/Status-Active%20Development-green" alt="Status">
+  <img src="https://img.shields.io/badge/Status-Stable%20Release-green" alt="Status">
   <img src="https://img.shields.io/badge/Layer-scReport%20Lite-lightgrey" alt="Layer">
   <img src="https://img.shields.io/badge/Focus-Single--cell%20Reporting-purple" alt="Focus">
   <a href="https://doi.org/10.5281/zenodo.21245542"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.21245542.svg" alt="DOI"></a>
@@ -21,9 +21,9 @@ It is designed as the **Lite layer of the scReport ecosystem**: a focused, brows
 
 scReportLite does **not** replace Seurat, Scanpy, or upstream analysis workflows. Instead, it converts pre-computed single-cell outputs into a shareable interactive report for exploration, presentation, and communication.
 
-## Current development version
+## Current stable version
 
-The current development version is:
+The current stable source version is:
 
 ```text
 scReportLite v1.0.0
@@ -148,9 +148,19 @@ marker, and expression tables.
 
 ---
 
-## Recommended v0.7.0 Panels
+## Standard v1.0.0 Report
 
-For a complete v0.7.0 report, use:
+The simple Seurat interface includes the standard report pages by default:
+
+```r
+sc_report(
+  object = seu,
+  markers = markers,
+  panels = "all"
+)
+```
+
+Advanced prepared-table workflows can select report panels explicitly:
 
 ```r
 panels = c(
@@ -623,50 +633,28 @@ Very large reports may generate a large HTML entry file and dependency directory
 - Seurat-first implementation
 - 2D UMAP only
 - No 3D visualization
-- Marker genes must be pre-computed
-- QC module expects common Seurat-style QC columns
+- Marker results are optional but must be computed upstream when supplied
+- QC defaults to common Seurat-style metrics but accepts additional numeric metadata columns
 - Variable Features visualization requires HVG / VariableFeatures-compatible data
 - Very large gene expression matrices can produce heavy HTML files
-- Highest Expressed Genes zoom interaction may require further refinement when rendered with custom boxplot shapes
 
 ---
 
 ## Roadmap
 
-After the v0.7.0 UI reconstruction, development will focus on real-data
-acceptance, implementation cleanup, performance, documentation, and API
-stabilization toward v1.0.0 rather than expanding into every downstream
-analysis type.
+Version 1.0.0 freezes the current Lite product scope. Maintenance releases will
+focus on bug fixes, browser compatibility, documentation, accessibility, and
+performance without changing the accepted report contract.
 
-### QC
+The following capabilities are intentionally deferred to later major versions:
 
-- Validate full-cell rendering and pre/post-filter state with real datasets
-- Refine threshold inspection and per-sample statistics
-- Continue large-dataset performance work without silent sampling
+- explicit preprocessing and provenance declarations
+- before/after batch-correction comparisons
+- interactive multi-resolution and clustree workflows
+- broader metadata customization and additional object adapters
 
-### Feature
-
-- Validate subview state isolation and full gene payloads
-- Refine FeatureScatter metric selection and linked statistics
-- Continue accessibility and browser-interaction acceptance testing
-
-### PCA
-
-- Validate Elbow, PC Score, and PCA pair views with real PCA payloads
-- Refine loading-table linkage and grouped score inspection
-- Verify `cluster_col`-backed cluster colouring across every applicable PCA view
-
-### UMAP
-
-- Validate cluster, sample, marker, and gene-mode state transitions
-- Revisit multi-resolution interaction and clustree acceptance in a later release
-- Continue scalable full-cell rendering and WebGL verification
-
-### Implementation cleanup
-
-- Reduce large-file maintenance cost without changing the accepted UI contract
-- Strengthen module boundaries, data-port contracts, and regression tests
-- Run complete R package checks before the unified v1.0.0 release
+Composition, differential-expression, enrichment, communication, trajectory,
+and spatial reporting remain separate projects in the scReport ecosystem.
 
 ### scReport ecosystem
 
@@ -685,6 +673,22 @@ scReportCore        → shared schemas, plugin protocol, and reusable UI compone
 ---
 
 ## Changelog
+
+### v1.0.0 - First stable release
+
+- Added `sc_report(object = ...)` as the simple Seurat-first interface.
+- Added `sc_report_data()` for advanced prepared-table workflows while retaining
+  compatibility with named legacy table arguments.
+- Formalized report-only behavior: scReportLite does not run normalization,
+  dimensional reduction, clustering, batch correction, marker discovery,
+  differential expression, or cell annotation.
+- Added deterministic UMAP/PCA selection, active-identity clustering, optional
+  sample mode, and explicit assay/layer expression provenance.
+- Added timestamped report bundles, overwrite protection, explained empty pages,
+  and Preview warnings.
+- Generalized QC to custom numeric metrics with explicit missing-value handling.
+- Finalized authorship, ORCID, licensing, privacy guidance, tests, and package
+  metadata for the stable release.
 
 ### v0.7.0 - Unified interactive workspace
 
@@ -817,10 +821,9 @@ Major changes:
 
 If you use scReportLite in research projects, please cite:
 
-The citation below refers to the latest archived Zenodo release (v0.5.0).
-The v0.6.0 and v0.7.0 milestones are not separate archived releases; the
-citation and archived artifact will be updated with the planned unified v1.0.0
-release.
+The citation below currently refers to the latest published Zenodo archive,
+v0.5.0. The software source is now at v1.0.0; this section will be updated with
+the v1.0.0 version DOI after the stable release is archived on Zenodo.
 
 > Park, K. K. (2026).  
 > scReportLite v0.5.0.
