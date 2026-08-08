@@ -1,8 +1,20 @@
 # scReportLite
 
-<h2 align="center"><strong>⚠️ 重要警告：当前报告生成流程存在反复转义问题，可能在短时间内占用极大的内存。制作者正在加班加点修缮，敬请谅解。</strong></h2>
+<h2 align="center"><strong>⚠️ 已知问题：</strong></h2>
 
-<h2 align="center"><strong>⚠️ IMPORTANT WARNING: The current report-generation workflow performs repeated escaping operations and may consume an extremely large amount of memory within a short period. The maintainer is working urgently on a fix. Thank you for your understanding.</strong></h2>
+<p align="center"><strong>
+当前版本的报告生成流程在部分情况下可能出现异常的内存占用增长。<br>
+当处理较大的单细胞数据集时，可能导致 R 会话占用大量内存甚至中断。<br><br>
+该问题正在修复中。建议在正式分析前保存数据并确保具有足够内存资源。
+</strong></p>
+
+<h2 align="center"><strong>⚠️ Known Issue:</strong></h2>
+
+<p align="center"><strong>
+The current report generation workflow may cause excessive memory usage in some cases.<br>
+Large single-cell datasets may lead to rapid memory consumption and potential R session failure.<br><br>
+This issue is under active investigation and will be fixed in a future update.
+</strong></p>
 
 <p align="center">
   <strong>A lightweight interactive HTML reporting layer for single-cell RNA-seq analysis results.</strong>
