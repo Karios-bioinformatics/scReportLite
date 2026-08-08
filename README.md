@@ -1,5 +1,9 @@
 # scReportLite
 
+<h2 align="center"><strong>⚠️ 重要警告：当前报告生成流程存在反复转义问题，可能在短时间内占用极大的内存。制作者正在加班加点修缮，敬请谅解。</strong></h2>
+
+<h2 align="center"><strong>⚠️ IMPORTANT WARNING: The current report-generation workflow performs repeated escaping operations and may consume an extremely large amount of memory within a short period. The maintainer is working urgently on a fix. Thank you for your understanding.</strong></h2>
+
 <p align="center">
   <strong>A lightweight interactive HTML reporting layer for single-cell RNA-seq analysis results.</strong>
 </p>
